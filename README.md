@@ -1,5 +1,160 @@
 # ShrimpMate Backend
 
+The backend for **ShrimpMate**, an IoT platform designed to automate and monitor shrimp farming ponds.
+
+ShrimpMate connects ESP32 devices, environmental sensors, and automatic feeders with a Web Dashboard for farm managers and a Mobile App for shrimp farmers.
+
+## Project Background
+
+Feed usually accounts for approximately 50% to 60% of total shrimp farming costs. Manual feeding and visual observation through feeding trays can lead to underfeeding, overfeeding, water pollution, disease outbreaks, and delayed detection of abnormal conditions.
+
+ShrimpMate is designed to:
+
+- Automate feeding schedules and enable remote device control.
+- Continuously monitor pH, temperature, dissolved oxygen (DO), and device status.
+- Store and analyze pond data over time.
+- Detect abnormal conditions and send timely alerts.
+- Apply AI to analyze feeding behavior, forecast feed demand, and estimate shrimp biomass.
+
+## Proposed Architecture
+
+```text
+ESP32 + Sensors + Feeder
+       |
+      MQTT
+       |
+       v
+ShrimpMate Backend (NestJS)
+  |          |          |
+PostgreSQL  Redis      AI Engine
+  |          |          |
+  +----------+----------+
+          |
+     Web Dashboard / Mobile App
+```
+
+### Main Components
+
+- **Edge devices:** ESP32, pH sensors, temperature sensors, DO sensors, and automatic feeders.
+- **MQTT:** Transports sensor data, device status, and control commands in real time.
+- **Backend:** NestJS and TypeScript, organized into business modules.
+- **PostgreSQL:** Stores users, ponds, devices, feeding schedules, telemetry, and alerts.
+- **Redis:** Provides caching and real-time device state management.
+- **AI Engine:** Supports feeding behavior recognition, feed demand forecasting, biomass estimation, and anomaly detection.
+- **User applications:** React Web Dashboard and React Native Mobile App.
+- **Notifications:** Firebase Cloud Messaging (FCM) for urgent mobile alerts.
+
+## Technology Stack
+
+- Node.js
+- NestJS 12
+- TypeScript
+- PostgreSQL
+- Redis
+- MQTT
+- React and React Native
+- Firebase Cloud Messaging
+- YOLO11n and MobileNetV3
+- LightGBM, LSTM, and XGBoost
+- Isolation Forest
+
+## Backend Structure
+
+```text
+src/
+|-- common/                 # Shared decorators, guards, filters, interceptors, and utilities
+|-- config/                 # Application and environment configuration
+|-- database/               # Database connection and migrations
+|-- mqtt/                   # MQTT connection, publishing, and subscriptions
+|-- modules/
+|   |-- ai-integration/     # AI Engine integration
+|   |-- alerts/             # Anomaly and safety alerts
+|   |-- devices/            # Device management and control
+|   |-- feeding/            # Feeding schedules and commands
+|   |-- notifications/      # FCM notification delivery
+|   |-- safety-rule/        # Safety rule validation before device control
+|   |-- telemetry/          # Sensor data and device status
+|-- app.module.ts
+|-- main.ts
+```
+
+## Current Status
+
+The project is currently in the **backend initialization phase**:
+
+- The NestJS application has been created and builds successfully.
+- The initial business module structure is in place.
+- MQTT, PostgreSQL, Redis, AI, FCM, and the main business workflows are not fully implemented yet.
+- Several controllers and services are still skeletons for future development.
+
+This README describes the target architecture and project goals. Components that do not yet have implementation code should not be considered complete.
+
+## Installation
+
+### Requirements
+
+- Node.js compatible with NestJS 12 and the project's TypeScript version.
+- npm.
+- PostgreSQL, Redis, and an MQTT broker when the corresponding modules are implemented.
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+## Running the Backend
+
+```bash
+# Development mode
+npm run start:dev
+
+# Standard mode
+npm run start
+
+# Build for production
+npm run build
+
+# Run the production build
+npm run start:prod
+```
+
+The server runs at `http://localhost:3000` by default. Set the `PORT` environment variable to use a different port.
+
+## Quality Checks
+
+```bash
+# Lint
+npm run lint
+
+# Unit tests
+npm run test
+
+# End-to-end tests
+npm run test:e2e
+
+# Test coverage
+npm run test:cov
+```
+
+## Development Roadmap
+
+1. Complete environment configuration and add a health check.
+2. Integrate PostgreSQL, migrations, and the data model.
+3. Integrate the MQTT broker and define topics and ESP32 payloads.
+4. Implement telemetry for pH, temperature, DO, and device status.
+5. Implement device management, feeding schedules, and feeder control.
+6. Implement the Safety Rule Engine to validate commands before they reach devices.
+7. Add Redis for real-time state management.
+8. Implement alerts and FCM notifications.
+9. Integrate the AI Engine and data analysis pipeline.
+10. Add authentication, authorization, unit tests, and integration tests.
+
+## Expected Outcome
+
+ShrimpMate aims to reduce feed waste and labor costs, enable remote pond monitoring, and detect risks that may affect water quality and shrimp health at an early stage.
+# ShrimpMate Backend
+
 Backend trung tam cho he thong **ShrimpMate**, mot nen tang IoT ho tro tu dong hoa va giam sat ao nuoi tom.
 
 ShrimpMate ket noi thiet bi ESP32, cam bien moi truong va may cho an voi Web Dashboard danh cho nha quan ly va Mobile App danh cho nguoi nuoi.
