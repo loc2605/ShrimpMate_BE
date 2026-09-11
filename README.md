@@ -1,424 +1,452 @@
 # ShrimpMate Backend
 
-The backend for **ShrimpMate**, an IoT platform designed to automate and monitor shrimp farming ponds.
+Backend service for **ShrimpMate**, an IoT-based platform for monitoring and automating shrimp farming ponds.
 
-ShrimpMate connects ESP32 devices, environmental sensors, and automatic feeders with a Web Dashboard for farm managers and a Mobile App for shrimp farmers.
+The backend connects ESP32 devices, environmental sensors, and automatic feeders with the Web Dashboard and Mobile App. It is responsible for device communication, telemetry processing, feeding control, data storage, safety validation, alerts, and AI service integration.
 
-## Project Background
+---
 
-Feed usually accounts for approximately 50% to 60% of total shrimp farming costs. Manual feeding and visual observation through feeding trays can lead to underfeeding, overfeeding, water pollution, disease outbreaks, and delayed detection of abnormal conditions.
+## 1. Project Overview
 
-ShrimpMate is designed to:
+Shrimp farming requires continuous monitoring of water quality and feeding activities. Manual feeding and periodic observation can result in overfeeding, feed waste, water pollution, and delayed detection of abnormal environmental conditions.
 
-- Automate feeding schedules and enable remote device control.
-- Continuously monitor pH, temperature, dissolved oxygen (DO), and device status.
-- Store and analyze pond data over time.
-- Detect abnormal conditions and send timely alerts.
-- Apply AI to analyze feeding behavior, forecast feed demand, and estimate shrimp biomass.
+ShrimpMate aims to provide a centralized platform that can:
 
-## Proposed Architecture
+* Monitor pond conditions continuously.
+* Automate feeding schedules.
+* Control automatic feeders remotely.
+* Collect and store sensor data.
+* Monitor device status in real time.
+* Detect abnormal environmental conditions.
+* Send alerts to shrimp farmers.
+* Integrate AI services for feeding analysis, forecasting, biomass estimation, and anomaly detection.
 
-```text
-ESP32 + Sensors + Feeder
-       |
-      MQTT
-       |
-       v
-ShrimpMate Backend (NestJS)
-  |          |          |
-PostgreSQL  Redis      AI Engine
-  |          |          |
-  +----------+----------+
-          |
-     Web Dashboard / Mobile App
-```
+---
 
-### Main Components
-
-- **Edge devices:** ESP32, pH sensors, temperature sensors, DO sensors, and automatic feeders.
-- **MQTT:** Transports sensor data, device status, and control commands in real time.
-- **Backend:** NestJS and TypeScript, organized into business modules.
-- **PostgreSQL:** Stores users, ponds, devices, feeding schedules, telemetry, and alerts.
-- **Redis:** Provides caching and real-time device state management.
-- **AI Engine:** Supports feeding behavior recognition, feed demand forecasting, biomass estimation, and anomaly detection.
-- **User applications:** React Web Dashboard and React Native Mobile App.
-- **Notifications:** Firebase Cloud Messaging (FCM) for urgent mobile alerts.
-
-## Technology Stack
-
-- Node.js
-- NestJS 12
-- TypeScript
-- PostgreSQL
-- Redis
-- MQTT
-- React and React Native
-- Firebase Cloud Messaging
-- YOLO11n and MobileNetV3
-- LightGBM, LSTM, and XGBoost
-- Isolation Forest
-
-## Backend Structure
+## 2. System Architecture
 
 ```text
-src/
-|-- common/                 # Shared decorators, guards, filters, interceptors, and utilities
-|-- config/                 # Application and environment configuration
-|-- database/               # Database connection and migrations
-|-- mqtt/                   # MQTT connection, publishing, and subscriptions
-|-- modules/
-|   |-- ai-integration/     # AI Engine integration
-|   |-- alerts/             # Anomaly and safety alerts
-|   |-- devices/            # Device management and control
-|   |-- feeding/            # Feeding schedules and commands
-|   |-- notifications/      # FCM notification delivery
-|   |-- safety-rule/        # Safety rule validation before device control
-|   |-- telemetry/          # Sensor data and device status
-|-- app.module.ts
-|-- main.ts
+                    +----------------------+
+                    |   ESP32 + Sensors    |
+                    |   + Automatic Feeder |
+                    +----------+-----------+
+                               |
+                              MQTT
+                               |
+                               v
+                    +----------------------+
+                    |  ShrimpMate Backend  |
+                    |       NestJS         |
+                    +----------+-----------+
+                               |
+          +--------------------+--------------------+
+          |                    |                    |
+          v                    v                    v
+    +-----------+        +-----------+        +-----------+
+    | PostgreSQL|        |   Redis   |        | AI Engine |
+    +-----------+        +-----------+        +-----------+
+          |                    |                    |
+          +--------------------+--------------------+
+                               |
+                 +-------------+-------------+
+                 |                           |
+                 v                           v
+        +----------------+          +----------------+
+        | Web Dashboard  |          |  Mobile App   |
+        |     React      |          | React Native  |
+        +----------------+          +----------------+
+                               |
+                               v
+                    +----------------------+
+                    | Firebase Cloud       |
+                    | Messaging (FCM)      |
+                    +----------------------+
 ```
 
-## Current Status
+---
 
-The project is currently in the **backend initialization phase**:
+## 3. Main Components
 
-- The NestJS application has been created and builds successfully.
-- The initial business module structure is in place.
-- MQTT, PostgreSQL, Redis, AI, FCM, and the main business workflows are not fully implemented yet.
-- Several controllers and services are still skeletons for future development.
+### Edge Devices
 
-This README describes the target architecture and project goals. Components that do not yet have implementation code should not be considered complete.
+The edge layer consists of:
 
-## Installation
+* ESP32 microcontrollers
+* pH sensors
+* Temperature sensors
+* Dissolved Oxygen (DO) sensors
+* Automatic feeding mechanisms
 
-### Requirements
+ESP32 devices collect sensor measurements and communicate with the backend through MQTT.
 
-- Node.js compatible with NestJS 12 and the project's TypeScript version.
-- npm.
-- PostgreSQL, Redis, and an MQTT broker when the corresponding modules are implemented.
+### Backend
 
-Install dependencies:
+The backend is built with **NestJS and TypeScript** and provides:
 
-```bash
-npm install
-```
+* REST APIs
+* MQTT communication
+* Device management
+* Telemetry processing
+* Feeding schedule management
+* Safety rule validation
+* Alert management
+* AI Engine integration
+* Notification delivery
 
-## Running the Backend
+### PostgreSQL
 
-```bash
-# Development mode
-npm run start:dev
+PostgreSQL is used as the main relational database for storing:
 
-# Standard mode
-npm run start
+* Users
+* Ponds
+* Devices
+* Feeding schedules
+* Feeding records
+* Sensor telemetry
+* Alerts
+* System configurations
 
-# Build for production
-npm run build
+### Redis
 
-# Run the production build
-npm run start:prod
-```
+Redis is planned for:
 
-The server runs at `http://localhost:3000` by default. Set the `PORT` environment variable to use a different port.
+* Real-time device state
+* Caching
+* Temporary data
+* Frequently accessed information
 
-## Quality Checks
+### AI Engine
 
-```bash
-# Lint
-npm run lint
+The backend can communicate with a separate AI Engine to support:
 
-# Unit tests
-npm run test
+* Feeding behavior recognition
+* Feed demand forecasting
+* Shrimp biomass estimation
+* Environmental anomaly detection
 
-# End-to-end tests
-npm run test:e2e
+### Client Applications
 
-# Test coverage
-npm run test:cov
-```
+ShrimpMate provides two user-facing applications:
 
-## Development Roadmap
+* **React Web Dashboard** for farm management and monitoring.
+* **React Native Mobile App** for shrimp farmers and mobile notifications.
 
-1. Complete environment configuration and add a health check.
-2. Integrate PostgreSQL, migrations, and the data model.
-3. Integrate the MQTT broker and define topics and ESP32 payloads.
-4. Implement telemetry for pH, temperature, DO, and device status.
-5. Implement device management, feeding schedules, and feeder control.
-6. Implement the Safety Rule Engine to validate commands before they reach devices.
-7. Add Redis for real-time state management.
-8. Implement alerts and FCM notifications.
-9. Integrate the AI Engine and data analysis pipeline.
-10. Add authentication, authorization, unit tests, and integration tests.
+### Notifications
 
-## Expected Outcome
+Firebase Cloud Messaging (FCM) is used to deliver important alerts to mobile devices.
 
-ShrimpMate aims to reduce feed waste and labor costs, enable remote pond monitoring, and detect risks that may affect water quality and shrimp health at an early stage.
-# ShrimpMate Backend
+---
 
-Backend trung tam cho he thong **ShrimpMate**, mot nen tang IoT ho tro tu dong hoa va giam sat ao nuoi tom.
+## 4. Technology Stack
 
-ShrimpMate ket noi thiet bi ESP32, cam bien moi truong va may cho an voi Web Dashboard danh cho nha quan ly va Mobile App danh cho nguoi nuoi.
+| Category                | Technology               |
+| ----------------------- | ------------------------ |
+| Runtime                 | Node.js                  |
+| Backend Framework       | NestJS 12                |
+| Language                | TypeScript               |
+| Database                | PostgreSQL               |
+| Cache / Real-time State | Redis                    |
+| IoT Communication       | MQTT                     |
+| Web Frontend            | React                    |
+| Mobile Frontend         | React Native             |
+| Notifications           | Firebase Cloud Messaging |
+| Computer Vision         | YOLO11n, MobileNetV3     |
+| Machine Learning        | LightGBM, XGBoost        |
+| Time-Series Forecasting | LSTM                     |
+| Anomaly Detection       | Isolation Forest         |
 
-## Boi canh de tai
+---
 
-Chi phi thuc an thuong chiem khoang 50% - 60% tong chi phi nuoi tom. Phuong phap cho an thu cong hoac chi quan sat qua nha an de dan den cho an thieu, cho an du, o nhiem nguon nuoc va kho phat hien su co som.
-
-ShrimpMate duoc xay dung de:
-
-- Tu dong hoa lich trinh cho an va dieu khien thiet bi tu xa.
-- Giam sat lien tuc pH, nhiet do, DO va trang thai thiet bi.
-- Luu tru, phan tich du lieu ao nuoi theo thoi gian.
-- Phat hien bat thuong va gui canh bao kip thoi.
-- Ho tro AI trong phan tich hanh vi bat moi, du bao thuc an va uoc tinh sinh khoi.
-
-## Kien truc du kien
-
-```text
-ESP32 + Sensors + Feeder
-       |
-      MQTT
-       |
-       v
-ShrimpMate Backend (NestJS)
-  |          |          |
-PostgreSQL  Redis      AI Engine
-  |          |          |
-  +----------+----------+
-          |
-     Web Dashboard / Mobile App
-```
-
-### Cac thanh phan chinh
-
-- **Thiet bi bien:** ESP32, cam bien pH, nhiet do, DO va co cau may cho an.
-- **MQTT:** Truyen du lieu cam bien, trang thai thiet bi va lenh dieu khien theo thoi gian thuc.
-- **Backend:** NestJS va TypeScript, to chuc theo cac module nghiep vu.
-- **PostgreSQL:** Luu thong tin nguoi dung, ao nuoi, thiet bi, lich cho an, telemetry va canh bao.
-- **Redis:** Cache va quan ly trang thai thiet bi theo thoi gian thuc.
-- **AI Engine:** Nhan dien hanh vi an, du bao nhu cau thuc an, uoc tinh sinh khoi va phat hien bat thuong.
-- **Ung dung nguoi dung:** React Web Dashboard va React Native Mobile App.
-- **Thong bao:** Firebase Cloud Messaging (FCM) cho canh bao khan cap tren dien thoai.
-
-## Cong nghe
-
-- Node.js
-- NestJS 12
-- TypeScript
-- PostgreSQL
-- Redis
-- MQTT
-- React va React Native
-- Firebase Cloud Messaging
-- YOLO11n, MobileNetV3
-- LightGBM, LSTM, XGBoost
-- Isolation Forest
-
-## Cau truc backend
+## 5. Backend Structure
 
 ```text
 src/
-├── common/                 # Decorator, guard, filter, interceptor va tien ich dung chung
-├── config/                 # Cau hinh ung dung va moi truong
-├── database/               # Ket noi database va migration
-├── mqtt/                   # Ket noi, publish va subscribe MQTT
+├── common/
+│   ├── decorators/
+│   ├── guards/
+│   ├── filters/
+│   ├── interceptors/
+│   └── utils/
+│
+├── config/
+│   └── configuration/
+│
+├── database/
+│   ├── migrations/
+│   └── database.module.ts
+│
+├── mqtt/
+│   ├── mqtt.module.ts
+│   ├── mqtt.service.ts
+│   └── mqtt.constants.ts
+│
 ├── modules/
-│   ├── ai-integration/     # Tich hop AI Engine
-│   ├── alerts/             # Canh bao bat thuong va canh bao an toan
-│   ├── devices/            # Quan ly va dieu khien thiet bi
-│   ├── feeding/            # Lich trinh va lenh cho an
-│   ├── notifications/      # Gui thong bao FCM
-│   ├── safety-rule/        # Kiem tra lenh theo luat an toan
-│   └── telemetry/          # Du lieu cam bien va trang thai thiet bi
+│   ├── ai-integration/
+│   ├── alerts/
+│   ├── devices/
+│   ├── feeding/
+│   ├── notifications/
+│   ├── safety-rule/
+│   └── telemetry/
+│
 ├── app.module.ts
 └── main.ts
 ```
 
-## Trang thai hien tai
+### Module Responsibilities
 
-Project dang o giai doan **khoi tao backend**:
+| Module           | Responsibility                                          |
+| ---------------- | ------------------------------------------------------- |
+| `ai-integration` | Communicates with the AI Engine                         |
+| `alerts`         | Handles abnormal conditions and safety alerts           |
+| `devices`        | Manages ESP32 devices and feeder control                |
+| `feeding`        | Manages feeding schedules and feeding commands          |
+| `notifications`  | Sends mobile notifications through FCM                  |
+| `safety-rule`    | Validates device commands before execution              |
+| `telemetry`      | Processes and stores sensor and device data             |
+| `mqtt`           | Handles MQTT connections, subscriptions, and publishing |
+| `database`       | Manages PostgreSQL connection and migrations            |
+| `common`         | Shared backend utilities and infrastructure             |
+| `config`         | Application and environment configuration               |
 
-- NestJS app da duoc tao va build thanh cong.
-- Cau truc module nghiep vu da duoc chuan bi.
-- MQTT, PostgreSQL, Redis, AI, FCM va cac nghiep vu chinh chua duoc trien khai day du.
-- Mot so controller/service hien van la skeleton de chuan bi cho cac buoc phat trien tiep theo.
+---
 
-README nay mo ta kien truc va muc tieu cua de tai; khong xem cac thanh phan chua co code la da hoan thien.
+## 6. Communication Flow
 
-## Cai dat
+### Sensor Data
 
-Yeu cau:
+```text
+Sensor
+   |
+   v
+ESP32
+   |
+   | MQTT
+   v
+MQTT Broker
+   |
+   v
+ShrimpMate Backend
+   |
+   +----> Validate data
+   |
+   +----> Store telemetry
+   |
+   +----> Update device state
+   |
+   +----> Check safety rules
+   |
+   +----> Trigger alert if necessary
+```
 
-- Node.js phien ban ho tro TypeScript va NestJS 12.
-- npm.
-- PostgreSQL, Redis va MQTT broker khi cac module tuong ung duoc trien khai.
+### Feeding Control
 
-Cai dat dependency:
+```text
+Web / Mobile App
+       |
+       v
+ShrimpMate Backend
+       |
+       v
+Safety Rule Engine
+       |
+       v
+MQTT Command
+       |
+       v
+ESP32 Feeder
+       |
+       v
+Feeding Operation
+```
+
+---
+
+## 7. Current Development Status
+
+The project is currently in the **backend initialization phase**.
+
+### Completed
+
+* NestJS application initialized.
+* TypeScript configuration established.
+* Initial backend module structure created.
+* Application successfully builds.
+
+### In Progress / Planned
+
+* Environment configuration
+* PostgreSQL integration
+* Database models and migrations
+* MQTT broker integration
+* ESP32 communication protocol
+* Sensor telemetry
+* Device management
+* Feeding schedules
+* Safety Rule Engine
+* Redis integration
+* Alert processing
+* FCM notifications
+* AI Engine integration
+* Authentication and authorization
+* Unit and integration testing
+
+> This README describes the target backend architecture. Features that have not been implemented yet should not be considered production-ready.
+
+---
+
+## 8. Installation
+
+### Requirements
+
+Make sure the following software is installed:
+
+* Node.js
+* npm
+* PostgreSQL
+* Redis
+* MQTT Broker
+
+PostgreSQL, Redis, and MQTT are required when their corresponding modules are enabled.
+
+### Install Dependencies
 
 ```bash
 npm install
 ```
 
-## Chay backend
+---
+
+## 9. Environment Configuration
+
+Create a `.env` file in the project root.
+
+Example:
+
+```env
+PORT=3000
+
+DATABASE_URL=postgresql://username:password@localhost:5432/shrimpmate
+
+REDIS_HOST=localhost
+REDIS_PORT=6379
+
+MQTT_BROKER_URL=mqtt://localhost:1883
+
+AI_ENGINE_URL=http://localhost:8000
+
+FIREBASE_PROJECT_ID=
+FIREBASE_CLIENT_EMAIL=
+FIREBASE_PRIVATE_KEY=
+```
+
+Do not commit sensitive credentials or private keys to the repository.
+
+---
+
+## 10. Running the Backend
+
+### Development
 
 ```bash
-# Moi truong phat trien
 npm run start:dev
+```
 
-# Chay thong thuong
+### Standard
+
+```bash
 npm run start
+```
 
-# Build production
+### Build
+
+```bash
 npm run build
+```
 
-# Chay ban da build
+### Production
+
+```bash
 npm run start:prod
 ```
 
-Mac dinh server chay tai `http://localhost:3000`. Co the thay doi port bang bien moi truong `PORT`.
+The backend runs on:
 
-## Kiem tra chat luong
+```text
+http://localhost:3000
+```
+
+The port can be changed through the `PORT` environment variable.
+
+---
+
+## 11. Quality Checks
+
+### Lint
 
 ```bash
-# Lint
 npm run lint
+```
 
-# Unit test
+### Unit Tests
+
+```bash
 npm run test
+```
 
-# E2E test
+### End-to-End Tests
+
+```bash
 npm run test:e2e
+```
 
-# Coverage
+### Test Coverage
+
+```bash
 npm run test:cov
 ```
 
-## Lo trinh phat trien
+---
 
-1. Hoan thien cau hinh moi truong va health check.
-2. Tich hop PostgreSQL, migration va mo hinh du lieu.
-3. Tich hop MQTT broker, topic va quy uoc payload cho ESP32.
-4. Xay dung telemetry cho pH, nhiet do, DO va trang thai thiet bi.
-5. Xay dung quan ly thiet bi, lich cho an va dieu khien may cho an.
-6. Xay dung Safety Rule Engine de kiem tra lenh truoc khi gui xuong thiet bi.
-7. Bo sung Redis de luu trang thai thoi gian thuc.
-8. Xay dung canh bao va tich hop FCM.
-9. Tich hop AI Engine va luong phan tich du lieu.
-10. Bo sung authentication, authorization, unit test va integration test.
+## 12. Development Roadmap
 
-## Muc tieu dau ra
+The backend will be developed in the following stages:
 
-ShrimpMate huong toi viec giup nguoi nuoi giam lang phi thuc an, giam nhan cong, theo doi ao nuoi tu xa va phat hien som cac rui ro anh huong den moi truong cung nhu suc khoe dan tom.
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+1. Configure environment variables and health checks.
+2. Integrate PostgreSQL and database migrations.
+3. Define the database model.
+4. Integrate MQTT communication.
+5. Define MQTT topics and ESP32 payload formats.
+6. Implement sensor telemetry.
+7. Implement device management.
+8. Implement feeding schedules and feeder control.
+9. Implement the Safety Rule Engine.
+10. Integrate Redis for real-time device state.
+11. Implement alerts and FCM notifications.
+12. Integrate the AI Engine.
+13. Implement authentication and authorization.
+14. Add unit, integration, and end-to-end tests.
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+---
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## 13. Expected Outcome
 
-## Description
+ShrimpMate is expected to provide a centralized backend platform that helps shrimp farmers:
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+* Reduce feed waste.
+* Reduce manual labor.
+* Monitor pond conditions remotely.
+* Control feeding equipment remotely.
+* Detect abnormal water-quality conditions earlier.
+* Receive timely alerts.
+* Use historical data and AI-based analysis to support farming decisions.
 
-## Project setup
+---
 
-```bash
-$ npm install
-```
+## 14. Project Status
 
-## Compile and run the project
+**Status:** Backend initialization
 
-```bash
-# development
-$ npm run start
+**Architecture:** NestJS + PostgreSQL + Redis + MQTT + AI Engine
 
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
-```
-
-## Run tests
-
-```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
-```
-
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Observability
-
-In production applications, observability is essential for understanding how your system behaves, detecting issues early, and maintaining reliable performance.
-
-[NestJS Observe](https://observe.nestjs.com) automatically instruments your NestJS application, giving you deep visibility into your system with minimal setup:
-
-- **Distributed tracing:** Follow requests across services and understand how they flow through your system.
-- **Waterfall analysis:** Visualize request execution and identify slow operations, bottlenecks, and unexpected delays.
-- **Performance analysis:** Analyze application performance in real time and quickly pinpoint areas that need optimization.
-- **Metrics:** Track key application and infrastructure metrics to understand system health and performance trends.
-- **Logging:** Centralize and correlate logs with traces and other telemetry to make debugging easier.
-- **Error tracking:** Detect errors quickly and investigate their root causes with the surrounding context.
-- **SLA monitoring:** Track service-level objectives and identify when your application is approaching or exceeding defined thresholds.
-- **Alarms and alerts:** Set up alerts for critical errors, performance degradation, SLA violations, and other anomalies so your team can react quickly.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Auto-instrument your application with [NestJS Observer](https://observer.nestjs.com). Distributed tracing, metrics, and logging made easy. Error tracking and performance monitoring for your NestJS applications.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+**Target:** IoT-based shrimp pond monitoring and automated feeding platform
