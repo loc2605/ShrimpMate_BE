@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { entities } from './entities';
 
 @Module({
   imports: [
@@ -10,7 +11,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
       useFactory: (configService: ConfigService) => ({
         type: 'postgres' as const,
         url: configService.getOrThrow<string>('database.url'),
-        autoLoadEntities: true,
+        entities,
+        migrations: [__dirname + '/migrations/*{.js,.ts}'],
         synchronize: false,
         migrationsRun: false,
       }),

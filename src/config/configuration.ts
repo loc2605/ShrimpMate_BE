@@ -16,4 +16,8 @@ export default () => ({
   ai: {
     engineUrl: process.env.AI_ENGINE_URL,
   },
+  auth: {
+    jwtSecret: process.env.JWT_SECRET,
+    jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '1d',
+  },
 });

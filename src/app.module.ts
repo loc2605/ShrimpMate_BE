@@ -18,6 +18,7 @@ import { TelemetryService } from './modules/telemetry/telemetry.service';
 import { MqttController } from './mqtt/mqtt.controller';
 import { MqttService } from './mqtt/mqtt.service';
 import { DatabaseModule } from './database/database.module';
+import { AuthModule } from './modules/auth/auth.module';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -37,6 +38,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
       }),
     }),
     DatabaseModule,
+    AuthModule,
     // Distributed tracing, auto-correlated logs, request/job metrics, error
     // telemetry, alarms, and more — out of the box. Sign up at https://observe.nestjs.com
     ObserveModule.forRoot({
