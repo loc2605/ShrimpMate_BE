@@ -24,7 +24,7 @@ export async function seedFarmPondData(dataSource: DataSource) {
       status: FarmStatus.ACTIVE,
     },
     {
-      name: 'Vườn Tôm Minh Phú',
+      name: 'Vườn Tôm Minh Phú',  
       address: 'Sóc Trăng, Việt Nam',
       status: FarmStatus.INACTIVE,
     },
