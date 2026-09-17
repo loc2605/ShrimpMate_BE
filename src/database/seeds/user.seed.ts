@@ -6,18 +6,21 @@ import { UserRole } from '../entities/enums';
 const defaultUsers = [
   {
     email: process.env.SEED_ADMIN_EMAIL ?? 'admin@shrimpmate.local',
+    phoneNumber: process.env.SEED_ADMIN_PHONE ?? '0901000001',
     password: process.env.SEED_ADMIN_PASSWORD ?? 'Admin@123456',
     fullName: 'ShrimpMate Admin',
     role: UserRole.ADMIN,
   },
   {
     email: process.env.SEED_MANAGER_EMAIL ?? 'manager@shrimpmate.local',
+    phoneNumber: process.env.SEED_MANAGER_PHONE ?? '0901000002',
     password: process.env.SEED_MANAGER_PASSWORD ?? 'Manager@123456',
     fullName: 'ShrimpMate Manager',
     role: UserRole.MANAGER,
   },
   {
     email: process.env.SEED_OPERATOR_EMAIL ?? 'operator@shrimpmate.local',
+    phoneNumber: process.env.SEED_OPERATOR_PHONE ?? '0901000003',
     password: process.env.SEED_OPERATOR_PASSWORD ?? 'Operator@123456',
     fullName: 'ShrimpMate Operator',
     role: UserRole.OPERATOR,
@@ -42,6 +45,10 @@ export async function seedUserData(dataSource: DataSource) {
     const existingUser = await userRepository.findOne({ where: { email } });
 
     if (existingUser) {
+      if (!existingUser.phoneNumber) {
+        existingUser.phoneNumber = seedUser.phoneNumber;
+        await userRepository.save(existingUser);
+      }
       continue;
     }
 
@@ -50,6 +57,7 @@ export async function seedUserData(dataSource: DataSource) {
       await userRepository.save(
         userRepository.create({
           email,
+          phoneNumber: seedUser.phoneNumber,
           passwordHash,
           fullName: seedUser.fullName,
           role: seedUser.role,

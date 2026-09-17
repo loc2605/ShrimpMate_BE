@@ -20,12 +20,14 @@ import { UpdateUserRoleDto } from './dto/update-user-role.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { OtpDeliveryService } from './otp-delivery.service';
+import { isEmailIdentifier, normalizePhoneNumber } from '../../common/utils/phone.util';
 
 type SafeUser = Omit<User, 'passwordHash' | 'refreshTokenHash'>;
 
 const PASSWORD_RESET_SUCCESS_MESSAGE =
-  'Nếu email tồn tại trong hệ thống, mã OTP đã được gửi. Vui lòng kiểm tra hộp thư hoặc liên hệ quản trị viên.';
+  'Nếu tài khoản tồn tại trong hệ thống, mã OTP đã được gửi. Vui lòng kiểm tra email/SMS hoặc liên hệ quản trị viên.';
 const INVALID_OTP_MESSAGE = 'Mã OTP không hợp lệ hoặc đã hết hạn';
+const INVALID_CREDENTIALS_MESSAGE = 'Email/số điện thoại hoặc mật khẩu không đúng';
 
 @Injectable()
 export class AuthService {
@@ -41,15 +43,14 @@ export class AuthService {
 
   async register(registerDto: RegisterDto) {
     const email = registerDto.email.trim().toLowerCase();
-    const existingUser = await this.userRepository.findOne({ where: { email } });
-
-    if (existingUser) {
-      throw new ConflictException('Email đã được sử dụng');
-    }
+    const phoneNumber = normalizePhoneNumber(registerDto.phoneNumber);
+    await this.ensureUniqueEmail(email);
+    await this.ensureUniquePhoneNumber(phoneNumber);
 
     const passwordHash = await bcrypt.hash(registerDto.password, 12);
     const user = this.userRepository.create({
       email,
+      phoneNumber,
       passwordHash,
       fullName: registerDto.fullName.trim(),
       role: UserRole.OPERATOR,
@@ -62,12 +63,13 @@ export class AuthService {
 
   async adminCreateUser(dto: AdminCreateUserDto) {
     const email = dto.email.trim().toLowerCase();
-    const existingUser = await this.userRepository.findOne({ where: { email } });
-    if (existingUser) {
-      throw new ConflictException('Email đã được sử dụng');
-    }
+    const phoneNumber = normalizePhoneNumber(dto.phoneNumber);
+    await this.ensureUniqueEmail(email);
+    await this.ensureUniquePhoneNumber(phoneNumber);
+
     const user = this.userRepository.create({
       email,
+      phoneNumber,
       passwordHash: await bcrypt.hash(dto.password, 12),
       fullName: dto.fullName.trim(),
       role: dto.role,
@@ -78,11 +80,10 @@ export class AuthService {
   }
 
   async login(loginDto: LoginDto) {
-    const email = loginDto.email.trim().toLowerCase();
-    const user = await this.userRepository.findOne({ where: { email } });
+    const user = await this.findUserByIdentifier(loginDto.identifier);
 
     if (!user || !user.isActive || !(await bcrypt.compare(loginDto.password, user.passwordHash))) {
-      throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
+      throw new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE);
     }
 
     return this.createAuthResponse(user);
@@ -111,49 +112,22 @@ export class AuthService {
   }
 
   async forgotPassword(dto: ForgotPasswordDto) {
-    const email = dto.email.trim().toLowerCase();
-    const user = await this.userRepository.findOne({ where: { email } });
+    const user = await this.findUserByIdentifier(dto.identifier);
 
     if (!user?.isActive) {
       return { message: PASSWORD_RESET_SUCCESS_MESSAGE };
     }
 
-    const cooldownSeconds = this.configService.get<number>('auth.passwordReset.otpRequestCooldownSeconds', 60);
-    const latestOtp = await this.passwordResetOtpRepository.findOne({
-      where: { userId: user.id },
-      order: { createdAt: 'DESC' },
-    });
-    if (latestOtp) {
-      const cooldownEndsAt = latestOtp.createdAt.getTime() + cooldownSeconds * 1000;
-      if (Date.now() < cooldownEndsAt) {
-        return { message: PASSWORD_RESET_SUCCESS_MESSAGE };
-      }
+    const issued = await this.issuePasswordResetOtp(user, dto.identifier);
+    if (!issued) {
+      return { message: PASSWORD_RESET_SUCCESS_MESSAGE };
     }
 
-    const otp = randomInt(0, 1_000_000).toString().padStart(6, '0');
-    const expiresInMinutes = this.configService.get<number>('auth.passwordReset.otpExpiresInMinutes', 5);
-    const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000);
-
-    await this.passwordResetOtpRepository.update(
-      { userId: user.id, usedAt: IsNull() },
-      { usedAt: new Date() },
-    );
-
-    await this.passwordResetOtpRepository.save(
-      this.passwordResetOtpRepository.create({
-        userId: user.id,
-        otpHash: await bcrypt.hash(otp, 10),
-        expiresAt,
-      }),
-    );
-
-    await this.otpDeliveryService.sendPasswordResetOtp(email, otp);
     return { message: PASSWORD_RESET_SUCCESS_MESSAGE };
   }
 
   async resetPassword(dto: ResetPasswordDto) {
-    const email = dto.email.trim().toLowerCase();
-    const user = await this.userRepository.findOne({ where: { email } });
+    const user = await this.findUserByIdentifier(dto.identifier);
 
     if (!user?.isActive) {
       throw new BadRequestException(INVALID_OTP_MESSAGE);
@@ -280,6 +254,60 @@ export class AuthService {
       throw new NotFoundException(`Không tìm thấy tài khoản với id ${id}`);
     }
     return user;
+  }
+
+  private async findUserByIdentifier(identifier: string) {
+    const trimmed = identifier.trim();
+    if (isEmailIdentifier(trimmed)) {
+      return this.userRepository.findOne({ where: { email: trimmed.toLowerCase() } });
+    }
+    return this.userRepository.findOne({ where: { phoneNumber: normalizePhoneNumber(trimmed) } });
+  }
+
+  private async ensureUniqueEmail(email: string) {
+    if (await this.userRepository.findOne({ where: { email } })) {
+      throw new ConflictException('Email đã được sử dụng');
+    }
+  }
+
+  private async ensureUniquePhoneNumber(phoneNumber: string) {
+    if (await this.userRepository.findOne({ where: { phoneNumber } })) {
+      throw new ConflictException('Số điện thoại đã được sử dụng');
+    }
+  }
+
+  private async issuePasswordResetOtp(user: User, identifier: string) {
+    const cooldownSeconds = this.configService.get<number>('auth.passwordReset.otpRequestCooldownSeconds', 60);
+    const latestOtp = await this.passwordResetOtpRepository.findOne({
+      where: { userId: user.id },
+      order: { createdAt: 'DESC' },
+    });
+    if (latestOtp) {
+      const cooldownEndsAt = latestOtp.createdAt.getTime() + cooldownSeconds * 1000;
+      if (Date.now() < cooldownEndsAt) {
+        return false;
+      }
+    }
+
+    const otp = randomInt(0, 1_000_000).toString().padStart(6, '0');
+    const expiresInMinutes = this.configService.get<number>('auth.passwordReset.otpExpiresInMinutes', 5);
+    const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000);
+
+    await this.passwordResetOtpRepository.update(
+      { userId: user.id, usedAt: IsNull() },
+      { usedAt: new Date() },
+    );
+
+    await this.passwordResetOtpRepository.save(
+      this.passwordResetOtpRepository.create({
+        userId: user.id,
+        otpHash: await bcrypt.hash(otp, 10),
+        expiresAt,
+      }),
+    );
+
+    await this.otpDeliveryService.sendPasswordResetOtp(identifier, otp);
+    return true;
   }
 
   private toSafeUser(user: User): SafeUser {

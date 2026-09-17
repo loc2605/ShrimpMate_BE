@@ -1,9 +1,9 @@
-import { IsEmail, IsString, Length, Matches, MaxLength } from 'class-validator';
+import { IsString, Length, Matches } from 'class-validator';
 
 export class ResetPasswordDto {
-  @IsEmail()
-  @MaxLength(255)
-  email!: string;
+  @IsString()
+  @Length(3, 255)
+  identifier!: string;
 
   @IsString()
   @Length(6, 6, { message: 'Mã OTP phải gồm 6 chữ số' })

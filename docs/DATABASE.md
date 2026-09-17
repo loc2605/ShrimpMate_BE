@@ -28,6 +28,7 @@ Lưu tài khoản đăng nhập.
 |---|---|---|
 | `id` | UUID | PK |
 | `email` | VARCHAR(255) | Unique, bắt buộc |
+| `phone_number` | VARCHAR(20) | Unique, có thể rỗng với tài khoản cũ; bắt buộc khi đăng ký mới |
 | `password_hash` | VARCHAR(255) | Mật khẩu đã mã hóa |
 | `refresh_token_hash` | VARCHAR(255) | Có thể rỗng, hash refresh token hiện tại |
 | `full_name` | VARCHAR(150) | Bắt buộc |
@@ -287,6 +288,7 @@ erDiagram
     USERS {
         uuid id PK
         varchar email UK
+        varchar phone_number UK
         varchar password_hash
         varchar refresh_token_hash
         varchar full_name

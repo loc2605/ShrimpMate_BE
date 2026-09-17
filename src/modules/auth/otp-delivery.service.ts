@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import nodemailer, { type Transporter } from 'nodemailer';
+import { isEmailIdentifier, normalizePhoneNumber } from '../../common/utils/phone.util';
 
 @Injectable()
 export class OtpDeliveryService {
@@ -27,12 +28,21 @@ export class OtpDeliveryService {
     });
   }
 
-  async sendPasswordResetOtp(email: string, otp: string) {
+  async sendPasswordResetOtp(identifier: string, otp: string) {
+    if (isEmailIdentifier(identifier)) {
+      await this.sendViaEmail(identifier.trim().toLowerCase(), otp);
+      return;
+    }
+
+    await this.sendViaPhone(normalizePhoneNumber(identifier), otp);
+  }
+
+  private async sendViaEmail(email: string, otp: string) {
     const nodeEnv = this.configService.get<string>('app.nodeEnv', 'development');
     const expiresInMinutes = this.configService.get<number>('auth.passwordReset.otpExpiresInMinutes', 5);
 
     if (nodeEnv !== 'production') {
-      this.logger.log(`[DEV] Mã OTP đặt lại mật khẩu cho ${email}: ${otp}`);
+      this.logger.log(`[DEV] Mã OTP đặt lại mật khẩu (email) cho ${email}: ${otp}`);
     }
 
     if (!this.transporter) {
@@ -70,5 +80,21 @@ export class OtpDeliveryService {
     } catch (error) {
       this.logger.error(`Failed to send password reset OTP to ${email}`, error instanceof Error ? error.stack : error);
     }
+  }
+
+  private async sendViaPhone(phoneNumber: string, otp: string) {
+    const nodeEnv = this.configService.get<string>('app.nodeEnv', 'development');
+    const expiresInMinutes = this.configService.get<number>('auth.passwordReset.otpExpiresInMinutes', 5);
+
+    if (nodeEnv !== 'production') {
+      this.logger.log(
+        `[DEV] Mã OTP đặt lại mật khẩu (SMS) cho ${phoneNumber}: ${otp} (hiệu lực ${expiresInMinutes} phút)`,
+      );
+      return;
+    }
+
+    this.logger.warn(
+      `Password reset OTP requested for ${phoneNumber} but SMS gateway is not configured. Integrate SMS provider for production.`,
+    );
   }
 }

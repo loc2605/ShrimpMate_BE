@@ -9,6 +9,9 @@ export class User {
   @Column({ unique: true, length: 255 })
   email!: string;
 
+  @Column({ name: 'phone_number', length: 20, nullable: true })
+  phoneNumber!: string | null;
+
   @Column({ name: 'password_hash', length: 255 })
   passwordHash!: string;
 

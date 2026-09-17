@@ -1,7 +1,7 @@
-import { IsEmail, MaxLength } from 'class-validator';
+import { IsString, Length } from 'class-validator';
 
 export class ForgotPasswordDto {
-  @IsEmail()
-  @MaxLength(255)
-  email!: string;
+  @IsString()
+  @Length(3, 255)
+  identifier!: string;
 }

@@ -79,6 +79,7 @@ Body:
 ```json
 {
   "email": "operator@example.com",
+  "phoneNumber": "0901234567",
   "password": "password123",
   "fullName": "Nguyen Van Operator"
 }
@@ -86,17 +87,21 @@ Body:
 
 Quyen: khong can dang nhap.
 
-Ghi chu: tai khoan dang ky moi mac dinh co role `operator`.
+Ghi chu:
+
+- Tai khoan dang ky moi mac dinh co role `operator`.
+- `phoneNumber` bat buoc, dinh dang so dien thoai Viet Nam (10 chu so, bat dau bang `0`, vi du `0901234567`). He thong tu chuan hoa dang `+84...` hoac `84...` ve dang `0xxxxxxxxx`.
+- `email` va `phoneNumber` deu phai unique; trung se tra ve `409 Conflict`.
 
 Tai khoan mau cho moi truong local duoc tao tu dong khi backend khoi dong:
 
-| Role | Email | Mat khau |
-| --- | --- | --- |
-| `admin` | `admin@shrimpmate.local` | `Admin@123456` |
-| `manager` | `manager@shrimpmate.local` | `Manager@123456` |
-| `operator` | `operator@shrimpmate.local` | `Operator@123456` |
+| Role | Email | So dien thoai | Mat khau |
+| --- | --- | --- | --- |
+| `admin` | `admin@shrimpmate.local` | `0901000001` | `Admin@123456` |
+| `manager` | `manager@shrimpmate.local` | `0901000002` | `Manager@123456` |
+| `operator` | `operator@shrimpmate.local` | `0901000003` | `Operator@123456` |
 
-Co the thay doi cac tai khoan mau bang cac bien moi truong `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, `SEED_MANAGER_EMAIL`, `SEED_MANAGER_PASSWORD`, `SEED_OPERATOR_EMAIL` va `SEED_OPERATOR_PASSWORD`.
+Co the thay doi cac tai khoan mau bang cac bien moi truong `SEED_*_EMAIL`, `SEED_*_PHONE`, `SEED_*_PASSWORD`.
 
 ### Dang nhap
 
@@ -108,12 +113,23 @@ Body:
 
 ```json
 {
-  "email": "operator@example.com",
+  "identifier": "operator@example.com",
+  "password": "password123"
+}
+```
+
+Hoac dang nhap bang so dien thoai:
+
+```json
+{
+  "identifier": "0901234567",
   "password": "password123"
 }
 ```
 
 Quyen: khong can dang nhap.
+
+`identifier` nhan **email** hoac **so dien thoai** da dang ky. Sai thong tin dang nhap tra ve `401 Unauthorized` voi message `Email/số điện thoại hoặc mật khẩu không đúng`.
 
 Response gom `accessToken` va thong tin user an toan, khong bao gom `passwordHash`:
 
@@ -124,6 +140,7 @@ Response gom `accessToken` va thong tin user an toan, khong bao gom `passwordHas
   "user": {
     "id": "uuid",
     "email": "operator@example.com",
+    "phoneNumber": "0901234567",
     "fullName": "Nguyen Van Operator",
     "role": "operator",
     "isActive": true,
@@ -159,29 +176,38 @@ POST /auth/forgot-password
 
 Quyen: khong can dang nhap.
 
-Body:
+Body (email):
 
 ```json
 {
-  "email": "operator@example.com"
+  "identifier": "operator@example.com"
 }
 ```
 
-Response luon tra ve cung mot thong bao, ke ca khi email khong ton tai hoac tai khoan bi khoa (tranh lo thong tin tai khoan):
+Body (so dien thoai):
 
 ```json
 {
-  "message": "Nếu email tồn tại trong hệ thống, mã OTP đã được gửi. Vui lòng kiểm tra hộp thư hoặc liên hệ quản trị viên."
+  "identifier": "0901234567"
+}
+```
+
+Response luon tra ve cung mot thong bao, ke ca khi tai khoan khong ton tai hoac bi khoa (tranh lo thong tin):
+
+```json
+{
+  "message": "Nếu tài khoản tồn tại trong hệ thống, mã OTP đã được gửi. Vui lòng kiểm tra email/SMS hoặc liên hệ quản trị viên."
 }
 ```
 
 Ghi chu van hanh:
 
+- `identifier` nhan email hoac so dien thoai da dang ky (cung quy tac voi dang nhap).
 - OTP gom 6 chu so, mac dinh het han sau `OTP_EXPIRES_IN_MINUTES` (mac dinh 5 phut).
-- Moi email chi co the yeu cau OTP moi sau `OTP_REQUEST_COOLDOWN_SECONDS` (mac dinh 60 giay).
-- Neu cau hinh SMTP (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, tuy chon `SMTP_FROM`), he thong gui OTP qua email.
-- Trong moi truong `development`/`test`, ma OTP van duoc in ra server log de test song song voi email (neu SMTP duoc bat).
-- Neu khong cau hinh SMTP, dev/test chi in log; production se ghi canh bao tren server.
+- Moi tai khoan chi co the yeu cau OTP moi sau `OTP_REQUEST_COOLDOWN_SECONDS` (mac dinh 60 giay).
+- Neu `identifier` la email va SMTP duoc cau hinh (`SMTP_HOST`, ...), he thong gui OTP qua email.
+- Neu `identifier` la so dien thoai, OTP duoc gui qua SMS (production can tich hop SMS gateway; dev/test in ra server log).
+- Trong moi truong `development`/`test`, ma OTP luon duoc in ra server log de test.
 - Yeu cau OTP moi se vo hieu hoa cac OTP chua dung truoc do cua cung user.
 
 ### Dat lai mat khau bang OTP
@@ -196,11 +222,23 @@ Body:
 
 ```json
 {
-  "email": "operator@example.com",
+  "identifier": "operator@example.com",
   "otp": "123456",
   "newPassword": "password-moi-123"
 }
 ```
+
+Hoac dung so dien thoai (cung tai khoan):
+
+```json
+{
+  "identifier": "0901234567",
+  "otp": "123456",
+  "newPassword": "password-moi-123"
+}
+```
+
+`identifier` co the la email hoac so dien thoai cua tai khoan; OTP gan voi user, khong bat buoc trung kenh voi lan yeu cau OTP.
 
 Thanh cong:
 
@@ -265,7 +303,7 @@ POST /auth/users
 
 Quyen: `admin`.
 
-Body: `{ "email": "manager2@example.com", "password": "Manager@123456", "fullName": "Manager Moi", "role": "manager" }`.
+Body: `{ "email": "manager2@example.com", "phoneNumber": "0901234568", "password": "Manager@123456", "fullName": "Manager Moi", "role": "manager" }`.
 
 Gia tri `role`: `admin`, `manager`, `operator`. Dang ky cong khai qua `POST /auth/register` van mac dinh tao `operator`.
 
@@ -285,6 +323,7 @@ Response tra ve thong tin user an toan (khong bao gom `passwordHash`, `refreshTo
 {
   "id": "uuid",
   "email": "manager2@example.com",
+  "phoneNumber": "0901234568",
   "fullName": "Manager Moi",
   "role": "manager",
   "isActive": true,
