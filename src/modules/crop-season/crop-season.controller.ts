@@ -6,6 +6,8 @@ import { UserRole } from '../../database/entities/enums';
 import { CreateCropSeasonDto } from './dto/create-crop-season.dto';
 import { UpdateCropSeasonDto } from './dto/update-crop-season.dto';
 import { CropSeasonService } from './crop-season.service';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { User } from '../../database/entities/user.entity';
 
 @Controller()
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -14,31 +16,31 @@ export class CropSeasonController {
 
   @Get('ponds/:pondId/crop-seasons')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR)
-  findAllByPond(@Param('pondId') pondId: string) {
-    return this.cropSeasonService.findAllByPond(pondId);
+  findAllByPond(@Param('pondId') pondId: string, @CurrentUser() user: User) {
+    return this.cropSeasonService.findAllByPond(pondId, user);
   }
 
   @Post('ponds/:pondId/crop-seasons')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  create(@Param('pondId') pondId: string, @Body() createDto: CreateCropSeasonDto) {
-    return this.cropSeasonService.create(pondId, createDto);
+  create(@Param('pondId') pondId: string, @Body() createDto: CreateCropSeasonDto, @CurrentUser() user: User) {
+    return this.cropSeasonService.create(pondId, createDto, user);
   }
 
   @Get('crop-seasons/:id')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR)
-  findOne(@Param('id') id: string) {
-    return this.cropSeasonService.findOne(id);
+  findOne(@Param('id') id: string, @CurrentUser() user: User) {
+    return this.cropSeasonService.findOne(id, user);
   }
 
   @Patch('crop-seasons/:id')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  update(@Param('id') id: string, @Body() updateDto: UpdateCropSeasonDto) {
-    return this.cropSeasonService.update(id, updateDto);
+  update(@Param('id') id: string, @Body() updateDto: UpdateCropSeasonDto, @CurrentUser() user: User) {
+    return this.cropSeasonService.update(id, updateDto, user);
   }
 
   @Delete('crop-seasons/:id')
   @Roles(UserRole.ADMIN)
-  remove(@Param('id') id: string) {
-    return this.cropSeasonService.remove(id);
+  remove(@Param('id') id: string, @CurrentUser() user: User) {
+    return this.cropSeasonService.remove(id, user);
   }
 }

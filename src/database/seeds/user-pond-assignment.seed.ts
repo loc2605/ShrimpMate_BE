@@ -8,15 +8,17 @@ export async function seedUserPondAssignments(dataSource: DataSource) {
   const userRepository = dataSource.getRepository(User);
   const pondRepository = dataSource.getRepository(Pond);
   const assignmentRepository = dataSource.getRepository(UserPondAssignment);
-  const operator = await userRepository.findOne({ where: { role: UserRole.OPERATOR } });
+  const users = await userRepository.find({ where: [{ role: UserRole.OPERATOR }, { role: UserRole.MANAGER }] });
   const ponds = await pondRepository.find({ order: { code: 'ASC' }, take: 2 });
 
-  if (!operator || ponds.length === 0) return;
+  if (users.length === 0 || ponds.length === 0) return;
 
-  for (const pond of ponds) {
-    const existing = await assignmentRepository.findOne({ where: { userId: operator.id, pondId: pond.id } });
-    if (!existing) {
-      await assignmentRepository.save(assignmentRepository.create({ userId: operator.id, pondId: pond.id }));
+  for (const user of users) {
+    for (const pond of ponds) {
+      const existing = await assignmentRepository.findOne({ where: { userId: user.id, pondId: pond.id } });
+      if (!existing) {
+        await assignmentRepository.save(assignmentRepository.create({ userId: user.id, pondId: pond.id }));
+      }
     }
   }
 }

@@ -6,9 +6,10 @@ import { CropSeason } from '../../database/entities/crop-season.entity';
 import { Pond } from '../../database/entities/pond.entity';
 import { CropSeasonController } from './crop-season.controller';
 import { CropSeasonService } from './crop-season.service';
+import { PondAccessModule } from '../../common/guards/pond-access.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([CropSeason, Pond]), PassportModule, AuthModule],
+  imports: [TypeOrmModule.forFeature([CropSeason, Pond]), PassportModule, AuthModule, PondAccessModule],
   controllers: [CropSeasonController],
   providers: [CropSeasonService],
   exports: [CropSeasonService],

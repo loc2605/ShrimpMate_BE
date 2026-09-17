@@ -24,20 +24,20 @@ export class FeedingController {
 
 	@Post('ponds/:pondId/feeding-schedules')
 	@Roles(UserRole.ADMIN, UserRole.MANAGER)
-	createSchedule(@Param('pondId') pondId: string, @Body() dto: CreateFeedingScheduleDto) {
-		return this.feedingService.createSchedule(pondId, dto);
+	createSchedule(@Param('pondId') pondId: string, @Body() dto: CreateFeedingScheduleDto, @CurrentUser() user: User) {
+		return this.feedingService.createSchedule(pondId, dto, user);
 	}
 
 	@Patch('feeding-schedules/:id')
 	@Roles(UserRole.ADMIN, UserRole.MANAGER)
-	updateSchedule(@Param('id') id: string, @Body() dto: UpdateFeedingScheduleDto) {
-		return this.feedingService.updateSchedule(id, dto);
+	updateSchedule(@Param('id') id: string, @Body() dto: UpdateFeedingScheduleDto, @CurrentUser() user: User) {
+		return this.feedingService.updateSchedule(id, dto, user);
 	}
 
 	@Delete('feeding-schedules/:id')
 	@Roles(UserRole.ADMIN)
-	removeSchedule(@Param('id') id: string) {
-		return this.feedingService.removeSchedule(id);
+	removeSchedule(@Param('id') id: string, @CurrentUser() user: User) {
+		return this.feedingService.removeSchedule(id, user);
 	}
 
 	@Get('ponds/:pondId/feeding-records')
@@ -48,13 +48,13 @@ export class FeedingController {
 
 	@Post('ponds/:pondId/feeding-records')
 	@Roles(UserRole.ADMIN, UserRole.MANAGER)
-	createRecord(@Param('pondId') pondId: string, @Body() dto: CreateFeedingRecordDto) {
-		return this.feedingService.createRecord(pondId, dto);
+	createRecord(@Param('pondId') pondId: string, @Body() dto: CreateFeedingRecordDto, @CurrentUser() user: User) {
+		return this.feedingService.createRecord(pondId, dto, user);
 	}
 
 	@Patch('feeding-records/:id')
 	@Roles(UserRole.ADMIN, UserRole.MANAGER)
-	updateRecord(@Param('id') id: string, @Body() dto: UpdateFeedingRecordDto) {
-		return this.feedingService.updateRecord(id, dto);
+	updateRecord(@Param('id') id: string, @Body() dto: UpdateFeedingRecordDto, @CurrentUser() user: User) {
+		return this.feedingService.updateRecord(id, dto, user);
 	}
 }

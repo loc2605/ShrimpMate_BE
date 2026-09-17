@@ -11,6 +11,8 @@ import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import { AssignPondDto } from './dto/assign-pond.dto';
+import { AdminCreateUserDto } from './dto/admin-create-user.dto';
+import { UpdateUserRoleDto } from './dto/update-user-role.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -53,6 +55,13 @@ export class AuthController {
     return this.authService.findAllUsers();
   }
 
+  @Post('users')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  adminCreateUser(@Body() dto: AdminCreateUserDto) {
+    return this.authService.adminCreateUser(dto);
+  }
+
   @Patch('users/:id/status')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
@@ -62,6 +71,17 @@ export class AuthController {
     @CurrentUser() currentUser: User,
   ) {
     return this.authService.updateUserStatus(id, dto, currentUser.id);
+  }
+
+  @Patch('users/:id/role')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  updateUserRole(
+    @Param('id') id: string,
+    @Body() dto: UpdateUserRoleDto,
+    @CurrentUser() currentUser: User,
+  ) {
+    return this.authService.updateUserRole(id, dto, currentUser.id);
   }
 
   @Post('users/:userId/ponds')

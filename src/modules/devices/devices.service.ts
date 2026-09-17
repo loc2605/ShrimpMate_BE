@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -7,7 +8,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { QueryFailedError, Repository } from 'typeorm';
 import { Device } from '../../database/entities/device.entity';
 import { Pond } from '../../database/entities/pond.entity';
-import { DeviceMode } from '../../database/entities/enums';
+import { DeviceMode, UserRole } from '../../database/entities/enums';
 import { CreateDeviceDto } from './dto/create-device.dto';
 import { UpdateDeviceDto } from './dto/update-device.dto';
 import { User } from '../../database/entities/user.entity';
@@ -23,7 +24,7 @@ export class DevicesService {
     private readonly pondAccessService: PondAccessService,
   ) {}
 
-  async createDevice(createDeviceDto: CreateDeviceDto) {
+  async createDevice(createDeviceDto: CreateDeviceDto, user?: User) {
     const normalizedUid = createDeviceDto.deviceUid.trim();
     const existingDevice = await this.deviceRepository.findOne({
       where: { deviceUid: normalizedUid },
@@ -34,8 +35,12 @@ export class DevicesService {
     }
 
     const pondId = createDeviceDto.pondId ?? null;
+    if (user && [UserRole.MANAGER, UserRole.OPERATOR].includes(user.role) && !pondId) {
+      throw new BadRequestException('Manager/operator phải gán Device vào Pond được phân công');
+    }
     if (pondId) {
       await this.ensurePondExists(pondId);
+      if (user) await this.pondAccessService.ensureCanAccess(user, pondId);
     }
 
     const device = this.deviceRepository.create({
@@ -77,7 +82,10 @@ export class DevicesService {
     if (!device) {
       throw new NotFoundException(`Không tìm thấy thiết bị với id ${id}`);
     }
-    if (user && device.pondId) {
+    if (user && [UserRole.MANAGER, UserRole.OPERATOR].includes(user.role)) {
+      if (!device.pondId) {
+        throw new ForbiddenException('Bạn không có quyền truy cập Device chưa được gán Pond');
+      }
       await this.pondAccessService.ensureCanAccess(user, device.pondId);
     }
 
@@ -122,8 +130,8 @@ export class DevicesService {
     }
   }
 
-  async removeDevice(id: string) {
-    const device = await this.findDeviceById(id);
+  async removeDevice(id: string, user?: User) {
+    const device = await this.findDeviceById(id, user);
     await this.deviceRepository.remove(device);
     return { message: `Đã xoá thiết bị ${device.name}` };
   }

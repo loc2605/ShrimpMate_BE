@@ -6,6 +6,8 @@ import { Pond } from '../../database/entities/pond.entity';
 import { CropSeasonStatus } from '../../database/entities/enums';
 import { CreateCropSeasonDto } from './dto/create-crop-season.dto';
 import { UpdateCropSeasonDto } from './dto/update-crop-season.dto';
+import { User } from '../../database/entities/user.entity';
+import { PondAccessService } from '../../common/guards/pond-access.service';
 
 @Injectable()
 export class CropSeasonService {
@@ -14,10 +16,12 @@ export class CropSeasonService {
     private readonly cropSeasonRepository: Repository<CropSeason>,
     @InjectRepository(Pond)
     private readonly pondRepository: Repository<Pond>,
+    private readonly pondAccessService: PondAccessService,
   ) {}
 
-  async create(pondId: string, createDto: CreateCropSeasonDto) {
+  async create(pondId: string, createDto: CreateCropSeasonDto, user?: User) {
     await this.findPond(pondId);
+    if (user) await this.pondAccessService.ensureCanAccess(user, pondId);
     this.validateStockingDate(createDto.stockingDate);
     await this.ensureNoActiveSeason(pondId, createDto.status);
 
@@ -37,15 +41,16 @@ export class CropSeasonService {
     }
   }
 
-  async findAllByPond(pondId: string) {
+  async findAllByPond(pondId: string, user?: User) {
     await this.findPond(pondId);
+    if (user) await this.pondAccessService.ensureCanAccess(user, pondId);
     return this.cropSeasonRepository.find({
       where: { pondId },
       order: { stockingDate: 'DESC' },
     });
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, user?: User) {
     const cropSeason = await this.cropSeasonRepository.findOne({
       where: { id },
       relations: { pond: true },
@@ -54,12 +59,13 @@ export class CropSeasonService {
     if (!cropSeason) {
       throw new NotFoundException(`Không tìm thấy vụ nuôi với id ${id}`);
     }
+    if (user) await this.pondAccessService.ensureCanAccess(user, cropSeason.pondId);
 
     return cropSeason;
   }
 
-  async update(id: string, updateDto: UpdateCropSeasonDto) {
-    const cropSeason = await this.findOne(id);
+  async update(id: string, updateDto: UpdateCropSeasonDto, user?: User) {
+    const cropSeason = await this.findOne(id, user);
 
     if (updateDto.status === CropSeasonStatus.ACTIVE) {
       await this.ensureNoActiveSeason(cropSeason.pondId, updateDto.status, id);
@@ -80,8 +86,8 @@ export class CropSeasonService {
     }
   }
 
-  async remove(id: string) {
-    const cropSeason = await this.findOne(id);
+  async remove(id: string, user?: User) {
+    const cropSeason = await this.findOne(id, user);
     await this.cropSeasonRepository.remove(cropSeason);
     return { message: `Đã xoá vụ nuôi ${cropSeason.name}` };
   }

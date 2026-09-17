@@ -28,6 +28,8 @@ Các phần cần tiếp tục:
 - [x] Bổ sung format lỗi validation `400` và `404` trong tài liệu API.
 - [x] Ghi chú cập nhật seed khi thêm quan hệ User-Pond.
 - [x] Triển khai User-Pond assignment trước Telemetry/Alert.
+- [x] Áp dụng User-Pond assignment cho cả manager và operator trên các API đọc/ghi hiện có.
+- [x] Thêm Admin API tạo user với role và đổi role user.
 - [x] Tách heartbeat REST thủ công khỏi heartbeat thiết bị qua MQTT.
 - [ ] AI và tài liệu sẽ thực hiện sau khi backend cốt lõi ổn định.
 
@@ -63,7 +65,7 @@ Kết quả cần đạt: đăng ký, đăng nhập và JWT hoạt động ổn 
 - [x] Thêm unique partial index ở database cho Crop Season `active`.
 - [x] Validate ngày thả giống, `initialCount` và `stockingDensity`.
 - [x] Không cho tạo Feeding Schedule/Record mới khi Pond không có Crop Season `active`.
-- [ ] Xác định có cần thêm quan hệ người dùng với Farm hay không.
+- [x] Xác định dùng quan hệ User-Pond assignment để giới hạn manager/operator theo Pond.
 - [x] Thêm phân trang `page`, `limit` cho danh sách Farm và Pond.
 - [x] Validate tên không rỗng và `areaM2 > 0`.
 

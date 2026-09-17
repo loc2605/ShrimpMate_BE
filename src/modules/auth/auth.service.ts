@@ -13,6 +13,8 @@ import { Pond } from '../../database/entities/pond.entity';
 import { UserPondAssignment } from '../../database/entities/user-pond-assignment.entity';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
+import { AdminCreateUserDto } from './dto/admin-create-user.dto';
+import { UpdateUserRoleDto } from './dto/update-user-role.dto';
 
 type SafeUser = Omit<User, 'passwordHash' | 'refreshTokenHash'>;
 
@@ -45,6 +47,23 @@ export class AuthService {
 
     const savedUser = await this.userRepository.save(user);
     return this.createAuthResponse(savedUser);
+  }
+
+  async adminCreateUser(dto: AdminCreateUserDto) {
+    const email = dto.email.trim().toLowerCase();
+    const existingUser = await this.userRepository.findOne({ where: { email } });
+    if (existingUser) {
+      throw new ConflictException('Email đã được sử dụng');
+    }
+    const user = this.userRepository.create({
+      email,
+      passwordHash: await bcrypt.hash(dto.password, 12),
+      fullName: dto.fullName.trim(),
+      role: dto.role,
+      isActive: true,
+      refreshTokenHash: null,
+    });
+    return this.toSafeUser(await this.userRepository.save(user));
   }
 
   async login(loginDto: LoginDto) {
@@ -105,6 +124,16 @@ export class AuthService {
     if (!dto.isActive) {
       user.refreshTokenHash = null;
     }
+    await this.userRepository.save(user);
+    return this.toSafeUser(user);
+  }
+
+  async updateUserRole(id: string, dto: UpdateUserRoleDto, currentUserId: string) {
+    const user = await this.findUser(id);
+    if (id === currentUserId && dto.role !== UserRole.ADMIN) {
+      throw new ForbiddenException('Không thể tự hạ quyền tài khoản đang đăng nhập');
+    }
+    user.role = dto.role;
     await this.userRepository.save(user);
     return this.toSafeUser(user);
   }

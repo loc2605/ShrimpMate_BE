@@ -13,7 +13,7 @@ export class PondAccessService {
   ) {}
 
   async ensureCanAccess(user: User, pondId: string) {
-    if (user.role !== UserRole.OPERATOR) {
+    if (![UserRole.OPERATOR, UserRole.MANAGER].includes(user.role)) {
       return;
     }
     const assignment = await this.assignmentRepository.findOne({ where: { userId: user.id, pondId } });
@@ -23,7 +23,7 @@ export class PondAccessService {
   }
 
   async findAssignedPondIds(user: User) {
-    if (user.role !== UserRole.OPERATOR) {
+    if (![UserRole.OPERATOR, UserRole.MANAGER].includes(user.role)) {
       return null;
     }
     const assignments = await this.assignmentRepository.find({ where: { userId: user.id } });

@@ -163,31 +163,32 @@ Firebase Cloud Messaging (FCM) is used to deliver important alerts to mobile dev
 src/
 ├── common/
 │   ├── decorators/
-│   ├── guards/
-│   ├── filters/
-│   ├── interceptors/
-│   └── utils/
+│   └── guards/
 │
 ├── config/
-│   └── configuration/
+│   └── configuration.ts
 │
 ├── database/
+│   ├── entities/
 │   ├── migrations/
+│   ├── seeds/
 │   └── database.module.ts
 │
 ├── mqtt/
-│   ├── mqtt.module.ts
-│   ├── mqtt.service.ts
-│   └── mqtt.constants.ts
+│   ├── mqtt.controller.ts
+│   └── mqtt.service.ts
 │
 ├── modules/
-│   ├── ai-integration/
-│   ├── alerts/
+│   ├── auth/
+│   ├── farm-pond/
+│   ├── crop-season/
 │   ├── devices/
 │   ├── feeding/
-│   ├── notifications/
-│   ├── safety-rule/
-│   └── telemetry/
+│   ├── ai-integration/   (placeholder)
+│   ├── alerts/           (placeholder)
+│   ├── notifications/    (placeholder)
+│   ├── safety-rule/      (placeholder)
+│   └── telemetry/        (placeholder)
 │
 ├── app.module.ts
 └── main.ts
@@ -195,19 +196,24 @@ src/
 
 ### Module Responsibilities
 
-| Module           | Responsibility                                          |
-| ---------------- | ------------------------------------------------------- |
-| `ai-integration` | Communicates with the AI Engine                         |
-| `alerts`         | Handles abnormal conditions and safety alerts           |
-| `devices`        | Manages ESP32 devices and feeder control                |
-| `feeding`        | Manages feeding schedules and feeding commands          |
-| `notifications`  | Sends mobile notifications through FCM                  |
-| `safety-rule`    | Validates device commands before execution              |
-| `telemetry`      | Processes and stores sensor and device data             |
-| `mqtt`           | Handles MQTT connections, subscriptions, and publishing |
-| `database`       | Manages PostgreSQL connection and migrations            |
-| `common`         | Shared backend utilities and infrastructure             |
-| `config`         | Application and environment configuration               |
+| Module           | Status        | Responsibility                                          |
+| ---------------- | ------------- | ------------------------------------------------------- |
+| `auth`           | Implemented   | JWT authentication, user management, pond assignment  |
+| `farm-pond`      | Implemented   | Farm and pond CRUD with soft delete                     |
+| `crop-season`    | Implemented   | Crop season lifecycle per pond                          |
+| `devices`        | Implemented   | ESP32 device management and feeder control              |
+| `feeding`        | Implemented   | Feeding schedules and feeding records                   |
+| `telemetry`      | Placeholder   | Processes and stores sensor and device data             |
+| `mqtt`           | Placeholder   | MQTT connections, subscriptions, and publishing         |
+| `alerts`         | Placeholder   | Handles abnormal conditions and safety alerts           |
+| `safety-rule`    | Placeholder   | Validates device commands before execution              |
+| `ai-integration` | Placeholder   | Communicates with the AI Engine                         |
+| `notifications`  | Placeholder   | Sends mobile notifications through FCM                  |
+| `database`       | Implemented   | Manages PostgreSQL connection and migrations            |
+| `common`         | Implemented   | Shared guards, decorators, and pond access control      |
+| `config`         | Implemented   | Application and environment configuration               |
+
+REST API details are documented in `docs/API.md`. Database schema is documented in `docs/DATABASE.md`.
 
 ---
 
@@ -264,34 +270,28 @@ Feeding Operation
 
 ## 7. Current Development Status
 
-The project is currently in the **backend initialization phase**.
+The project is in the **core backend phase**: authentication, farm management, devices, and feeding are implemented; IoT and alerting layers are still pending.
 
 ### Completed
 
-* NestJS application initialized.
-* TypeScript configuration established.
-* Initial backend module structure created.
-* Application successfully builds.
+* NestJS application with TypeScript, build, and lint.
+* Environment configuration with Joi validation.
+* PostgreSQL integration via TypeORM, migrations, and idempotent seeds.
+* JWT authentication with refresh token rotation and RBAC (`admin`, `manager`, `operator`).
+* User-Pond assignment for scoped manager/operator access.
+* CRUD for Farm, Pond, Crop Season, Device, Feeding Schedule, and Feeding Record.
+* API and database documentation (`docs/API.md`, `docs/DATABASE.md`).
 
 ### In Progress / Planned
 
-* Environment configuration
-* PostgreSQL integration
-* Database models and migrations
-* MQTT broker integration
-* ESP32 communication protocol
-* Sensor telemetry
-* Device management
-* Feeding schedules
-* Safety Rule Engine
-* Redis integration
-* Alert processing
-* FCM notifications
-* AI Engine integration
-* Authentication and authorization
-* Unit and integration testing
+* Telemetry ingestion and query APIs.
+* Alert processing and Safety Rule Engine.
+* MQTT broker integration and ESP32 communication protocol.
+* Redis for real-time device state and caching.
+* FCM notifications and AI Engine integration.
+* Unit, integration, and end-to-end testing.
 
-> This README describes the target backend architecture. Features that have not been implemented yet should not be considered production-ready.
+> Modules marked **Placeholder** above have entity/schema support but no business endpoints yet. See `docs/API.md` section 10 for the current API surface.
 
 ---
 
@@ -445,8 +445,8 @@ ShrimpMate is expected to provide a centralized backend platform that helps shri
 
 ## 14. Project Status
 
-**Status:** Backend initialization
+**Status:** Core backend implemented; IoT/alerting layers pending
 
-**Architecture:** NestJS + PostgreSQL + Redis + MQTT + AI Engine
+**Architecture:** NestJS + PostgreSQL (+ Redis, MQTT, AI Engine planned)
 
 **Target:** IoT-based shrimp pond monitoring and automated feeding platform

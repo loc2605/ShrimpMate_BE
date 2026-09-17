@@ -35,7 +35,7 @@ Lưu tài khoản đăng nhập.
 | `created_at` | TIMESTAMPTZ | Thời gian tạo |
 | `updated_at` | TIMESTAMPTZ | Thời gian cập nhật |
 
-Hiện tại `users` chưa có khóa ngoại đến bảng nghiệp vụ.
+`users` liên kết tới `ponds` thông qua bảng trung gian `user_pond_assignments`; assignment được dùng để giới hạn `manager` và `operator` theo Pond.
 
 ### `user_pond_assignments`
 
@@ -276,7 +276,6 @@ erDiagram
         boolean isActive
         timestamptz created_at
         timestamptz updated_at
-        timestamptz deleted_at
     }
 
     USER_POND_ASSIGNMENTS {
@@ -293,6 +292,7 @@ erDiagram
         enum status
         timestamptz created_at
         timestamptz updated_at
+        timestamptz deleted_at
     }
 
     PONDS {
@@ -450,6 +450,7 @@ erDiagram
 - `PK` là khóa chính, `FK` là khóa ngoại và `UK` là unique key.
 - `device_id` và `schedule_id` trong các bảng nghiệp vụ là khóa ngoại tùy chọn.
 - `pond_id` của `devices` là tùy chọn vì thiết bị có thể tồn tại trước khi được gán vào ao.
-- `users` và `safety_rules` hiện là các bảng độc lập.
-- `user_pond_assignments` là bảng trung gian; operator chỉ truy cập Pond được gán, còn manager/admin giữ quyền toàn hệ thống.
-- Một số tên cột dùng camel case là `isActive` và `rawData`; các cột còn lại chủ yếu dùng snake case.
+- `safety_rules` hiện là bảng độc lập; `users` liên kết với `ponds` qua `user_pond_assignments`.
+- `user_pond_assignments` là bảng trung gian; manager và operator chỉ truy cập Pond được gán, còn admin giữ quyền toàn hệ thống.
+- Một số tên cột dùng camelCase trong database là `isActive` (users), `isEnabled` (feeding_schedules, safety_rules) và `rawData` (telemetry_readings); các cột còn lại chủ yếu dùng snake_case.
+- Bảng `users` không có soft delete; chỉ `farms` và `ponds` dùng `deleted_at`.

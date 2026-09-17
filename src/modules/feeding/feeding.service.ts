@@ -30,8 +30,8 @@ export class FeedingService {
 		private readonly pondAccessService: PondAccessService,
 	) {}
 
-	async createSchedule(pondId: string, dto: CreateFeedingScheduleDto) {
-		await this.ensurePondCanReceiveFeeding(pondId);
+	async createSchedule(pondId: string, dto: CreateFeedingScheduleDto, user?: User) {
+		await this.ensurePondCanReceiveFeeding(pondId, user);
 		const timeOfDay = this.normalizeTime(dto.timeOfDay);
 		await this.ensureNoScheduleConflict(pondId, timeOfDay, dto.daysOfWeek);
 		const schedule = this.scheduleRepository.create({
@@ -51,8 +51,9 @@ export class FeedingService {
 		return this.scheduleRepository.find({ where: { pondId }, order: { timeOfDay: 'ASC' } });
 	}
 
-	async updateSchedule(id: string, dto: UpdateFeedingScheduleDto) {
+	async updateSchedule(id: string, dto: UpdateFeedingScheduleDto, user?: User) {
 		const schedule = await this.findSchedule(id);
+		if (user) await this.pondAccessService.ensureCanAccess(user, schedule.pondId);
 		const timeOfDay = dto.timeOfDay ? this.normalizeTime(dto.timeOfDay) : schedule.timeOfDay;
 		await this.ensureNoScheduleConflict(schedule.pondId, timeOfDay, dto.daysOfWeek ?? schedule.daysOfWeek, id);
 		Object.assign(schedule, {
@@ -65,14 +66,15 @@ export class FeedingService {
 		return this.scheduleRepository.save(schedule);
 	}
 
-	async removeSchedule(id: string) {
+	async removeSchedule(id: string, user?: User) {
 		const schedule = await this.findSchedule(id);
+		if (user) await this.pondAccessService.ensureCanAccess(user, schedule.pondId);
 		await this.scheduleRepository.remove(schedule);
 		return { message: `Đã xoá lịch cho ăn ${schedule.name}` };
 	}
 
-	async createRecord(pondId: string, dto: CreateFeedingRecordDto) {
-		await this.ensurePondCanReceiveFeeding(pondId);
+	async createRecord(pondId: string, dto: CreateFeedingRecordDto, user?: User) {
+		await this.ensurePondCanReceiveFeeding(pondId, user);
 		if (dto.status && dto.status !== FeedingStatus.REQUESTED) {
 			throw new BadRequestException('Feeding Record mới phải bắt đầu ở trạng thái requested; dùng PATCH để cập nhật tiến trình');
 		}
@@ -125,11 +127,12 @@ export class FeedingService {
 		});
 	}
 
-	async updateRecord(id: string, dto: UpdateFeedingRecordDto) {
+	async updateRecord(id: string, dto: UpdateFeedingRecordDto, user?: User) {
 		const record = await this.recordRepository.findOne({ where: { id } });
 		if (!record) {
 			throw new NotFoundException(`Không tìm thấy lần cho ăn với id ${id}`);
 		}
+		if (user) await this.pondAccessService.ensureCanAccess(user, record.pondId);
 
 		if (dto.status && dto.status !== record.status) {
 			this.ensureValidStatusTransition(record.status, dto.status);
@@ -191,8 +194,9 @@ export class FeedingService {
 		}
 	}
 
-	private async ensurePondCanReceiveFeeding(pondId: string) {
+	private async ensurePondCanReceiveFeeding(pondId: string, user?: User) {
 		await this.findPond(pondId);
+		if (user) await this.pondAccessService.ensureCanAccess(user, pondId);
 		const activeSeason = await this.cropSeasonRepository.findOne({
 			where: { pondId, status: CropSeasonStatus.ACTIVE },
 		});

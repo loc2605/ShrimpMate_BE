@@ -13,7 +13,7 @@ Authorization: Bearer <access_token>
 ### Role
 
 - `admin`: toan quyen
-- `manager`: xem, tao va cap nhat du lieu van hanh
+- `manager`: xem va cap nhat du lieu van hanh trong cac Pond duoc gan; Admin tao Farm/Pond va gan quyen
 - `operator`: chi xem du lieu trong cac Pond duoc gan, duoc phep dung emergency stop Device
 
 Neu khong co token hoac token khong hop le, API tra ve `401 Unauthorized`.
@@ -94,8 +94,9 @@ Tai khoan mau cho moi truong local duoc tao tu dong khi backend khoi dong:
 | --- | --- | --- |
 | `admin` | `admin@shrimpmate.local` | `Admin@123456` |
 | `manager` | `manager@shrimpmate.local` | `Manager@123456` |
+| `operator` | `operator@shrimpmate.local` | `Operator@123456` |
 
-Co the thay doi cac tai khoan mau bang cac bien moi truong `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, `SEED_MANAGER_EMAIL` va `SEED_MANAGER_PASSWORD`.
+Co the thay doi cac tai khoan mau bang cac bien moi truong `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, `SEED_MANAGER_EMAIL`, `SEED_MANAGER_PASSWORD`, `SEED_OPERATOR_EMAIL` va `SEED_OPERATOR_PASSWORD`.
 
 ### Dang nhap
 
@@ -185,11 +186,39 @@ GET /auth/admin-check
 
 Quyen: `admin`.
 
-Response:
+### Admin tao tai khoan voi role cu the
+
+```http
+POST /auth/users
+```
+
+Quyen: `admin`.
+
+Body: `{ "email": "manager2@example.com", "password": "Manager@123456", "fullName": "Manager Moi", "role": "manager" }`.
+
+Gia tri `role`: `admin`, `manager`, `operator`. Dang ky cong khai qua `POST /auth/register` van mac dinh tao `operator`.
+
+### Admin doi role tai khoan
+
+```http
+PATCH /auth/users/:id/role
+```
+
+Quyen: `admin`.
+
+Body: `{ "role": "manager" }`.
+
+Response tra ve thong tin user an toan (khong bao gom `passwordHash`, `refreshTokenHash`):
 
 ```json
 {
-  "message": "Bạn có quyền Admin"
+  "id": "uuid",
+  "email": "manager2@example.com",
+  "fullName": "Manager Moi",
+  "role": "manager",
+  "isActive": true,
+  "createdAt": "2026-09-17T05:20:14.217Z",
+  "updatedAt": "2026-09-17T05:20:14.217Z"
 }
 ```
 
@@ -237,7 +266,7 @@ DELETE /auth/users/:userId/ponds/:pondId
 
 Quyen: `admin`.
 
-Operator chi xem va thao tac tren cac Pond duoc gan; manager/admin van co quyen toan he thong theo role hien tai.
+Manager va operator chi xem/thao tac tren cac Pond duoc gan; admin co quyen toan he thong. Neu user khong co assignment, danh sach Pond-scoped tra ve rong va truy cap chi tiet bi tu choi `403`.
 
 ---
 
@@ -253,6 +282,7 @@ Quyen: `admin`, `manager`, `operator`.
 
 Query tuy chon: `page` (mac dinh `1`) va `limit` (mac dinh `20`, toi da `100`). Vi du: `GET /farms?page=1&limit=20`.
 Response gom `data` va `meta` (`page`, `limit`, `total`, `pageCount`).
+Voi `manager` va `operator`, `data` chi gom cac Farm co Pond duoc gan; `admin` thay toan bo Farm.
 
 ### Tao Farm
 
@@ -260,7 +290,7 @@ Response gom `data` va `meta` (`page`, `limit`, `total`, `pageCount`).
 POST /farms
 ```
 
-Quyen: `admin`, `manager`.
+Quyen: `admin`.
 
 Body:
 
@@ -296,7 +326,7 @@ GET /farms/788b3aaf-8235-45fb-8214-abe3aaed2bb5
 PATCH /farms/:id
 ```
 
-Quyen: `admin`, `manager`.
+Quyen: `admin`, `manager` trong pham vi Pond duoc gan.
 
 Body co the gui mot phan:
 
@@ -331,6 +361,7 @@ Quyen: `admin`, `manager`, `operator`.
 
 Query tuy chon: `page` (mac dinh `1`) va `limit` (mac dinh `20`, toi da `100`). Vi du: `GET /farms/:farmId/ponds?page=1&limit=20`.
 Response gom `data` va `meta` (`page`, `limit`, `total`, `pageCount`).
+`manager` va `operator` chi nhan cac Pond da duoc gan; `admin` nhan toan bo Pond cua Farm.
 
 Vi du:
 
@@ -344,7 +375,7 @@ GET /farms/788b3aaf-8235-45fb-8214-abe3aaed2bb5/ponds
 POST /farms/:farmId/ponds
 ```
 
-Quyen: `admin`, `manager`.
+Quyen: `admin`.
 
 Body:
 
@@ -406,6 +437,7 @@ GET /devices
 ```
 
 Quyen: `admin`, `manager`, `operator`.
+`manager` va `operator` chi nhan Device co `pondId` thuoc assignment; Device chua gan Pond khong hien thi va khong duoc tao boi hai role nay. `admin` nhan toan bo Device.
 
 ### Tao Device
 
@@ -447,6 +479,7 @@ GET /devices/:id
 ```
 
 Quyen: `admin`, `manager`, `operator`.
+Device ngoai assignment cua `manager`/`operator` tra ve `403`.
 
 ### Cap nhat Device
 
@@ -507,6 +540,7 @@ GET /ponds/:pondId/crop-seasons
 ```
 
 Quyen: `admin`, `manager`, `operator`.
+`manager` va `operator` chi truy van duoc Crop Season cua Pond duoc gan; `admin` truy cap toan bo.
 
 Vi du:
 
@@ -583,6 +617,7 @@ GET /ponds/:pondId/feeding-schedules
 ```
 
 Quyen: `admin`, `manager`, `operator`.
+`manager` va `operator` chi xem lich cua Pond duoc gan.
 
 ### Tao lich cho an
 
@@ -659,6 +694,7 @@ GET /ponds/:pondId/feeding-records
 ```
 
 Quyen: `admin`, `manager`, `operator`.
+`manager` va `operator` chi xem record cua Pond duoc gan.
 
 ### Cap nhat Feeding Record
 
@@ -706,7 +742,7 @@ Du lieu seed nam tai:
 - `src/database/seeds/user-pond-assignment.seed.ts`
 
 Seed co tinh idempotent: neu bang da co du lieu thi khong tao trung lan nua.
-User operator mau duoc gan hai Pond dau tien boi `user-pond-assignment.seed.ts`; cac user dang ky moi khong duoc gan Pond tu dong va can Admin gan qua API assignment.
+User manager va operator mau duoc gan hai Pond dau tien boi `user-pond-assignment.seed.ts`; cac user dang ky moi khong duoc gan Pond tu dong va can Admin gan qua API assignment.
 
 Heartbeat thiet bi that se duoc chuyen sang MQTT khi module MQTT duoc trien khai; endpoint REST hien chi phuc vu test/thao tac thu cong.
 

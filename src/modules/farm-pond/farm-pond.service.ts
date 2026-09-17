@@ -67,8 +67,8 @@ export class FarmPondService {
     return farm;
   }
 
-  async updateFarm(id: string, updateFarmDto: UpdateFarmDto) {
-    const farm = await this.findFarmById(id);
+  async updateFarm(id: string, updateFarmDto: UpdateFarmDto, user?: User) {
+    const farm = await this.findFarmById(id, user);
     Object.assign(farm, {
       ...updateFarmDto,
       name: updateFarmDto.name?.trim() ?? farm.name,

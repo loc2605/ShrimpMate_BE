@@ -31,8 +31,8 @@ export class DevicesController {
 
   @Post()
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  create(@Body() createDeviceDto: CreateDeviceDto) {
-    return this.devicesService.createDevice(createDeviceDto);
+  create(@Body() createDeviceDto: CreateDeviceDto, @CurrentUser() user: User) {
+    return this.devicesService.createDevice(createDeviceDto, user);
   }
 
   @Get(':id')
@@ -49,8 +49,8 @@ export class DevicesController {
 
   @Delete(':id')
   @Roles(UserRole.ADMIN)
-  remove(@Param('id') id: string) {
-    return this.devicesService.removeDevice(id);
+  remove(@Param('id') id: string, @CurrentUser() user: User) {
+    return this.devicesService.removeDevice(id, user);
   }
 
   @Post(':id/emergency-stop')
