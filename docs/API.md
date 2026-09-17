@@ -467,7 +467,7 @@ Body:
 
 Gia tri `status`: `planned`, `active`, `completed`, `cancelled`.
 
-Moi Pond chi duoc co mot Crop Season o trang thai `active`.
+`name` khong duoc rong; `stockingDate` khong duoc vuot qua mot nam trong tuong lai; `initialCount` va `stockingDensity` phai lon hon `0`. Moi Pond chi duoc co mot Crop Season o trang thai `active`, duoc bao ve boi unique partial index o database.
 
 ### Lay chi tiet vu nuoi
 
@@ -577,7 +577,7 @@ Body:
 
 Gia tri `source`: `schedule`, `manual`, `ai`. Gia tri `status`: `requested`, `running`, `completed`, `stopped`, `failed`.
 
-`deviceId` va `scheduleId` la tuy chon, nhung neu gui thi phai ton tai va thuoc cung Pond. Neu khong gui `startedAt`, he thong tu dong dung thoi diem hien tai.
+`deviceId` va `scheduleId` la tuy chon, nhung neu gui thi phai ton tai va thuoc cung Pond. Pond phai co Crop Season dang `active`; sau khi vu chuyen sang `completed`, he thong khong cho tao Feeding Schedule/Record moi. Neu khong gui `startedAt`, he thong tu dong dung thoi diem hien tai.
 
 ### Lay lich su cho an cua Pond
 

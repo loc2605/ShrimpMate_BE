@@ -79,6 +79,8 @@ Lưu các vụ nuôi của ao.
 | `estimated_survival_rate` | NUMERIC(5,2) | Có thể rỗng |
 | `status` | ENUM | `planned`, `active`, `completed`, `cancelled` |
 
+Có unique partial index trên `pond_id` với điều kiện `status = 'active'`, bảo đảm mỗi Pond chỉ có một Crop Season đang hoạt động ngay cả khi có request đồng thời.
+
 ### `devices`
 
 Lưu các thiết bị IoT như feeder, sensor và camera.

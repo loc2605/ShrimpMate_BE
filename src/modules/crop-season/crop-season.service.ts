@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { QueryFailedError, Repository } from 'typeorm';
 import { CropSeason } from '../../database/entities/crop-season.entity';
 import { Pond } from '../../database/entities/pond.entity';
 import { CropSeasonStatus } from '../../database/entities/enums';
@@ -18,6 +18,7 @@ export class CropSeasonService {
 
   async create(pondId: string, createDto: CreateCropSeasonDto) {
     await this.findPond(pondId);
+    this.validateStockingDate(createDto.stockingDate);
     await this.ensureNoActiveSeason(pondId, createDto.status);
 
     const cropSeason = this.cropSeasonRepository.create({
@@ -29,7 +30,11 @@ export class CropSeasonService {
       estimatedSurvivalRate: createDto.estimatedSurvivalRate ?? null,
     });
 
-    return this.cropSeasonRepository.save(cropSeason);
+    try {
+      return await this.cropSeasonRepository.save(cropSeason);
+    } catch (error) {
+      this.throwActiveSeasonConflict(error);
+    }
   }
 
   async findAllByPond(pondId: string) {
@@ -59,13 +64,20 @@ export class CropSeasonService {
     if (updateDto.status === CropSeasonStatus.ACTIVE) {
       await this.ensureNoActiveSeason(cropSeason.pondId, updateDto.status, id);
     }
+    if (updateDto.stockingDate) {
+      this.validateStockingDate(updateDto.stockingDate);
+    }
 
     Object.assign(cropSeason, {
       ...updateDto,
       name: updateDto.name?.trim() ?? cropSeason.name,
     });
 
-    return this.cropSeasonRepository.save(cropSeason);
+    try {
+      return await this.cropSeasonRepository.save(cropSeason);
+    } catch (error) {
+      this.throwActiveSeasonConflict(error);
+    }
   }
 
   async remove(id: string) {
@@ -94,5 +106,22 @@ export class CropSeasonService {
     if (activeSeason && activeSeason.id !== excludedId) {
       throw new BadRequestException('Mỗi ao chỉ được có một vụ nuôi đang hoạt động');
     }
+  }
+
+  private validateStockingDate(stockingDate: string) {
+    const maximumDate = new Date();
+    maximumDate.setFullYear(maximumDate.getFullYear() + 1);
+    const parsedDate = new Date(`${stockingDate}T00:00:00Z`);
+
+    if (parsedDate > maximumDate) {
+      throw new BadRequestException('Ngày thả giống không được vượt quá một năm trong tương lai');
+    }
+  }
+
+  private throwActiveSeasonConflict(error: unknown): never {
+    if (error instanceof QueryFailedError && (error as QueryFailedError & { driverError?: { code?: string } }).driverError?.code === '23505') {
+      throw new BadRequestException('Mỗi ao chỉ được có một vụ nuôi đang hoạt động');
+    }
+    throw error;
   }
 }

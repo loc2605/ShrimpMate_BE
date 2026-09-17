@@ -52,8 +52,11 @@ Kết quả cần đạt: đăng ký, đăng nhập và JWT hoạt động ổn 
 - [ ] Kiểm tra không cho trùng mã Pond trong cùng một Farm.
 - [x] Kiểm tra xóa mềm Farm đồng thời xóa mềm các Pond liên quan.
 - [ ] Test CRUD Crop Season.
-- [ ] Kiểm tra mỗi Pond chỉ có một Crop Season ở trạng thái `active`.
-- [ ] Bổ sung kiểm tra dữ liệu đầu vào và thông báo lỗi rõ ràng.
+- [x] Kiểm tra mỗi Pond chỉ có một Crop Season ở trạng thái `active`.
+- [x] Bổ sung kiểm tra dữ liệu đầu vào và thông báo lỗi rõ ràng.
+- [x] Thêm unique partial index ở database cho Crop Season `active`.
+- [x] Validate ngày thả giống, `initialCount` và `stockingDensity`.
+- [x] Không cho tạo Feeding Schedule/Record mới khi Pond không có Crop Season `active`.
 - [ ] Xác định có cần thêm quan hệ người dùng với Farm hay không.
 - [x] Thêm phân trang `page`, `limit` cho danh sách Farm và Pond.
 - [x] Validate tên không rỗng và `areaM2 > 0`.

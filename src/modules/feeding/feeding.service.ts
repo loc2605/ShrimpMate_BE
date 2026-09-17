@@ -2,10 +2,11 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Device } from '../../database/entities/device.entity';
+import { CropSeason } from '../../database/entities/crop-season.entity';
 import { FeedingRecord } from '../../database/entities/feeding-record.entity';
 import { FeedingSchedule } from '../../database/entities/feeding-schedule.entity';
 import { Pond } from '../../database/entities/pond.entity';
-import { FeedingStatus } from '../../database/entities/enums';
+import { CropSeasonStatus, FeedingStatus } from '../../database/entities/enums';
 import { CreateFeedingRecordDto } from './dto/create-feeding-record.dto';
 import { CreateFeedingScheduleDto } from './dto/create-feeding-schedule.dto';
 import { UpdateFeedingScheduleDto } from './dto/update-feeding-schedule.dto';
@@ -21,10 +22,12 @@ export class FeedingService {
 		private readonly pondRepository: Repository<Pond>,
 		@InjectRepository(Device)
 		private readonly deviceRepository: Repository<Device>,
+		@InjectRepository(CropSeason)
+		private readonly cropSeasonRepository: Repository<CropSeason>,
 	) {}
 
 	async createSchedule(pondId: string, dto: CreateFeedingScheduleDto) {
-		await this.findPond(pondId);
+		await this.ensurePondCanReceiveFeeding(pondId);
 		const schedule = this.scheduleRepository.create({
 			...dto,
 			pondId,
@@ -62,7 +65,7 @@ export class FeedingService {
 	}
 
 	async createRecord(pondId: string, dto: CreateFeedingRecordDto) {
-		await this.findPond(pondId);
+		await this.ensurePondCanReceiveFeeding(pondId);
 
 		if (dto.deviceId) {
 			const device = await this.deviceRepository.findOne({ where: { id: dto.deviceId } });
@@ -125,5 +128,15 @@ export class FeedingService {
 			throw new NotFoundException(`Không tìm thấy lịch cho ăn với id ${id}`);
 		}
 		return schedule;
+	}
+
+	private async ensurePondCanReceiveFeeding(pondId: string) {
+		await this.findPond(pondId);
+		const activeSeason = await this.cropSeasonRepository.findOne({
+			where: { pondId, status: CropSeasonStatus.ACTIVE },
+		});
+		if (!activeSeason) {
+			throw new BadRequestException('Pond chưa có Crop Season active; không thể tạo dữ liệu cho ăn mới');
+		}
 	}
 }

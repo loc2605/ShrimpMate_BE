@@ -1,9 +1,10 @@
-import { IsDateString, IsEnum, IsInt, IsNumber, IsOptional, IsString, Length, Max, Min } from 'class-validator';
+import { IsDateString, IsEnum, IsInt, IsNumber, IsOptional, IsString, Length, Matches, Max, Min } from 'class-validator';
 import { CropSeasonStatus } from '../../../database/entities';
 
 export class CreateCropSeasonDto {
   @IsString()
   @Length(2, 150)
+  @Matches(/\S/, { message: 'Tên vụ nuôi không được rỗng' })
   name!: string;
 
   @IsDateString()
