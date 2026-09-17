@@ -77,7 +77,10 @@ Kết quả cần đạt: hoàn chỉnh phần quản lý trang trại, ao và v
   - `DELETE /devices/:id`
 - [x] Cho phép gán hoặc bỏ gán Device vào Pond.
 - [x] Kiểm tra `device_uid` không bị trùng.
+- [x] Bảo vệ unique `device_uid` ở tầng database và xử lý race condition.
 - [x] Xử lý các enum `type`, `status`, `mode`.
+- [x] Tách endpoint dừng khẩn cấp cho operator.
+- [x] Cập nhật heartbeat và `lastSeenAt` của Device.
 - [x] Phân quyền Device theo role.
 - [x] Bổ sung seed một số Device mẫu.
 

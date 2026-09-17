@@ -50,4 +50,16 @@ export class DevicesController {
   remove(@Param('id') id: string) {
     return this.devicesService.removeDevice(id);
   }
+
+  @Post(':id/emergency-stop')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR)
+  emergencyStop(@Param('id') id: string) {
+    return this.devicesService.emergencyStop(id);
+  }
+
+  @Post(':id/heartbeat')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR)
+  heartbeat(@Param('id') id: string) {
+    return this.devicesService.heartbeat(id);
+  }
 }

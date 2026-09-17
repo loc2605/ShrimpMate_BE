@@ -416,7 +416,7 @@ Gia tri `status`: `online`, `offline`, `error`, `maintenance`.
 Gia tri `mode`: `automatic`, `manual`, `emergency_stop`.
 
 Neu `pondId` duoc gui thi phai ton tai trong `ponds`.
-`deviceUid` phai unique trong he thong.
+`deviceUid` phai unique trong he thong. Rang buoc unique duoc dat o database, nen truong hop hai request dong thoi dang ky cung UID van bi chan.
 
 ### Lay chi tiet Device
 
@@ -451,6 +451,26 @@ DELETE /devices/:id
 ```
 
 Quyen: `admin`.
+
+### Dừng khẩn cấp Device
+
+```http
+POST /devices/:id/emergency-stop
+```
+
+Quyen: `admin`, `manager`, `operator`.
+
+Endpoint này chỉ đổi `mode` sang `emergency_stop`; operator không được dùng `PATCH /devices/:id` để thay đổi các thuộc tính quản trị khác.
+
+### Cập nhật heartbeat Device
+
+```http
+POST /devices/:id/heartbeat
+```
+
+Quyen: `admin`, `manager`, `operator`.
+
+Endpoint cập nhật `lastSeenAt` thành thời điểm hiện tại để theo dõi thiết bị mất kết nối. MQTT có thể gọi cùng service này khi tích hợp.
 
 ---
 

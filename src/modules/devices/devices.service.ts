@@ -4,9 +4,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { QueryFailedError, Repository } from 'typeorm';
 import { Device } from '../../database/entities/device.entity';
 import { Pond } from '../../database/entities/pond.entity';
+import { DeviceMode } from '../../database/entities/enums';
 import { CreateDeviceDto } from './dto/create-device.dto';
 import { UpdateDeviceDto } from './dto/update-device.dto';
 
@@ -43,7 +44,11 @@ export class DevicesService {
       metadata: createDeviceDto.metadata ?? {},
     });
 
-    return this.deviceRepository.save(device);
+    try {
+      return await this.deviceRepository.save(device);
+    } catch (error) {
+      this.throwDeviceUidConflict(error);
+    }
   }
 
   async findAllDevices() {
@@ -94,7 +99,11 @@ export class DevicesService {
       metadata: updateDeviceDto.metadata ?? device.metadata,
     });
 
-    return this.deviceRepository.save(device);
+    try {
+      return await this.deviceRepository.save(device);
+    } catch (error) {
+      this.throwDeviceUidConflict(error);
+    }
   }
 
   async removeDevice(id: string) {
@@ -103,11 +112,30 @@ export class DevicesService {
     return { message: `Đã xoá thiết bị ${device.name}` };
   }
 
+  async emergencyStop(id: string) {
+    const device = await this.findDeviceById(id);
+    device.mode = DeviceMode.EMERGENCY_STOP;
+    return this.deviceRepository.save(device);
+  }
+
+  async heartbeat(id: string) {
+    const device = await this.findDeviceById(id);
+    device.lastSeenAt = new Date();
+    return this.deviceRepository.save(device);
+  }
+
   private async ensurePondExists(pondId: string) {
     const pond = await this.pondRepository.findOne({ where: { id: pondId } });
     if (!pond) {
       throw new NotFoundException(`Không tìm thấy ao nuôi với id ${pondId}`);
     }
     return pond;
+  }
+
+  private throwDeviceUidConflict(error: unknown): never {
+    if (error instanceof QueryFailedError && (error as QueryFailedError & { driverError?: { code?: string } }).driverError?.code === '23505') {
+      throw new BadRequestException('device_uid đã tồn tại');
+    }
+    throw error;
   }
 }
