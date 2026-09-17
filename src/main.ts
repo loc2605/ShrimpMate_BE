@@ -5,6 +5,7 @@ import { AppModule, ObserveInstrument } from './app.module';
 import { seedFarmPondData } from './database/seeds/farm-pond.seed';
 import { seedCropSeasonData } from './database/seeds/crop-season.seed';
 import { seedDeviceData } from './database/seeds/device.seed';
+import { seedFeedingData } from './database/seeds/feeding.seed';
 import { seedUserData } from './database/seeds/user.seed';
 
 async function bootstrap() {
@@ -20,6 +21,7 @@ async function bootstrap() {
   await seedFarmPondData(dataSource);
   await seedCropSeasonData(dataSource);
   await seedDeviceData(dataSource);
+  await seedFeedingData(dataSource);
 
   await app.listen(process.env.PORT ?? 3000);
 }

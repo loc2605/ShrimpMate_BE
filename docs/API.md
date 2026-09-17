@@ -429,7 +429,93 @@ Quyen: `admin`.
 
 ---
 
-## 8. Du lieu seed hien tai
+## 8. Feeding API
+
+### Lay danh sach lich cho an cua Pond
+
+```http
+GET /ponds/:pondId/feeding-schedules
+```
+
+Quyen: `admin`, `manager`, `operator`.
+
+### Tao lich cho an
+
+```http
+POST /ponds/:pondId/feeding-schedules
+```
+
+Quyen: `admin`, `manager`.
+
+Body:
+
+```json
+{
+  "name": "Lich cho an sang",
+  "timeOfDay": "08:00",
+  "feedAmountKg": 12.5,
+  "spreadRateKgPerMinute": 1.25,
+  "daysOfWeek": [1, 2, 3, 4, 5, 6, 0],
+  "isEnabled": true
+}
+```
+
+`timeOfDay` dung dinh dang `HH:mm` hoac `HH:mm:ss`. `daysOfWeek` dung gia tri tu `0` den `6`, trong do `0` la Chu Nhat. Khoi luong phai lon hon `0`.
+
+### Cap nhat lich cho an
+
+```http
+PATCH /feeding-schedules/:id
+```
+
+Quyen: `admin`, `manager`.
+
+### Xoa lich cho an
+
+```http
+DELETE /feeding-schedules/:id
+```
+
+Quyen: `admin`.
+
+### Tao Feeding Record
+
+```http
+POST /ponds/:pondId/feeding-records
+```
+
+Quyen: `admin`, `manager`.
+
+Body:
+
+```json
+{
+  "deviceId": "uuid-cua-device",
+  "scheduleId": "uuid-cua-schedule",
+  "requestedAmountKg": 12.5,
+  "actualAmountKg": 12.3,
+  "source": "schedule",
+  "status": "completed",
+  "appetiteLevel": 2,
+  "leftoverPercent": 3.5
+}
+```
+
+Gia tri `source`: `schedule`, `manual`, `ai`. Gia tri `status`: `requested`, `running`, `completed`, `stopped`, `failed`.
+
+`deviceId` va `scheduleId` la tuy chon, nhung neu gui thi phai ton tai va thuoc cung Pond. Neu khong gui `startedAt`, he thong tu dong dung thoi diem hien tai.
+
+### Lay lich su cho an cua Pond
+
+```http
+GET /ponds/:pondId/feeding-records
+```
+
+Quyen: `admin`, `manager`, `operator`.
+
+---
+
+## 9. Du lieu seed hien tai
 
 Ung dung tu dong tao du lieu mau khi khoi dong neu database chua co du lieu:
 
@@ -437,18 +523,20 @@ Ung dung tu dong tao du lieu mau khi khoi dong neu database chua co du lieu:
 - 4 Pond mau
 - 2 Crop Season mau
 - 3 Device mau
+- 3 Feeding Schedule mau
 
 Du lieu seed nam tai:
 
 - `src/database/seeds/farm-pond.seed.ts`
 - `src/database/seeds/crop-season.seed.ts`
 - `src/database/seeds/device.seed.ts`
+- `src/database/seeds/feeding.seed.ts`
 
 Seed co tinh idempotent: neu bang da co du lieu thi khong tao trung lan nua.
 
 ---
 
-## 9. Module dang cho trien khai
+## 10. Module dang cho trien khai
 
 Cac controller duoc hoan thien:
 
@@ -461,7 +549,7 @@ Hien tai cac module con lai chua la placeholder va chua nen dung de test API ngh
 
 ---
 
-## 10. Cach test nhanh bang Postman
+## 11. Cach test nhanh bang Postman
 
 1. Goi `POST /auth/login` de lay `accessToken`.
 2. Trong Postman chon tab `Authorization`.

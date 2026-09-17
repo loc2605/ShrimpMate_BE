@@ -17,8 +17,8 @@ Các phần đã có:
 
 Các phần cần tiếp tục:
 
-- [ ] Hoàn thiện quản lý Device.
-- [ ] Hoàn thiện Feeding Schedule và Feeding Record.
+- [x] Hoàn thiện quản lý Device.
+- [x] Hoàn thiện Feeding Schedule và Feeding Record.
 - [ ] Hoàn thiện Telemetry Reading.
 - [ ] Hoàn thiện Alert và Safety Rule.
 - [ ] Kết nối MQTT.
@@ -56,31 +56,31 @@ Kết quả cần đạt: hoàn chỉnh phần quản lý trang trại, ao và v
 
 ### Ngày 3 - Hoàn thiện Device Management
 
-- [ ] Tạo DTO cho Device.
+- [x] Tạo DTO cho Device.
 - [ ] Tạo các endpoint:
   - `POST /devices`
   - `GET /devices`
   - `GET /devices/:id`
   - `PATCH /devices/:id`
   - `DELETE /devices/:id`
-- [ ] Cho phép gán hoặc bỏ gán Device vào Pond.
-- [ ] Kiểm tra `device_uid` không bị trùng.
-- [ ] Xử lý các enum `type`, `status`, `mode`.
-- [ ] Phân quyền Device theo role.
-- [ ] Bổ sung seed một số Device mẫu.
+- [x] Cho phép gán hoặc bỏ gán Device vào Pond.
+- [x] Kiểm tra `device_uid` không bị trùng.
+- [x] Xử lý các enum `type`, `status`, `mode`.
+- [x] Phân quyền Device theo role.
+- [x] Bổ sung seed một số Device mẫu.
 
 Kết quả cần đạt: quản lý được sensor, feeder, camera và gateway.
 
 ### Ngày 4 - Hoàn thiện Feeding
 
-- [ ] Tạo DTO cho Feeding Schedule.
-- [ ] Tạo CRUD Feeding Schedule theo Pond.
-- [ ] Kiểm tra giờ cho ăn, khối lượng thức ăn và ngày trong tuần.
-- [ ] Tạo API tạo và xem Feeding Record.
-- [ ] Liên kết Feeding Record với Pond, Device và Schedule.
-- [ ] Hỗ trợ các nguồn cho ăn: `schedule`, `manual`, `ai`.
-- [ ] Xử lý trạng thái: `requested`, `running`, `completed`, `stopped`, `failed`.
-- [ ] Phân quyền: operator chỉ xem, manager tạo/cập nhật, admin xóa hoặc quản trị.
+- [x] Tạo DTO cho Feeding Schedule.
+- [x] Tạo CRUD Feeding Schedule theo Pond.
+- [x] Kiểm tra giờ cho ăn, khối lượng thức ăn và ngày trong tuần.
+- [x] Tạo API tạo và xem Feeding Record.
+- [x] Liên kết Feeding Record với Pond, Device và Schedule.
+- [x] Hỗ trợ các nguồn cho ăn: `schedule`, `manual`, `ai`.
+- [x] Xử lý trạng thái: `requested`, `running`, `completed`, `stopped`, `failed`.
+- [x] Phân quyền: operator chỉ xem, manager tạo/cập nhật, admin xóa hoặc quản trị.
 
 Kết quả cần đạt: tạo được lịch cho ăn và lưu lịch sử các lần cho ăn.
 
