@@ -1,8 +1,9 @@
-import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 import { Pond } from './pond.entity';
 import { DeviceMode, DeviceStatus, DeviceType } from './enums';
 
 @Entity('devices')
+@Index('IDX_devices_pond_status', ['pondId', 'status'])
 export class Device {
   @PrimaryGeneratedColumn('uuid')
   id!: string;

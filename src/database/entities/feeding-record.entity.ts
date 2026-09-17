@@ -1,10 +1,13 @@
-import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 import { Device } from './device.entity';
 import { FeedingSchedule } from './feeding-schedule.entity';
 import { Pond } from './pond.entity';
 import { AppetiteLevel, FeedingSource, FeedingStatus } from './enums';
 
 @Entity('feeding_records')
+@Index('IDX_feeding_records_pond_started', ['pondId', 'startedAt'])
+@Index('IDX_feeding_records_device_started', ['deviceId', 'startedAt'])
+@Index('IDX_feeding_records_pond_status', ['pondId', 'status'])
 export class FeedingRecord {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -56,4 +59,10 @@ export class FeedingRecord {
 
   @Column({ name: 'stopped_reason', type: 'text', nullable: true })
   stoppedReason!: string | null;
+
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
+  createdAt!: Date;
+
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
+  updatedAt!: Date;
 }

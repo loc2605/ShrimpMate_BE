@@ -1,7 +1,8 @@
-import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 import { Pond } from './pond.entity';
 
 @Entity('feeding_schedules')
+@Index('IDX_feeding_schedules_pond_enabled', ['pondId', 'isEnabled'])
 export class FeedingSchedule {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -30,6 +31,9 @@ export class FeedingSchedule {
 
   @Column({ default: true })
   isEnabled!: boolean;
+
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
+  createdAt!: Date;
 
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt!: Date;

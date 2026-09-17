@@ -1,7 +1,8 @@
-import { Column, CreateDateColumn, DeleteDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import { Column, CreateDateColumn, DeleteDateColumn, Entity, Index, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 import { FarmStatus } from './enums';
 
 @Entity('farms')
+@Index('IDX_farms_status', ['status'])
 export class Farm {
   @PrimaryGeneratedColumn('uuid')
   id!: string;

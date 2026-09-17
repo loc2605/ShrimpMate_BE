@@ -81,6 +81,8 @@ Lưu các vụ nuôi của ao.
 
 Có unique partial index trên `pond_id` với điều kiện `status = 'active'`, bảo đảm mỗi Pond chỉ có một Crop Season đang hoạt động ngay cả khi có request đồng thời.
 
+Các bảng nghiệp vụ có `created_at` và `updated_at` để audit. Các bảng ghi nhận sự kiện bất biến dùng timestamp nghiệp vụ riêng như `measured_at`, `triggered_at` hoặc `started_at`; Telemetry đã có index theo Pond/Device và thời gian.
+
 ### `devices`
 
 Lưu các thiết bị IoT như feeder, sensor và camera.

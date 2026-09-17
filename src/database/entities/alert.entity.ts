@@ -1,9 +1,10 @@
-import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 import { Device } from './device.entity';
 import { Pond } from './pond.entity';
 import { AlertSeverity, AlertStatus } from './enums';
 
 @Entity('alerts')
+@Index('IDX_alerts_pond_status_triggered', ['pondId', 'status', 'triggeredAt'])
 export class Alert {
   @PrimaryGeneratedColumn('uuid')
   id!: string;

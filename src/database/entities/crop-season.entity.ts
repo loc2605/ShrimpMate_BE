@@ -1,8 +1,9 @@
-import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 import { Pond } from './pond.entity';
 import { CropSeasonStatus } from './enums';
 
 @Entity('crop_seasons')
+@Index('IDX_crop_seasons_pond_status', ['pondId', 'status'])
 export class CropSeason {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -34,4 +35,10 @@ export class CropSeason {
 
   @Column({ type: 'enum', enum: CropSeasonStatus, default: CropSeasonStatus.PLANNED })
   status!: CropSeasonStatus;
+
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
+  createdAt!: Date;
+
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
+  updatedAt!: Date;
 }

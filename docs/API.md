@@ -19,6 +19,35 @@ Authorization: Bearer <access_token>
 Neu khong co token hoac token khong hop le, API tra ve `401 Unauthorized`.
 Neu role khong du quyen, API tra ve `403 Forbidden`.
 
+### Format loi chung
+
+Loi validation `400 Bad Request`:
+
+```json
+{
+  "statusCode": 400,
+  "message": [
+    "areaM2 must be a number conforming to the specified constraints",
+    "Diện tích ao phải lớn hơn 0"
+  ],
+  "error": "Bad Request"
+}
+```
+
+`message` la mang cac loi validation; FE nen hien thi hoac map theo tung truong input. Cac loi nghiep vu cung dung `400` nhung `message` co the la mot chuoi, vi du `Mỗi ao chỉ được có một vụ nuôi đang hoạt động`.
+
+Loi khong tim thay `404 Not Found`:
+
+```json
+{
+  "statusCode": 404,
+  "message": "Không tìm thấy ao nuôi với id <pondId>",
+  "error": "Not Found"
+}
+```
+
+FE nen xu ly `statusCode` truoc, sau do doc `message` de hien thi thong bao phu hop.
+
 ---
 
 ## 2. Health check
@@ -607,6 +636,7 @@ Du lieu seed nam tai:
 - `src/database/seeds/feeding.seed.ts`
 
 Seed co tinh idempotent: neu bang da co du lieu thi khong tao trung lan nua.
+Khi them bang phan quyen User-Pond, can cap nhat seed va migration cung luc voi schema moi; seed User/Pond hien tai chua tao assignment.
 
 ---
 

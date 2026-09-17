@@ -1,8 +1,9 @@
-import { Column, DeleteDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, CreateDateColumn, DeleteDateColumn, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 import { Farm } from './farm.entity';
 import { PondStatus } from './enums';
 
 @Entity('ponds')
+@Index('IDX_ponds_farm_status', ['farmId', 'status'])
 export class Pond {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -28,4 +29,10 @@ export class Pond {
 
   @DeleteDateColumn({ name: 'deleted_at', type: 'timestamptz', nullable: true })
   deletedAt!: Date | null;
+
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
+  createdAt!: Date;
+
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
+  updatedAt!: Date;
 }
