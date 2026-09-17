@@ -35,6 +35,10 @@ Các phần cần tiếp tục:
 - [ ] Test đăng ký tài khoản operator.
 - [ ] Test đăng nhập bằng tài khoản `admin`, `manager` và `operator`.
 - [ ] Test `GET /auth/me`.
+- [x] Có refresh token để làm mới access token.
+- [x] Có API đổi mật khẩu `PATCH /auth/change-password`.
+- [x] Admin có thể khóa/mở khóa tài khoản.
+- [x] Cảnh báo khi production dùng mật khẩu seed mặc định.
 - [ ] Test `GET /auth/admin-check` với đúng và sai role.
 - [ ] Kiểm tra các response lỗi: `400`, `401`, `403`, `404`, `409`.
 - [ ] Sửa lỗi cấu hình NestJS Observe nếu tiếp tục sử dụng monitoring.

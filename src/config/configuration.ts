@@ -19,5 +19,7 @@ export default () => ({
   auth: {
     jwtSecret: process.env.JWT_SECRET,
     jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '1d',
+    refreshTokenSecret: process.env.JWT_REFRESH_SECRET ?? process.env.JWT_SECRET,
+    refreshTokenExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? '30d',
   },
 });

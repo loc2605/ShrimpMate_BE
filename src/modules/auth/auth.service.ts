@@ -1,15 +1,18 @@
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import type { SignOptions } from 'jsonwebtoken';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from '../../database/entities/user.entity';
 import { UserRole } from '../../database/entities/enums';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 
-type SafeUser = Omit<User, 'passwordHash'>;
+type SafeUser = Omit<User, 'passwordHash' | 'refreshTokenHash'>;
 
 @Injectable()
 export class AuthService {
@@ -51,18 +54,87 @@ export class AuthService {
     return this.createAuthResponse(user);
   }
 
+  async refreshToken(refreshToken: string) {
+    let payload: { sub: string; type?: string };
+    try {
+      payload = await this.jwtService.verifyAsync<{ sub: string; type?: string }>(refreshToken, {
+        secret: this.configService.getOrThrow<string>('auth.refreshTokenSecret'),
+      });
+    } catch {
+      throw new UnauthorizedException('Refresh token không hợp lệ hoặc đã hết hạn');
+    }
+
+    if (payload.type !== 'refresh') {
+      throw new UnauthorizedException('Token không phải refresh token');
+    }
+
+    const user = await this.userRepository.findOne({ where: { id: payload.sub } });
+    if (!user || !user.isActive || !user.refreshTokenHash || !(await bcrypt.compare(refreshToken, user.refreshTokenHash))) {
+      throw new UnauthorizedException('Refresh token không hợp lệ');
+    }
+
+    return this.createAuthResponse(user);
+  }
+
+  async changePassword(userId: string, dto: ChangePasswordDto) {
+    const user = await this.findUser(userId);
+    if (!(await bcrypt.compare(dto.currentPassword, user.passwordHash))) {
+      throw new UnauthorizedException('Mật khẩu hiện tại không đúng');
+    }
+    user.passwordHash = await bcrypt.hash(dto.newPassword, 12);
+    user.refreshTokenHash = null;
+    await this.userRepository.save(user);
+    return { message: 'Đổi mật khẩu thành công, vui lòng đăng nhập lại' };
+  }
+
+  async findAllUsers() {
+    const users = await this.userRepository.find({ order: { createdAt: 'DESC' } });
+    return users.map((user) => this.toSafeUser(user));
+  }
+
+  async updateUserStatus(id: string, dto: UpdateUserStatusDto, currentUserId: string) {
+    const user = await this.findUser(id);
+    if (id === currentUserId && !dto.isActive) {
+      throw new ForbiddenException('Không thể tự khóa tài khoản đang đăng nhập');
+    }
+    user.isActive = dto.isActive;
+    if (!dto.isActive) {
+      user.refreshTokenHash = null;
+    }
+    await this.userRepository.save(user);
+    return this.toSafeUser(user);
+  }
+
   private async createAuthResponse(user: User) {
     const payload = { sub: user.id, email: user.email, role: user.role };
     const accessToken = await this.jwtService.signAsync(payload);
+    const refreshToken = await this.jwtService.signAsync(
+      { sub: user.id, type: 'refresh' },
+      {
+        secret: this.configService.getOrThrow<string>('auth.refreshTokenSecret'),
+        expiresIn: this.configService.get<string>('auth.refreshTokenExpiresIn', '30d') as SignOptions['expiresIn'],
+      },
+    );
+    user.refreshTokenHash = await bcrypt.hash(refreshToken, 12);
+    await this.userRepository.save(user);
 
     return {
       accessToken,
+      refreshToken,
       user: this.toSafeUser(user),
     };
   }
 
+  private async findUser(id: string) {
+    const user = await this.userRepository.findOne({ where: { id } });
+    if (!user) {
+      throw new NotFoundException(`Không tìm thấy tài khoản với id ${id}`);
+    }
+    return user;
+  }
+
   private toSafeUser(user: User): SafeUser {
-    const { passwordHash: _passwordHash, ...safeUser } = user;
+    const { passwordHash: _passwordHash, refreshTokenHash: _refreshTokenHash, ...safeUser } = user;
     return safeUser;
   }
 }

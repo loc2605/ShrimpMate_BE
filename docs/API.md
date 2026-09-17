@@ -90,6 +90,7 @@ Response gom `accessToken` va thong tin user an toan, khong bao gom `passwordHas
 ```json
 {
   "accessToken": "eyJ...",
+  "refreshToken": "eyJ...",
   "user": {
     "id": "uuid",
     "email": "operator@example.com",
@@ -99,6 +100,43 @@ Response gom `accessToken` va thong tin user an toan, khong bao gom `passwordHas
   }
 }
 ```
+
+`accessToken` dung de goi API va co thoi han theo `JWT_EXPIRES_IN`. Khi access token het han, gui `refreshToken` den `POST /auth/refresh-token` de nhan cap token moi. Refresh token duoc rotate moi lan refresh.
+
+### Lam moi token
+
+```http
+POST /auth/refresh-token
+```
+
+Quyen: khong can access token, nhung bat buoc co refresh token hop le.
+
+Body:
+
+```json
+{
+  "refreshToken": "eyJ..."
+}
+```
+
+### Doi mat khau
+
+```http
+PATCH /auth/change-password
+```
+
+Quyen: user da dang nhap.
+
+Body:
+
+```json
+{
+  "currentPassword": "password-cu",
+  "newPassword": "password-moi-123"
+}
+```
+
+Doi mat khau se huy refresh token hien tai; user can dang nhap lai tren cac thiet bi.
 
 ### Lay thong tin tai khoan hien tai
 
@@ -123,6 +161,32 @@ Response:
   "message": "Ban co quyen Admin"
 }
 ```
+
+### Lay danh sach tai khoan
+
+```http
+GET /auth/users
+```
+
+Quyen: `admin`.
+
+### Khoa hoac mo khoa tai khoan
+
+```http
+PATCH /auth/users/:id/status
+```
+
+Quyen: `admin`.
+
+Body:
+
+```json
+{
+  "isActive": false
+}
+```
+
+Tai khoan bi khoa khong the dang nhap va cac refresh token cua tai khoan do bi huy. Admin khong the tu khoa tai khoan dang dang nhap.
 
 ---
 
@@ -559,4 +623,4 @@ Hien tai cac module con lai chua la placeholder va chua nen dung de test API ngh
 6. Lay `farmId`, sau do test `GET /farms/:farmId/ponds`.
 7. Lay `pondId`, sau do test `GET /ponds/:pondId/crop-seasons`.
 
-Token co thoi han. Neu gap `401 Unauthorized`, hay dang nhap lai de lay token moi.
+Token co thoi han. Neu gap `401 Unauthorized` do access token het han, goi `POST /auth/refresh-token` thay vi bat user dang nhap lai.
