@@ -69,7 +69,7 @@ Kết quả cần đạt: hoàn chỉnh phần quản lý trang trại, ao và v
 ### Ngày 3 - Hoàn thiện Device Management
 
 - [x] Tạo DTO cho Device.
-- [ ] Tạo các endpoint:
+- [x] Tạo các endpoint:
   - `POST /devices`
   - `GET /devices`
   - `GET /devices/:id`
@@ -133,17 +133,19 @@ Kết quả cần đạt: có luồng thử nghiệm từ thiết bị -> MQTT -
 - [ ] Viết test cho RolesGuard và JwtStrategy.
 - [ ] Viết test cho Farm/Pond/CropSeason service.
 - [ ] Viết e2e test cho các luồng chính.
-- [ ] Chạy `npm run build`.
-- [ ] Chạy `npm run lint`.
+- [x] Chạy `npm run build`.
+- [x] Chạy `npm run lint`.
 - [ ] Sửa lỗi cấu hình Jest để test chạy được với NestJS hiện tại.
 - [ ] Chuẩn bị dữ liệu và kịch bản demo.
 
 Kết quả cần đạt: project build được, lint pass, các API chính có test và có thể trình diễn end-to-end. Tài liệu chi tiết sẽ cập nhật sau.
 
+Ghi chú hiện tại: build và lint đã pass; Jest vẫn chưa chạy được do xung đột ESM giữa cấu hình Jest và package NestJS hiện tại.
+
 ### Công việc để sau
 
 - [ ] Tích hợp AI Recommendation và AI Engine.
-- [ ] Cập nhật đầy đủ `docs/API.md` và `docs/DATABASE.md`.
+- [x] Cập nhật đầy đủ `docs/API.md` và `docs/DATABASE.md`.
 - [ ] Tạo Postman collection hoàn chỉnh.
 - [ ] Viết hướng dẫn triển khai production.
 

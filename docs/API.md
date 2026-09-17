@@ -14,7 +14,7 @@ Authorization: Bearer <access_token>
 
 - `admin`: toan quyen
 - `manager`: xem, tao va cap nhat du lieu van hanh
-- `operator`: chi xem du lieu
+- `operator`: chi xem du lieu, duoc phep dung emergency stop va heartbeat Device
 
 Neu khong co token hoac token khong hop le, API tra ve `401 Unauthorized`.
 Neu role khong du quyen, API tra ve `403 Forbidden`.
@@ -125,7 +125,9 @@ Response gom `accessToken` va thong tin user an toan, khong bao gom `passwordHas
     "email": "operator@example.com",
     "fullName": "Nguyen Van Operator",
     "role": "operator",
-    "isActive": true
+    "isActive": true,
+    "createdAt": "2026-09-17T05:20:14.217Z",
+    "updatedAt": "2026-09-17T05:20:14.217Z"
   }
 }
 ```
@@ -187,7 +189,7 @@ Response:
 
 ```json
 {
-  "message": "Ban co quyen Admin"
+  "message": "Bạn có quyền Admin"
 }
 ```
 
@@ -672,6 +674,7 @@ Ung dung tu dong tao du lieu mau khi khoi dong neu database chua co du lieu:
 - 2 Crop Season mau
 - 3 Device mau
 - 3 Feeding Schedule mau
+- 2 tai khoan mau trong moi truong khong phai production
 
 Du lieu seed nam tai:
 
@@ -679,6 +682,7 @@ Du lieu seed nam tai:
 - `src/database/seeds/crop-season.seed.ts`
 - `src/database/seeds/device.seed.ts`
 - `src/database/seeds/feeding.seed.ts`
+- `src/database/seeds/user.seed.ts`
 
 Seed co tinh idempotent: neu bang da co du lieu thi khong tao trung lan nua.
 Khi them bang phan quyen User-Pond, can cap nhat seed va migration cung luc voi schema moi; seed User/Pond hien tai chua tao assignment.
@@ -687,14 +691,21 @@ Khi them bang phan quyen User-Pond, can cap nhat seed va migration cung luc voi 
 
 ## 10. Module dang cho trien khai
 
-Cac controller duoc hoan thien:
+Cac module/controller da hoan thien:
 
 - `/devices` - hoan thien
-- `/feeding`
+- `/feeding` - hoan thien
+
+Cac controller/service sau hien la placeholder, chua co endpoint nghiep vu:
+
 - `/telemetry`
 - `/mqtt`
+- `AlertsModule`
+- `SafetyRuleModule`
+- `AiIntegrationModule`
+- `NotificationsModule`
 
-Hien tai cac module con lai chua la placeholder va chua nen dung de test API nghiep vu.
+Khong nen dung cac module nay de test API nghiep vu cho den khi co implementation.
 
 ---
 

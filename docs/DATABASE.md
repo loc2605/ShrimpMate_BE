@@ -27,6 +27,7 @@ Lưu tài khoản đăng nhập.
 | `id` | UUID | PK |
 | `email` | VARCHAR(255) | Unique, bắt buộc |
 | `password_hash` | VARCHAR(255) | Mật khẩu đã mã hóa |
+| `refresh_token_hash` | VARCHAR(255) | Có thể rỗng, hash refresh token hiện tại |
 | `full_name` | VARCHAR(150) | Bắt buộc |
 | `role` | ENUM | `admin`, `manager`, `operator` |
 | `isActive` | BOOLEAN | Mặc định `true` |
@@ -62,6 +63,8 @@ Lưu thông tin ao nuôi.
 | `area_m2` | NUMERIC(12,2) | Diện tích |
 | `status` | ENUM | `active`, `inactive`, `maintenance` |
 | `deleted_at` | TIMESTAMPTZ | Có thể rỗng, dùng cho soft delete |
+| `created_at` | TIMESTAMPTZ | Thời gian tạo |
+| `updated_at` | TIMESTAMPTZ | Thời gian cập nhật |
 
 ### `crop_seasons`
 
@@ -78,10 +81,12 @@ Lưu các vụ nuôi của ao.
 | `initial_average_weight_g` | NUMERIC(8,3) | Có thể rỗng |
 | `estimated_survival_rate` | NUMERIC(5,2) | Có thể rỗng |
 | `status` | ENUM | `planned`, `active`, `completed`, `cancelled` |
+| `created_at` | TIMESTAMPTZ | Thời gian tạo |
+| `updated_at` | TIMESTAMPTZ | Thời gian cập nhật |
 
 Có unique partial index trên `pond_id` với điều kiện `status = 'active'`, bảo đảm mỗi Pond chỉ có một Crop Season đang hoạt động ngay cả khi có request đồng thời.
 
-Các bảng nghiệp vụ có `created_at` và `updated_at` để audit. Các bảng ghi nhận sự kiện bất biến dùng timestamp nghiệp vụ riêng như `measured_at`, `triggered_at` hoặc `started_at`; Telemetry đã có index theo Pond/Device và thời gian.
+Các bảng quản lý và nghiệp vụ có `created_at` và `updated_at` để audit. Các bảng ghi nhận sự kiện bất biến dùng timestamp nghiệp vụ riêng như `measured_at`, `triggered_at` hoặc `started_at`; Telemetry đã có index theo Pond/Device và thời gian.
 
 ### `devices`
 
@@ -116,6 +121,7 @@ Lưu lịch cho ăn tự động.
 | `spread_rate_kg_per_minute` | NUMERIC(10,3) | Có thể rỗng |
 | `days_of_week` | SMALLINT ARRAY | Các ngày trong tuần |
 | `isEnabled` | BOOLEAN | Mặc định `true` |
+| `created_at` | TIMESTAMPTZ | Thời gian tạo |
 | `updated_at` | TIMESTAMPTZ | Thời gian cập nhật |
 
 ### `feeding_records`
@@ -137,6 +143,8 @@ Lưu lịch sử các lần cho ăn.
 | `appetite_level` | SMALLINT | `0` none, `1` weak, `2` normal, `3` strong |
 | `leftover_percent` | NUMERIC(5,2) | Có thể rỗng |
 | `stopped_reason` | TEXT | Có thể rỗng |
+| `created_at` | TIMESTAMPTZ | Thời gian tạo |
+| `updated_at` | TIMESTAMPTZ | Thời gian cập nhật |
 
 ### `telemetry_readings`
 
@@ -223,14 +231,14 @@ Lưu các cảnh báo từ ao hoặc thiết bị.
 
 | Quan hệ | Cardinality | On delete |
 |---|---:|---|
-| `farms` -> `ponds` | 1 - N | Xóa farm sẽ xóa ponds |
-| `ponds` -> `crop_seasons` | 1 - N | Xóa pond sẽ xóa crop seasons |
+| `farms` -> `ponds` | 1 - N | Soft delete farm đồng thời soft delete ponds trong service |
+| `ponds` -> `crop_seasons` | 1 - N | FK cascade chỉ áp dụng khi hard delete; API hiện dùng soft delete |
 | `ponds` -> `devices` | 1 - N | Xóa pond sẽ set `devices.pond_id = NULL` |
-| `ponds` -> `feeding_schedules` | 1 - N | Xóa pond sẽ xóa schedules |
-| `ponds` -> `feeding_records` | 1 - N | Xóa pond sẽ xóa records |
-| `ponds` -> `telemetry_readings` | 1 - N | Xóa pond sẽ xóa readings |
-| `ponds` -> `ai_recommendations` | 1 - N | Xóa pond sẽ xóa recommendations |
-| `ponds` -> `alerts` | 1 - N | Xóa pond sẽ xóa alerts |
+| `ponds` -> `feeding_schedules` | 1 - N | FK cascade khi hard delete; soft delete API giữ dữ liệu |
+| `ponds` -> `feeding_records` | 1 - N | FK cascade khi hard delete; soft delete API giữ dữ liệu |
+| `ponds` -> `telemetry_readings` | 1 - N | FK cascade khi hard delete; soft delete API giữ dữ liệu |
+| `ponds` -> `ai_recommendations` | 1 - N | FK cascade khi hard delete; soft delete API giữ dữ liệu |
+| `ponds` -> `alerts` | 1 - N | FK cascade khi hard delete; soft delete API giữ dữ liệu |
 | `devices` -> `feeding_records` | 1 - N, tùy chọn | Xóa device sẽ set FK thành `NULL` |
 | `devices` -> `telemetry_readings` | 1 - N, tùy chọn | Xóa device sẽ set FK thành `NULL` |
 | `devices` -> `alerts` | 1 - N, tùy chọn | Xóa device sẽ set FK thành `NULL` |
@@ -244,11 +252,13 @@ erDiagram
         uuid id PK
         varchar email UK
         varchar password_hash
+        varchar refresh_token_hash
         varchar full_name
         enum role
         boolean isActive
         timestamptz created_at
         timestamptz updated_at
+        timestamptz deleted_at
     }
 
     FARMS {
@@ -267,6 +277,9 @@ erDiagram
         varchar name
         numeric area_m2
         enum status
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
     }
 
     CROP_SEASONS {
@@ -276,7 +289,11 @@ erDiagram
         date stocking_date
         integer initial_count
         numeric stocking_density
+        numeric initial_average_weight_g
+        numeric estimated_survival_rate
         enum status
+        timestamptz created_at
+        timestamptz updated_at
     }
 
     DEVICES {
@@ -287,6 +304,11 @@ erDiagram
         enum type
         enum status
         enum mode
+        varchar firmware_version
+        timestamptz last_seen_at
+        jsonb metadata
+        timestamptz created_at
+        timestamptz updated_at
     }
 
     FEEDING_SCHEDULES {
@@ -295,8 +317,11 @@ erDiagram
         varchar name
         time time_of_day
         numeric feed_amount_kg
+        numeric spread_rate_kg_per_minute
         smallint_array days_of_week
         boolean isEnabled
+        timestamptz created_at
+        timestamptz updated_at
     }
 
     FEEDING_RECORDS {
@@ -305,10 +330,16 @@ erDiagram
         uuid device_id FK
         uuid schedule_id FK
         timestamptz started_at
+        timestamptz finished_at
         numeric requested_amount_kg
         numeric actual_amount_kg
         enum source
         enum status
+        smallint appetite_level
+        numeric leftover_percent
+        text stopped_reason
+        timestamptz created_at
+        timestamptz updated_at
     }
 
     TELEMETRY_READINGS {
@@ -317,20 +348,31 @@ erDiagram
         uuid device_id FK
         timestamptz measured_at
         double ph
+        double dissolved_oxygen_mg_l
         double temperature_c
         double salinity_ppt
         double ammonia_mg_l
+        double turbidity_ntu
+        jsonb rawData
     }
 
     AI_RECOMMENDATIONS {
         uuid id PK
         uuid pond_id FK
         varchar model_name
+        varchar model_version
         numeric predicted_feed_amount_kg
+        numeric spread_rate_kg_per_minute
+        smallint appetite_level
         numeric biomass_kg
+        double anomaly_score
         double confidence
+        jsonb input_snapshot
+        text explanation
         enum safety_decision
+        text safety_reason
         enum status
+        timestamptz created_at
     }
 
     SAFETY_RULES {
@@ -341,6 +383,8 @@ erDiagram
         boolean isEnabled
         jsonb condition
         jsonb action
+        timestamptz created_at
+        timestamptz updated_at
     }
 
     ALERTS {
@@ -352,6 +396,11 @@ erDiagram
         enum status
         varchar message
         timestamptz triggered_at
+        timestamptz acknowledged_at
+        timestamptz resolved_at
+        jsonb metadata
+        timestamptz created_at
+        timestamptz updated_at
     }
 
     FARMS ||--o{ PONDS : contains
