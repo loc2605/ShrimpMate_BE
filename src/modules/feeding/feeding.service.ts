@@ -10,6 +10,7 @@ import { CropSeasonStatus, FeedingStatus } from '../../database/entities/enums';
 import { CreateFeedingRecordDto } from './dto/create-feeding-record.dto';
 import { CreateFeedingScheduleDto } from './dto/create-feeding-schedule.dto';
 import { UpdateFeedingScheduleDto } from './dto/update-feeding-schedule.dto';
+import { UpdateFeedingRecordDto } from './dto/update-feeding-record.dto';
 
 @Injectable()
 export class FeedingService {
@@ -28,11 +29,13 @@ export class FeedingService {
 
 	async createSchedule(pondId: string, dto: CreateFeedingScheduleDto) {
 		await this.ensurePondCanReceiveFeeding(pondId);
+		const timeOfDay = this.normalizeTime(dto.timeOfDay);
+		await this.ensureNoScheduleConflict(pondId, timeOfDay, dto.daysOfWeek);
 		const schedule = this.scheduleRepository.create({
 			...dto,
 			pondId,
 			name: dto.name.trim(),
-			timeOfDay: dto.timeOfDay.length === 5 ? `${dto.timeOfDay}:00` : dto.timeOfDay,
+			timeOfDay,
 			spreadRateKgPerMinute: dto.spreadRateKgPerMinute ?? null,
 			isEnabled: dto.isEnabled ?? true,
 		});
@@ -46,12 +49,12 @@ export class FeedingService {
 
 	async updateSchedule(id: string, dto: UpdateFeedingScheduleDto) {
 		const schedule = await this.findSchedule(id);
+		const timeOfDay = dto.timeOfDay ? this.normalizeTime(dto.timeOfDay) : schedule.timeOfDay;
+		await this.ensureNoScheduleConflict(schedule.pondId, timeOfDay, dto.daysOfWeek ?? schedule.daysOfWeek, id);
 		Object.assign(schedule, {
 			...dto,
 			name: dto.name?.trim() ?? schedule.name,
-			timeOfDay: dto.timeOfDay
-				? dto.timeOfDay.length === 5 ? `${dto.timeOfDay}:00` : dto.timeOfDay
-				: schedule.timeOfDay,
+			timeOfDay,
 			spreadRateKgPerMinute: dto.spreadRateKgPerMinute !== undefined
 				? dto.spreadRateKgPerMinute : schedule.spreadRateKgPerMinute,
 		});
@@ -66,6 +69,9 @@ export class FeedingService {
 
 	async createRecord(pondId: string, dto: CreateFeedingRecordDto) {
 		await this.ensurePondCanReceiveFeeding(pondId);
+		if (dto.status && dto.status !== FeedingStatus.REQUESTED) {
+			throw new BadRequestException('Feeding Record mới phải bắt đầu ở trạng thái requested; dùng PATCH để cập nhật tiến trình');
+		}
 
 		if (dto.deviceId) {
 			const device = await this.deviceRepository.findOne({ where: { id: dto.deviceId } });
@@ -87,7 +93,7 @@ export class FeedingService {
 			}
 		}
 
-		const status = dto.status ?? FeedingStatus.REQUESTED;
+		const status = FeedingStatus.REQUESTED;
 		const record = this.recordRepository.create({
 			...dto,
 			pondId,
@@ -114,6 +120,27 @@ export class FeedingService {
 		});
 	}
 
+	async updateRecord(id: string, dto: UpdateFeedingRecordDto) {
+		const record = await this.recordRepository.findOne({ where: { id } });
+		if (!record) {
+			throw new NotFoundException(`Không tìm thấy lần cho ăn với id ${id}`);
+		}
+
+		if (dto.status && dto.status !== record.status) {
+			this.ensureValidStatusTransition(record.status, dto.status);
+			record.status = dto.status;
+			record.finishedAt = [FeedingStatus.COMPLETED, FeedingStatus.STOPPED, FeedingStatus.FAILED].includes(dto.status)
+				? new Date() : null;
+		}
+		Object.assign(record, {
+			actualAmountKg: dto.actualAmountKg !== undefined ? dto.actualAmountKg : record.actualAmountKg,
+			appetiteLevel: dto.appetiteLevel !== undefined ? dto.appetiteLevel : record.appetiteLevel,
+			leftoverPercent: dto.leftoverPercent !== undefined ? dto.leftoverPercent : record.leftoverPercent,
+			stoppedReason: dto.stoppedReason !== undefined ? dto.stoppedReason?.trim() ?? null : record.stoppedReason,
+		});
+		return this.recordRepository.save(record);
+	}
+
 	private async findPond(id: string) {
 		const pond = await this.pondRepository.findOne({ where: { id } });
 		if (!pond) {
@@ -128,6 +155,35 @@ export class FeedingService {
 			throw new NotFoundException(`Không tìm thấy lịch cho ăn với id ${id}`);
 		}
 		return schedule;
+	}
+
+	private async ensureNoScheduleConflict(pondId: string, timeOfDay: string, daysOfWeek: number[], excludedId?: string) {
+		const schedules = await this.scheduleRepository.find({ where: { pondId } });
+		const conflict = schedules.find((schedule) =>
+			schedule.id !== excludedId
+				&& schedule.timeOfDay === timeOfDay
+				&& schedule.daysOfWeek.some((day) => daysOfWeek.includes(day)),
+		);
+		if (conflict) {
+			throw new BadRequestException('Pond đã có lịch cho ăn trùng giờ và ngày trong tuần');
+		}
+	}
+
+	private normalizeTime(timeOfDay: string) {
+		return timeOfDay.length === 5 ? `${timeOfDay}:00` : timeOfDay;
+	}
+
+	private ensureValidStatusTransition(currentStatus: FeedingStatus, nextStatus: FeedingStatus) {
+		const transitions: Record<FeedingStatus, FeedingStatus[]> = {
+			[FeedingStatus.REQUESTED]: [FeedingStatus.RUNNING, FeedingStatus.STOPPED, FeedingStatus.FAILED],
+			[FeedingStatus.RUNNING]: [FeedingStatus.COMPLETED, FeedingStatus.STOPPED, FeedingStatus.FAILED],
+			[FeedingStatus.COMPLETED]: [],
+			[FeedingStatus.STOPPED]: [],
+			[FeedingStatus.FAILED]: [],
+		};
+		if (!transitions[currentStatus].includes(nextStatus)) {
+			throw new BadRequestException(`Không thể chuyển trạng thái từ ${currentStatus} sang ${nextStatus}`);
+		}
 	}
 
 	private async ensurePondCanReceiveFeeding(pondId: string) {

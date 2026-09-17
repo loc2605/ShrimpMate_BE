@@ -584,6 +584,7 @@ Body:
 ```
 
 `timeOfDay` dung dinh dang `HH:mm` hoac `HH:mm:ss`. `daysOfWeek` dung gia tri tu `0` den `6`, trong do `0` la Chu Nhat. Khoi luong phai lon hon `0`.
+Khong the tao hoac cap nhat hai lich cua cung Pond neu trung `timeOfDay` va co it nhat mot ngay trong `daysOfWeek` trung nhau.
 
 ### Cap nhat lich cho an
 
@@ -617,16 +618,17 @@ Body:
   "scheduleId": "uuid-cua-schedule",
   "requestedAmountKg": 12.5,
   "actualAmountKg": 12.3,
-  "source": "schedule",
-  "status": "completed",
-  "appetiteLevel": 2,
-  "leftoverPercent": 3.5
+  "source": "schedule"
 }
 ```
 
 Gia tri `source`: `schedule`, `manual`, `ai`. Gia tri `status`: `requested`, `running`, `completed`, `stopped`, `failed`.
 
+Record moi luon bat dau o trang thai `requested`; dung PATCH de chuyen sang `running`, `completed`, `stopped` hoac `failed`.
+
 `deviceId` va `scheduleId` la tuy chon, nhung neu gui thi phai ton tai va thuoc cung Pond. Pond phai co Crop Season dang `active`; sau khi vu chuyen sang `completed`, he thong khong cho tao Feeding Schedule/Record moi. Neu khong gui `startedAt`, he thong tu dong dung thoi diem hien tai.
+
+`appetiteLevel` va `leftoverPercent` hien la input thu cong de phuc vu demo/vận hành. Khi tich hop AI, AI service co the cap nhat cung record qua PATCH nay; khong can doi schema hay tao luong ghi moi.
 
 ### Lay lich su cho an cua Pond
 
@@ -635,6 +637,29 @@ GET /ponds/:pondId/feeding-records
 ```
 
 Quyen: `admin`, `manager`, `operator`.
+
+### Cap nhat Feeding Record
+
+```http
+PATCH /feeding-records/:id
+```
+
+Quyen: `admin`, `manager`.
+
+Dung de cap nhat trang thai theo luong `requested` -> `running` -> `completed` (hoac `stopped`/`failed`) va bo sung `actualAmountKg` khi thiet bi bao ket qua.
+
+Body:
+
+```json
+{
+  "status": "completed",
+  "actualAmountKg": 12.3,
+  "appetiteLevel": 2,
+  "leftoverPercent": 3.5
+}
+```
+
+Khong the chuyen nguoc trang thai hoac cap nhat record da ket thuc sang trang thai khac.
 
 ---
 

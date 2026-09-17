@@ -91,11 +91,14 @@ Kết quả cần đạt: quản lý được sensor, feeder, camera và gateway
 - [x] Tạo DTO cho Feeding Schedule.
 - [x] Tạo CRUD Feeding Schedule theo Pond.
 - [x] Kiểm tra giờ cho ăn, khối lượng thức ăn và ngày trong tuần.
+- [x] Chặn lịch trùng giờ và giao nhau về ngày trong tuần trên cùng Pond.
 - [x] Tạo API tạo và xem Feeding Record.
+- [x] Thêm PATCH Feeding Record để cập nhật trạng thái và khối lượng thực tế.
 - [x] Liên kết Feeding Record với Pond, Device và Schedule.
 - [x] Hỗ trợ các nguồn cho ăn: `schedule`, `manual`, `ai`.
 - [x] Xử lý trạng thái: `requested`, `running`, `completed`, `stopped`, `failed`.
 - [x] Phân quyền: operator chỉ xem, manager tạo/cập nhật, admin xóa hoặc quản trị.
+- [x] Ghi rõ appetiteLevel/leftoverPercent hiện là input thủ công, sẵn sàng cho AI cập nhật qua PATCH.
 
 Kết quả cần đạt: tạo được lịch cho ăn và lưu lịch sử các lần cho ăn.
 

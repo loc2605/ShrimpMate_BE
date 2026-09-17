@@ -6,6 +6,7 @@ import { UserRole } from '../../database/entities/enums';
 import { CreateFeedingRecordDto } from './dto/create-feeding-record.dto';
 import { CreateFeedingScheduleDto } from './dto/create-feeding-schedule.dto';
 import { UpdateFeedingScheduleDto } from './dto/update-feeding-schedule.dto';
+import { UpdateFeedingRecordDto } from './dto/update-feeding-record.dto';
 import { FeedingService } from './feeding.service';
 
 @Controller()
@@ -47,5 +48,11 @@ export class FeedingController {
 	@Roles(UserRole.ADMIN, UserRole.MANAGER)
 	createRecord(@Param('pondId') pondId: string, @Body() dto: CreateFeedingRecordDto) {
 		return this.feedingService.createRecord(pondId, dto);
+	}
+
+	@Patch('feeding-records/:id')
+	@Roles(UserRole.ADMIN, UserRole.MANAGER)
+	updateRecord(@Param('id') id: string, @Body() dto: UpdateFeedingRecordDto) {
+		return this.feedingService.updateRecord(id, dto);
 	}
 }
