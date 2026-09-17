@@ -16,6 +16,7 @@ Tài liệu mô tả database hiện tại dựa trên các entity và migration
 - `safety_rules`
 - `alerts`
 - `user_pond_assignments`
+- `password_reset_otps`
 
 ## 2. Chi tiết bảng
 
@@ -49,6 +50,22 @@ Bảng trung gian giới hạn operator theo Pond.
 | `created_at` | TIMESTAMPTZ | Thời gian gán |
 
 Unique trên (`user_id`, `pond_id`); có index riêng trên `user_id` và `pond_id`.
+
+### `password_reset_otps`
+
+Lưu mã OTP đặt lại mật khẩu (UC002). OTP được lưu dạng hash, không lưu plaintext.
+
+| Cột | Kiểu | Ràng buộc / Mô tả |
+|---|---|---|
+| `id` | UUID | PK |
+| `user_id` | UUID | FK -> `users.id`, bắt buộc |
+| `otp_hash` | VARCHAR(255) | Hash OTP 6 chữ số |
+| `expires_at` | TIMESTAMPTZ | Thời điểm hết hạn |
+| `used_at` | TIMESTAMPTZ | Có thể rỗng; đánh dấu OTP đã dùng hoặc bị vô hiệu |
+| `attempt_count` | INTEGER | Số lần nhập OTP sai, mặc định `0` |
+| `created_at` | TIMESTAMPTZ | Thời gian tạo OTP |
+
+Index: `(user_id, created_at)`.
 
 ### `farms`
 
@@ -261,6 +278,7 @@ Lưu các cảnh báo từ ao hoặc thiết bị.
 | `feeding_schedules` -> `feeding_records` | 1 - N, tùy chọn | Xóa schedule sẽ set FK thành `NULL` |
 | `users` -> `user_pond_assignments` | 1 - N | Xóa user sẽ xóa assignment |
 | `ponds` -> `user_pond_assignments` | 1 - N | Xóa pond sẽ xóa assignment |
+| `users` -> `password_reset_otps` | 1 - N | Xóa user sẽ xóa OTP |
 
 ## 4. ERD Mermaid
 
@@ -282,6 +300,16 @@ erDiagram
         uuid id PK
         uuid user_id FK
         uuid pond_id FK
+        timestamptz created_at
+    }
+
+    PASSWORD_RESET_OTPS {
+        uuid id PK
+        uuid user_id FK
+        varchar otp_hash
+        timestamptz expires_at
+        timestamptz used_at
+        integer attempt_count
         timestamptz created_at
     }
 
@@ -437,6 +465,7 @@ erDiagram
     PONDS ||--o{ AI_RECOMMENDATIONS : receives
     PONDS ||--o{ ALERTS : generates
     USERS ||--o{ USER_POND_ASSIGNMENTS : receives
+    USERS ||--o{ PASSWORD_RESET_OTPS : requests
     PONDS ||--o{ USER_POND_ASSIGNMENTS : grants
     DEVICES o|--o{ FEEDING_RECORDS : executes
     DEVICES o|--o{ TELEMETRY_READINGS : sends

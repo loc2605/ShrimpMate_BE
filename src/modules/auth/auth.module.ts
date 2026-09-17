@@ -8,13 +8,15 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { User } from '../../database/entities/user.entity';
 import { Pond } from '../../database/entities/pond.entity';
 import { UserPondAssignment } from '../../database/entities/user-pond-assignment.entity';
+import { PasswordResetOtp } from '../../database/entities/password-reset-otp.entity';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
+import { OtpDeliveryService } from './otp-delivery.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, Pond, UserPondAssignment]),
+    TypeOrmModule.forFeature([User, Pond, UserPondAssignment, PasswordResetOtp]),
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -28,7 +30,7 @@ import { JwtStrategy } from './jwt.strategy';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, JwtAuthGuard],
+  providers: [AuthService, JwtStrategy, JwtAuthGuard, OtpDeliveryService],
   exports: [AuthService, PassportModule, JwtModule, JwtAuthGuard],
 })
 export class AuthModule {}

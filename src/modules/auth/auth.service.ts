@@ -1,9 +1,10 @@
-import { ConflictException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import { randomInt } from 'crypto';
 import type { SignOptions } from 'jsonwebtoken';
-import { Repository } from 'typeorm';
+import { IsNull, MoreThan, Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from '../../database/entities/user.entity';
 import { UserRole } from '../../database/entities/enums';
@@ -11,12 +12,20 @@ import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { Pond } from '../../database/entities/pond.entity';
 import { UserPondAssignment } from '../../database/entities/user-pond-assignment.entity';
+import { PasswordResetOtp } from '../../database/entities/password-reset-otp.entity';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import { AdminCreateUserDto } from './dto/admin-create-user.dto';
 import { UpdateUserRoleDto } from './dto/update-user-role.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
+import { OtpDeliveryService } from './otp-delivery.service';
 
 type SafeUser = Omit<User, 'passwordHash' | 'refreshTokenHash'>;
+
+const PASSWORD_RESET_SUCCESS_MESSAGE =
+  'Nếu email tồn tại trong hệ thống, mã OTP đã được gửi. Vui lòng kiểm tra hộp thư hoặc liên hệ quản trị viên.';
+const INVALID_OTP_MESSAGE = 'Mã OTP không hợp lệ hoặc đã hết hạn';
 
 @Injectable()
 export class AuthService {
@@ -26,6 +35,8 @@ export class AuthService {
     private readonly configService: ConfigService,
     @InjectRepository(Pond) private readonly pondRepository: Repository<Pond>,
     @InjectRepository(UserPondAssignment) private readonly assignmentRepository: Repository<UserPondAssignment>,
+    @InjectRepository(PasswordResetOtp) private readonly passwordResetOtpRepository: Repository<PasswordResetOtp>,
+    private readonly otpDeliveryService: OtpDeliveryService,
   ) {}
 
   async register(registerDto: RegisterDto) {
@@ -97,6 +108,94 @@ export class AuthService {
     }
 
     return this.createAuthResponse(user);
+  }
+
+  async forgotPassword(dto: ForgotPasswordDto) {
+    const email = dto.email.trim().toLowerCase();
+    const user = await this.userRepository.findOne({ where: { email } });
+
+    if (!user?.isActive) {
+      return { message: PASSWORD_RESET_SUCCESS_MESSAGE };
+    }
+
+    const cooldownSeconds = this.configService.get<number>('auth.passwordReset.otpRequestCooldownSeconds', 60);
+    const latestOtp = await this.passwordResetOtpRepository.findOne({
+      where: { userId: user.id },
+      order: { createdAt: 'DESC' },
+    });
+    if (latestOtp) {
+      const cooldownEndsAt = latestOtp.createdAt.getTime() + cooldownSeconds * 1000;
+      if (Date.now() < cooldownEndsAt) {
+        return { message: PASSWORD_RESET_SUCCESS_MESSAGE };
+      }
+    }
+
+    const otp = randomInt(0, 1_000_000).toString().padStart(6, '0');
+    const expiresInMinutes = this.configService.get<number>('auth.passwordReset.otpExpiresInMinutes', 5);
+    const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000);
+
+    await this.passwordResetOtpRepository.update(
+      { userId: user.id, usedAt: IsNull() },
+      { usedAt: new Date() },
+    );
+
+    await this.passwordResetOtpRepository.save(
+      this.passwordResetOtpRepository.create({
+        userId: user.id,
+        otpHash: await bcrypt.hash(otp, 10),
+        expiresAt,
+      }),
+    );
+
+    await this.otpDeliveryService.sendPasswordResetOtp(email, otp);
+    return { message: PASSWORD_RESET_SUCCESS_MESSAGE };
+  }
+
+  async resetPassword(dto: ResetPasswordDto) {
+    const email = dto.email.trim().toLowerCase();
+    const user = await this.userRepository.findOne({ where: { email } });
+
+    if (!user?.isActive) {
+      throw new BadRequestException(INVALID_OTP_MESSAGE);
+    }
+
+    const otpRecord = await this.passwordResetOtpRepository.findOne({
+      where: {
+        userId: user.id,
+        usedAt: IsNull(),
+        expiresAt: MoreThan(new Date()),
+      },
+      order: { createdAt: 'DESC' },
+    });
+
+    if (!otpRecord) {
+      throw new BadRequestException(INVALID_OTP_MESSAGE);
+    }
+
+    const maxAttempts = this.configService.get<number>('auth.passwordReset.otpMaxAttempts', 5);
+    if (otpRecord.attemptCount >= maxAttempts) {
+      throw new BadRequestException(INVALID_OTP_MESSAGE);
+    }
+
+    const otpMatches = await bcrypt.compare(dto.otp, otpRecord.otpHash);
+    if (!otpMatches) {
+      otpRecord.attemptCount += 1;
+      await this.passwordResetOtpRepository.save(otpRecord);
+      throw new BadRequestException(INVALID_OTP_MESSAGE);
+    }
+
+    user.passwordHash = await bcrypt.hash(dto.newPassword, 12);
+    user.refreshTokenHash = null;
+    await this.userRepository.save(user);
+
+    otpRecord.usedAt = new Date();
+    await this.passwordResetOtpRepository.save(otpRecord);
+    await this.passwordResetOtpRepository.update(
+      { userId: user.id, usedAt: IsNull() },
+      { usedAt: new Date() },
+    );
+
+    return { message: 'Đặt lại mật khẩu thành công, vui lòng đăng nhập lại' };
   }
 
   async changePassword(userId: string, dto: ChangePasswordDto) {

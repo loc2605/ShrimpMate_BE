@@ -151,6 +151,77 @@ Body:
 }
 ```
 
+### Quen mat khau (UC002 - gui OTP)
+
+```http
+POST /auth/forgot-password
+```
+
+Quyen: khong can dang nhap.
+
+Body:
+
+```json
+{
+  "email": "operator@example.com"
+}
+```
+
+Response luon tra ve cung mot thong bao, ke ca khi email khong ton tai hoac tai khoan bi khoa (tranh lo thong tin tai khoan):
+
+```json
+{
+  "message": "Nếu email tồn tại trong hệ thống, mã OTP đã được gửi. Vui lòng kiểm tra hộp thư hoặc liên hệ quản trị viên."
+}
+```
+
+Ghi chu van hanh:
+
+- OTP gom 6 chu so, mac dinh het han sau `OTP_EXPIRES_IN_MINUTES` (mac dinh 5 phut).
+- Moi email chi co the yeu cau OTP moi sau `OTP_REQUEST_COOLDOWN_SECONDS` (mac dinh 60 giay).
+- Neu cau hinh SMTP (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, tuy chon `SMTP_FROM`), he thong gui OTP qua email.
+- Trong moi truong `development`/`test`, ma OTP van duoc in ra server log de test song song voi email (neu SMTP duoc bat).
+- Neu khong cau hinh SMTP, dev/test chi in log; production se ghi canh bao tren server.
+- Yeu cau OTP moi se vo hieu hoa cac OTP chua dung truoc do cua cung user.
+
+### Dat lai mat khau bang OTP
+
+```http
+POST /auth/reset-password
+```
+
+Quyen: khong can dang nhap.
+
+Body:
+
+```json
+{
+  "email": "operator@example.com",
+  "otp": "123456",
+  "newPassword": "password-moi-123"
+}
+```
+
+Thanh cong:
+
+```json
+{
+  "message": "Đặt lại mật khẩu thành công, vui lòng đăng nhập lại"
+}
+```
+
+OTP sai, het han hoac vuot so lan thu (`OTP_MAX_ATTEMPTS`, mac dinh 5) tra ve `400 Bad Request`:
+
+```json
+{
+  "statusCode": 400,
+  "message": "Mã OTP không hợp lệ hoặc đã hết hạn",
+  "error": "Bad Request"
+}
+```
+
+Dat lai mat khau thanh cong se huy refresh token hien tai; user can dang nhap lai.
+
 ### Doi mat khau
 
 ```http
