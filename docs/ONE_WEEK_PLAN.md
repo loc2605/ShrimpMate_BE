@@ -24,8 +24,11 @@ Các phần cần tiếp tục:
 - [ ] Kết nối MQTT.
 - [ ] Bổ sung test cho các chức năng chính.
 - [x] Rà soát timestamp, index lọc và index truy vấn theo thời gian.
+- [x] Thêm index Feeding Record theo `(pond_id, created_at)`.
 - [x] Bổ sung format lỗi validation `400` và `404` trong tài liệu API.
 - [x] Ghi chú cập nhật seed khi thêm quan hệ User-Pond.
+- [x] Triển khai User-Pond assignment trước Telemetry/Alert.
+- [x] Tách heartbeat REST thủ công khỏi heartbeat thiết bị qua MQTT.
 - [ ] AI và tài liệu sẽ thực hiện sau khi backend cốt lõi ổn định.
 
 ## 2. Kế hoạch theo từng ngày

@@ -6,13 +6,15 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import type { SignOptions } from 'jsonwebtoken';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { User } from '../../database/entities/user.entity';
+import { Pond } from '../../database/entities/pond.entity';
+import { UserPondAssignment } from '../../database/entities/user-pond-assignment.entity';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User]),
+    TypeOrmModule.forFeature([User, Pond, UserPondAssignment]),
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],

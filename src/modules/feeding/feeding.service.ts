@@ -11,6 +11,8 @@ import { CreateFeedingRecordDto } from './dto/create-feeding-record.dto';
 import { CreateFeedingScheduleDto } from './dto/create-feeding-schedule.dto';
 import { UpdateFeedingScheduleDto } from './dto/update-feeding-schedule.dto';
 import { UpdateFeedingRecordDto } from './dto/update-feeding-record.dto';
+import { User } from '../../database/entities/user.entity';
+import { PondAccessService } from '../../common/guards/pond-access.service';
 
 @Injectable()
 export class FeedingService {
@@ -25,6 +27,7 @@ export class FeedingService {
 		private readonly deviceRepository: Repository<Device>,
 		@InjectRepository(CropSeason)
 		private readonly cropSeasonRepository: Repository<CropSeason>,
+		private readonly pondAccessService: PondAccessService,
 	) {}
 
 	async createSchedule(pondId: string, dto: CreateFeedingScheduleDto) {
@@ -42,8 +45,9 @@ export class FeedingService {
 		return this.scheduleRepository.save(schedule);
 	}
 
-	async findSchedulesByPond(pondId: string) {
+	async findSchedulesByPond(pondId: string, user?: User) {
 		await this.findPond(pondId);
+		if (user) await this.pondAccessService.ensureCanAccess(user, pondId);
 		return this.scheduleRepository.find({ where: { pondId }, order: { timeOfDay: 'ASC' } });
 	}
 
@@ -111,8 +115,9 @@ export class FeedingService {
 		return this.recordRepository.save(record);
 	}
 
-	async findRecordsByPond(pondId: string) {
+	async findRecordsByPond(pondId: string, user?: User) {
 		await this.findPond(pondId);
+		if (user) await this.pondAccessService.ensureCanAccess(user, pondId);
 		return this.recordRepository.find({
 			where: { pondId },
 			relations: { device: true, schedule: true },

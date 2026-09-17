@@ -14,7 +14,7 @@ Authorization: Bearer <access_token>
 
 - `admin`: toan quyen
 - `manager`: xem, tao va cap nhat du lieu van hanh
-- `operator`: chi xem du lieu, duoc phep dung emergency stop va heartbeat Device
+- `operator`: chi xem du lieu trong cac Pond duoc gan, duoc phep dung emergency stop Device
 
 Neu khong co token hoac token khong hop le, API tra ve `401 Unauthorized`.
 Neu role khong du quyen, API tra ve `403 Forbidden`.
@@ -218,6 +218,26 @@ Body:
 ```
 
 Tai khoan bi khoa khong the dang nhap va cac refresh token cua tai khoan do bi huy. Admin khong the tu khoa tai khoan dang dang nhap.
+
+### Gan User vao Pond
+
+```http
+POST /auth/users/:userId/ponds
+```
+
+Quyen: `admin`.
+
+Body: `{ "pondId": "uuid-cua-pond" }`.
+
+### Huy gan User khoi Pond
+
+```http
+DELETE /auth/users/:userId/ponds/:pondId
+```
+
+Quyen: `admin`.
+
+Operator chi xem va thao tac tren cac Pond duoc gan; manager/admin van co quyen toan he thong theo role hien tai.
 
 ---
 
@@ -470,7 +490,7 @@ Endpoint này chỉ đổi `mode` sang `emergency_stop`; operator không đượ
 POST /devices/:id/heartbeat
 ```
 
-Quyen: `admin`, `manager`, `operator`.
+Quyen: `admin`, `manager` cho thao tác REST test/thủ công. Operator không gọi endpoint này. Thiết bị thật nên gửi heartbeat qua MQTT; khi đó MQTT là nguồn cập nhật `lastSeenAt` chính.
 
 Endpoint cập nhật `lastSeenAt` thành thời điểm hiện tại để theo dõi thiết bị mất kết nối. MQTT có thể gọi cùng service này khi tích hợp.
 
@@ -674,7 +694,7 @@ Ung dung tu dong tao du lieu mau khi khoi dong neu database chua co du lieu:
 - 2 Crop Season mau
 - 3 Device mau
 - 3 Feeding Schedule mau
-- 2 tai khoan mau trong moi truong khong phai production
+- 3 tai khoan mau trong moi truong khong phai production
 
 Du lieu seed nam tai:
 
@@ -683,9 +703,12 @@ Du lieu seed nam tai:
 - `src/database/seeds/device.seed.ts`
 - `src/database/seeds/feeding.seed.ts`
 - `src/database/seeds/user.seed.ts`
+- `src/database/seeds/user-pond-assignment.seed.ts`
 
 Seed co tinh idempotent: neu bang da co du lieu thi khong tao trung lan nua.
-Khi them bang phan quyen User-Pond, can cap nhat seed va migration cung luc voi schema moi; seed User/Pond hien tai chua tao assignment.
+User operator mau duoc gan hai Pond dau tien boi `user-pond-assignment.seed.ts`; cac user dang ky moi khong duoc gan Pond tu dong va can Admin gan qua API assignment.
+
+Heartbeat thiet bi that se duoc chuyen sang MQTT khi module MQTT duoc trien khai; endpoint REST hien chi phuc vu test/thao tac thu cong.
 
 ---
 

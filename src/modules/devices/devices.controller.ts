@@ -15,6 +15,8 @@ import { UserRole } from '../../database/entities/enums';
 import { CreateDeviceDto } from './dto/create-device.dto';
 import { UpdateDeviceDto } from './dto/update-device.dto';
 import { DevicesService } from './devices.service';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { User } from '../../database/entities/user.entity';
 
 @Controller('devices')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -23,8 +25,8 @@ export class DevicesController {
 
   @Get()
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR)
-  findAll() {
-    return this.devicesService.findAllDevices();
+  findAll(@CurrentUser() user: User) {
+    return this.devicesService.findAllDevices(user);
   }
 
   @Post()
@@ -35,14 +37,14 @@ export class DevicesController {
 
   @Get(':id')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR)
-  findOne(@Param('id') id: string) {
-    return this.devicesService.findDeviceById(id);
+  findOne(@Param('id') id: string, @CurrentUser() user: User) {
+    return this.devicesService.findDeviceById(id, user);
   }
 
   @Patch(':id')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  update(@Param('id') id: string, @Body() updateDeviceDto: UpdateDeviceDto) {
-    return this.devicesService.updateDevice(id, updateDeviceDto);
+  update(@Param('id') id: string, @Body() updateDeviceDto: UpdateDeviceDto, @CurrentUser() user: User) {
+    return this.devicesService.updateDevice(id, updateDeviceDto, user);
   }
 
   @Delete(':id')
@@ -53,13 +55,13 @@ export class DevicesController {
 
   @Post(':id/emergency-stop')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR)
-  emergencyStop(@Param('id') id: string) {
-    return this.devicesService.emergencyStop(id);
+  emergencyStop(@Param('id') id: string, @CurrentUser() user: User) {
+    return this.devicesService.emergencyStop(id, user);
   }
 
   @Post(':id/heartbeat')
-  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR)
-  heartbeat(@Param('id') id: string) {
-    return this.devicesService.heartbeat(id);
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  heartbeat(@Param('id') id: string, @CurrentUser() user: User) {
+    return this.devicesService.heartbeat(id, user);
   }
 }

@@ -15,6 +15,7 @@ Tài liệu mô tả database hiện tại dựa trên các entity và migration
 - `ai_recommendations`
 - `safety_rules`
 - `alerts`
+- `user_pond_assignments`
 
 ## 2. Chi tiết bảng
 
@@ -35,6 +36,19 @@ Lưu tài khoản đăng nhập.
 | `updated_at` | TIMESTAMPTZ | Thời gian cập nhật |
 
 Hiện tại `users` chưa có khóa ngoại đến bảng nghiệp vụ.
+
+### `user_pond_assignments`
+
+Bảng trung gian giới hạn operator theo Pond.
+
+| Cột | Kiểu | Ràng buộc / Mô tả |
+|---|---|---|
+| `id` | UUID | PK |
+| `user_id` | UUID | FK -> `users.id`, bắt buộc |
+| `pond_id` | UUID | FK -> `ponds.id`, bắt buộc |
+| `created_at` | TIMESTAMPTZ | Thời gian gán |
+
+Unique trên (`user_id`, `pond_id`); có index riêng trên `user_id` và `pond_id`.
 
 ### `farms`
 
@@ -166,6 +180,8 @@ Lưu dữ liệu đo từ cảm biến môi trường.
 
 Index hiện có: `(pond_id, measured_at)` và `(device_id, measured_at)`.
 
+Feeding Record có index theo `(pond_id, started_at)`, `(pond_id, created_at)`, `(device_id, started_at)` và `(pond_id, status)`.
+
 ### `ai_recommendations`
 
 Lưu các đề xuất do AI tạo ra.
@@ -243,6 +259,8 @@ Lưu các cảnh báo từ ao hoặc thiết bị.
 | `devices` -> `telemetry_readings` | 1 - N, tùy chọn | Xóa device sẽ set FK thành `NULL` |
 | `devices` -> `alerts` | 1 - N, tùy chọn | Xóa device sẽ set FK thành `NULL` |
 | `feeding_schedules` -> `feeding_records` | 1 - N, tùy chọn | Xóa schedule sẽ set FK thành `NULL` |
+| `users` -> `user_pond_assignments` | 1 - N | Xóa user sẽ xóa assignment |
+| `ponds` -> `user_pond_assignments` | 1 - N | Xóa pond sẽ xóa assignment |
 
 ## 4. ERD Mermaid
 
@@ -259,6 +277,13 @@ erDiagram
         timestamptz created_at
         timestamptz updated_at
         timestamptz deleted_at
+    }
+
+    USER_POND_ASSIGNMENTS {
+        uuid id PK
+        uuid user_id FK
+        uuid pond_id FK
+        timestamptz created_at
     }
 
     FARMS {
@@ -411,6 +436,8 @@ erDiagram
     PONDS ||--o{ TELEMETRY_READINGS : receives
     PONDS ||--o{ AI_RECOMMENDATIONS : receives
     PONDS ||--o{ ALERTS : generates
+    USERS ||--o{ USER_POND_ASSIGNMENTS : receives
+    PONDS ||--o{ USER_POND_ASSIGNMENTS : grants
     DEVICES o|--o{ FEEDING_RECORDS : executes
     DEVICES o|--o{ TELEMETRY_READINGS : sends
     DEVICES o|--o{ ALERTS : triggers
@@ -424,4 +451,5 @@ erDiagram
 - `device_id` và `schedule_id` trong các bảng nghiệp vụ là khóa ngoại tùy chọn.
 - `pond_id` của `devices` là tùy chọn vì thiết bị có thể tồn tại trước khi được gán vào ao.
 - `users` và `safety_rules` hiện là các bảng độc lập.
+- `user_pond_assignments` là bảng trung gian; operator chỉ truy cập Pond được gán, còn manager/admin giữ quyền toàn hệ thống.
 - Một số tên cột dùng camel case là `isActive` và `rawData`; các cột còn lại chủ yếu dùng snake case.

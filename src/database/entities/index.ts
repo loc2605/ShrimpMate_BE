@@ -10,6 +10,7 @@ export * from './pond.entity';
 export * from './safety-rule.entity';
 export * from './telemetry-reading.entity';
 export * from './user.entity';
+export * from './user-pond-assignment.entity';
 
 import { Alert } from './alert.entity';
 import { AiRecommendation } from './ai-recommendation.entity';
@@ -22,9 +23,11 @@ import { Pond } from './pond.entity';
 import { SafetyRule } from './safety-rule.entity';
 import { TelemetryReading } from './telemetry-reading.entity';
 import { User } from './user.entity';
+import { UserPondAssignment } from './user-pond-assignment.entity';
 
 export const entities = [
 	User,
+	UserPondAssignment,
 	Farm,
 	Pond,
 	CropSeason,

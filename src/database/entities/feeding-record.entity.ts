@@ -6,6 +6,7 @@ import { AppetiteLevel, FeedingSource, FeedingStatus } from './enums';
 
 @Entity('feeding_records')
 @Index('IDX_feeding_records_pond_started', ['pondId', 'startedAt'])
+@Index('IDX_feeding_records_pond_created', ['pondId', 'createdAt'])
 @Index('IDX_feeding_records_device_started', ['deviceId', 'startedAt'])
 @Index('IDX_feeding_records_pond_status', ['pondId', 'status'])
 export class FeedingRecord {

@@ -10,6 +10,8 @@ import { Pond } from '../../database/entities/pond.entity';
 import { DeviceMode } from '../../database/entities/enums';
 import { CreateDeviceDto } from './dto/create-device.dto';
 import { UpdateDeviceDto } from './dto/update-device.dto';
+import { User } from '../../database/entities/user.entity';
+import { PondAccessService } from '../../common/guards/pond-access.service';
 
 @Injectable()
 export class DevicesService {
@@ -18,6 +20,7 @@ export class DevicesService {
     private readonly deviceRepository: Repository<Device>,
     @InjectRepository(Pond)
     private readonly pondRepository: Repository<Pond>,
+    private readonly pondAccessService: PondAccessService,
   ) {}
 
   async createDevice(createDeviceDto: CreateDeviceDto) {
@@ -51,14 +54,21 @@ export class DevicesService {
     }
   }
 
-  async findAllDevices() {
+  async findAllDevices(user?: User) {
+    const assignedPondIds = user ? await this.pondAccessService.findAssignedPondIds(user) : null;
+    const where = assignedPondIds
+      ? assignedPondIds.length > 0
+        ? assignedPondIds.map((pondId) => ({ pondId }))
+        : { id: '00000000-0000-0000-0000-000000000000' }
+      : undefined;
     return this.deviceRepository.find({
+      where,
       order: { createdAt: 'DESC' },
       relations: { pond: true },
     });
   }
 
-  async findDeviceById(id: string) {
+  async findDeviceById(id: string, user?: User) {
     const device = await this.deviceRepository.findOne({
       where: { id },
       relations: { pond: true },
@@ -67,12 +77,15 @@ export class DevicesService {
     if (!device) {
       throw new NotFoundException(`Không tìm thấy thiết bị với id ${id}`);
     }
+    if (user && device.pondId) {
+      await this.pondAccessService.ensureCanAccess(user, device.pondId);
+    }
 
     return device;
   }
 
-  async updateDevice(id: string, updateDeviceDto: UpdateDeviceDto) {
-    const device = await this.findDeviceById(id);
+  async updateDevice(id: string, updateDeviceDto: UpdateDeviceDto, user?: User) {
+    const device = await this.findDeviceById(id, user);
 
     if (updateDeviceDto.deviceUid && updateDeviceDto.deviceUid.trim() !== device.deviceUid) {
       const existing = await this.deviceRepository.findOne({
@@ -87,6 +100,9 @@ export class DevicesService {
     if (updateDeviceDto.pondId !== undefined) {
       if (updateDeviceDto.pondId) {
         await this.ensurePondExists(updateDeviceDto.pondId);
+        if (user) {
+          await this.pondAccessService.ensureCanAccess(user, updateDeviceDto.pondId);
+        }
       }
       device.pondId = updateDeviceDto.pondId ?? null;
     }
@@ -112,14 +128,14 @@ export class DevicesService {
     return { message: `Đã xoá thiết bị ${device.name}` };
   }
 
-  async emergencyStop(id: string) {
-    const device = await this.findDeviceById(id);
+  async emergencyStop(id: string, user?: User) {
+    const device = await this.findDeviceById(id, user);
     device.mode = DeviceMode.EMERGENCY_STOP;
     return this.deviceRepository.save(device);
   }
 
-  async heartbeat(id: string) {
-    const device = await this.findDeviceById(id);
+  async heartbeat(id: string, user?: User) {
+    const device = await this.findDeviceById(id, user);
     device.lastSeenAt = new Date();
     return this.deviceRepository.save(device);
   }

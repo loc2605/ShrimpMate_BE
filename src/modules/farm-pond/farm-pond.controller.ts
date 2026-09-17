@@ -19,6 +19,8 @@ import { CreatePondDto } from './dto/create-pond.dto';
 import { UpdatePondDto } from './dto/update-pond.dto';
 import { PaginationDto } from './dto/pagination.dto';
 import { FarmPondService } from './farm-pond.service';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { User } from '../../database/entities/user.entity';
 
 @Controller('farms')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -27,8 +29,8 @@ export class FarmPondController {
 
   @Get()
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR)
-  findAllFarms(@Query() pagination: PaginationDto) {
-    return this.farmPondService.findAllFarms(pagination);
+  findAllFarms(@Query() pagination: PaginationDto, @CurrentUser() user: User) {
+    return this.farmPondService.findAllFarms(pagination, user);
   }
 
   @Post()
@@ -39,8 +41,8 @@ export class FarmPondController {
 
   @Get(':id')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR)
-  findFarmById(@Param('id') id: string) {
-    return this.farmPondService.findFarmById(id);
+  findFarmById(@Param('id') id: string, @CurrentUser() user: User) {
+    return this.farmPondService.findFarmById(id, user);
   }
 
   @Patch(':id')
@@ -57,8 +59,8 @@ export class FarmPondController {
 
   @Get(':farmId/ponds')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR)
-  findAllPondsByFarm(@Param('farmId') farmId: string, @Query() pagination: PaginationDto) {
-    return this.farmPondService.findAllPondsByFarm(farmId, pagination);
+  findAllPondsByFarm(@Param('farmId') farmId: string, @Query() pagination: PaginationDto, @CurrentUser() user: User) {
+    return this.farmPondService.findAllPondsByFarm(farmId, pagination, user);
   }
 
   @Post(':farmId/ponds')
@@ -69,19 +71,19 @@ export class FarmPondController {
 
   @Get(':farmId/ponds/:id')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR)
-  findPondById(@Param('id') id: string) {
-    return this.farmPondService.findPondById(id);
+  findPondById(@Param('id') id: string, @CurrentUser() user: User) {
+    return this.farmPondService.findPondById(id, user);
   }
 
   @Patch(':farmId/ponds/:id')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  updatePond(@Param('id') id: string, @Body() updatePondDto: UpdatePondDto) {
-    return this.farmPondService.updatePond(id, updatePondDto);
+  updatePond(@Param('id') id: string, @Body() updatePondDto: UpdatePondDto, @CurrentUser() user: User) {
+    return this.farmPondService.updatePond(id, updatePondDto, user);
   }
 
   @Delete(':farmId/ponds/:id')
   @Roles(UserRole.ADMIN)
-  deletePond(@Param('id') id: string) {
-    return this.farmPondService.removePond(id);
+  deletePond(@Param('id') id: string, @CurrentUser() user: User) {
+    return this.farmPondService.removePond(id, user);
   }
 }

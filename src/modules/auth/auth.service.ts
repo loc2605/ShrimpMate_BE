@@ -9,6 +9,8 @@ import { User } from '../../database/entities/user.entity';
 import { UserRole } from '../../database/entities/enums';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { Pond } from '../../database/entities/pond.entity';
+import { UserPondAssignment } from '../../database/entities/user-pond-assignment.entity';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 
@@ -20,6 +22,8 @@ export class AuthService {
     @InjectRepository(User) private readonly userRepository: Repository<User>,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    @InjectRepository(Pond) private readonly pondRepository: Repository<Pond>,
+    @InjectRepository(UserPondAssignment) private readonly assignmentRepository: Repository<UserPondAssignment>,
   ) {}
 
   async register(registerDto: RegisterDto) {
@@ -103,6 +107,23 @@ export class AuthService {
     }
     await this.userRepository.save(user);
     return this.toSafeUser(user);
+  }
+
+  async assignPond(userId: string, pondId: string) {
+    await this.findUser(userId);
+    if (!(await this.pondRepository.findOne({ where: { id: pondId } }))) {
+      throw new NotFoundException(`Không tìm thấy ao nuôi với id ${pondId}`);
+    }
+    const existing = await this.assignmentRepository.findOne({ where: { userId, pondId } });
+    if (existing) return existing;
+    return this.assignmentRepository.save(this.assignmentRepository.create({ userId, pondId }));
+  }
+
+  async removePondAssignment(userId: string, pondId: string) {
+    const assignment = await this.assignmentRepository.findOne({ where: { userId, pondId } });
+    if (!assignment) throw new NotFoundException('Không tìm thấy phân quyền Pond');
+    await this.assignmentRepository.remove(assignment);
+    return { message: 'Đã hủy phân quyền Pond' };
   }
 
   private async createAuthResponse(user: User) {

@@ -16,11 +16,17 @@ const defaultUsers = [
     fullName: 'ShrimpMate Manager',
     role: UserRole.MANAGER,
   },
+  {
+    email: process.env.SEED_OPERATOR_EMAIL ?? 'operator@shrimpmate.local',
+    password: process.env.SEED_OPERATOR_PASSWORD ?? 'Operator@123456',
+    fullName: 'ShrimpMate Operator',
+    role: UserRole.OPERATOR,
+  },
 ];
 
 if (process.env.NODE_ENV === 'production') {
   const hasDefaultPassword = defaultUsers.some((user) =>
-    ['Admin@123456', 'Manager@123456'].includes(user.password),
+    ['Admin@123456', 'Manager@123456', 'Operator@123456'].includes(user.password),
   );
   if (hasDefaultPassword) {
     console.warn('WARNING: production is using a default seed password. Set SEED_*_PASSWORD before deployment.');

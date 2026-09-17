@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -10,6 +10,7 @@ import { RegisterDto } from './dto/register.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
+import { AssignPondDto } from './dto/assign-pond.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -61,6 +62,20 @@ export class AuthController {
     @CurrentUser() currentUser: User,
   ) {
     return this.authService.updateUserStatus(id, dto, currentUser.id);
+  }
+
+  @Post('users/:userId/ponds')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  assignPond(@Param('userId') userId: string, @Body() dto: AssignPondDto) {
+    return this.authService.assignPond(userId, dto.pondId);
+  }
+
+  @Delete('users/:userId/ponds/:pondId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  removePondAssignment(@Param('userId') userId: string, @Param('pondId') pondId: string) {
+    return this.authService.removePondAssignment(userId, pondId);
   }
 
   @Get('admin-check')
