@@ -11,6 +11,8 @@ import { FarmStatus, PondStatus } from '../../database/entities/enums';
 import { CreateFarmDto } from './dto/create-farm.dto';
 import { UpdateFarmDto } from './dto/update-farm.dto';
 import { CreatePondDto } from './dto/create-pond.dto';
+import { PaginationDto } from './dto/pagination.dto';
+import { UpdatePondDto } from './dto/update-pond.dto';
 
 @Injectable()
 export class FarmPondService {
@@ -24,16 +26,21 @@ export class FarmPondService {
   async createFarm(createFarmDto: CreateFarmDto) {
     const farm = this.farmRepository.create({
       ...createFarmDto,
+      name: createFarmDto.name.trim(),
+      address: createFarmDto.address?.trim() || null,
       status: createFarmDto.status ?? FarmStatus.ACTIVE,
     });
 
     return this.farmRepository.save(farm);
   }
 
-  async findAllFarms() {
-    return this.farmRepository.find({
+  async findAllFarms({ page = 1, limit = 20 }: PaginationDto = new PaginationDto()) {
+    const [data, total] = await this.farmRepository.findAndCount({
+      skip: (page - 1) * limit,
+      take: limit,
       order: { createdAt: 'DESC' },
     });
+    return { data, meta: { page, limit, total, pageCount: Math.ceil(total / limit) } };
   }
 
   async findFarmById(id: string) {
@@ -46,13 +53,21 @@ export class FarmPondService {
 
   async updateFarm(id: string, updateFarmDto: UpdateFarmDto) {
     const farm = await this.findFarmById(id);
-    Object.assign(farm, updateFarmDto);
+    Object.assign(farm, {
+      ...updateFarmDto,
+      name: updateFarmDto.name?.trim() ?? farm.name,
+      address: updateFarmDto.address !== undefined ? updateFarmDto.address.trim() || null : farm.address,
+    });
     return this.farmRepository.save(farm);
   }
 
   async removeFarm(id: string) {
     const farm = await this.findFarmById(id);
-    await this.farmRepository.remove(farm);
+    const ponds = await this.pondRepository.find({ where: { farmId: farm.id } });
+    if (ponds.length > 0) {
+      await this.pondRepository.softRemove(ponds);
+    }
+    await this.farmRepository.softRemove(farm);
     return { message: `Đã xoá trang trại ${farm.name}` };
   }
 
@@ -78,13 +93,16 @@ export class FarmPondService {
     return this.pondRepository.save(pond);
   }
 
-  async findAllPondsByFarm(farmId: string) {
+  async findAllPondsByFarm(farmId: string, { page = 1, limit = 20 }: PaginationDto = new PaginationDto()) {
     await this.findFarmById(farmId);
 
-    return this.pondRepository.find({
+    const [data, total] = await this.pondRepository.findAndCount({
       where: { farmId },
+      skip: (page - 1) * limit,
+      take: limit,
       order: { code: 'ASC' },
     });
+    return { data, meta: { page, limit, total, pageCount: Math.ceil(total / limit) } };
   }
 
   async findPondById(id: string) {
@@ -100,7 +118,7 @@ export class FarmPondService {
     return pond;
   }
 
-  async updatePond(id: string, updateData: Partial<CreatePondDto>) {
+  async updatePond(id: string, updateData: UpdatePondDto) {
     const pond = await this.findPondById(id);
 
     if (updateData.code && updateData.code.trim() !== pond.code) {
@@ -124,7 +142,7 @@ export class FarmPondService {
 
   async removePond(id: string) {
     const pond = await this.findPondById(id);
-    await this.pondRepository.remove(pond);
+    await this.pondRepository.softRemove(pond);
     return { message: `Đã xoá ao ${pond.name}` };
   }
 }

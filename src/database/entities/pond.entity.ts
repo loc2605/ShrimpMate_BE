@@ -1,4 +1,4 @@
-import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, DeleteDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 import { Farm } from './farm.entity';
 import { PondStatus } from './enums';
 
@@ -25,4 +25,7 @@ export class Pond {
 
   @Column({ type: 'enum', enum: PondStatus, default: PondStatus.ACTIVE })
   status!: PondStatus;
+
+  @DeleteDateColumn({ name: 'deleted_at', type: 'timestamptz', nullable: true })
+  deletedAt!: Date | null;
 }

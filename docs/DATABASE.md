@@ -47,6 +47,7 @@ Lưu thông tin trang trại.
 | `status` | ENUM | `active`, `inactive` |
 | `created_at` | TIMESTAMPTZ | Thời gian tạo |
 | `updated_at` | TIMESTAMPTZ | Thời gian cập nhật |
+| `deleted_at` | TIMESTAMPTZ | Có thể rỗng, dùng cho soft delete |
 
 ### `ponds`
 
@@ -60,6 +61,7 @@ Lưu thông tin ao nuôi.
 | `name` | VARCHAR(150) | Tên ao |
 | `area_m2` | NUMERIC(12,2) | Diện tích |
 | `status` | ENUM | `active`, `inactive`, `maintenance` |
+| `deleted_at` | TIMESTAMPTZ | Có thể rỗng, dùng cho soft delete |
 
 ### `crop_seasons`
 

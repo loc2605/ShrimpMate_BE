@@ -200,6 +200,9 @@ GET /farms
 
 Quyen: `admin`, `manager`, `operator`.
 
+Query tuy chon: `page` (mac dinh `1`) va `limit` (mac dinh `20`, toi da `100`). Vi du: `GET /farms?page=1&limit=20`.
+Response gom `data` va `meta` (`page`, `limit`, `total`, `pageCount`).
+
 ### Tao Farm
 
 ```http
@@ -219,6 +222,8 @@ Body:
 ```
 
 Gia tri `status`: `active`, `inactive`.
+
+`name` khong duoc rong hoac chi gom khoang trang.
 
 ### Lay chi tiet Farm
 
@@ -259,7 +264,7 @@ DELETE /farms/:id
 
 Quyen: `admin`.
 
-Luu y: xoa Farm se xoa cac Pond thuoc Farm do theo quan he cascade.
+Luu y: Farm va cac Pond thuoc Farm duoc soft delete bang `deletedAt`, khong xoa cung du lieu lich su Crop Season, Feeding Record, Telemetry va Alert.
 
 ---
 
@@ -272,6 +277,9 @@ GET /farms/:farmId/ponds
 ```
 
 Quyen: `admin`, `manager`, `operator`.
+
+Query tuy chon: `page` (mac dinh `1`) va `limit` (mac dinh `20`, toi da `100`). Vi du: `GET /farms/:farmId/ponds?page=1&limit=20`.
+Response gom `data` va `meta` (`page`, `limit`, `total`, `pageCount`).
 
 Vi du:
 
@@ -299,6 +307,8 @@ Body:
 ```
 
 Gia tri `status`: `active`, `inactive`, `maintenance`.
+
+`name` khong duoc rong hoac chi gom khoang trang; `areaM2` phai lon hon `0`.
 
 ### Lay chi tiet Pond
 

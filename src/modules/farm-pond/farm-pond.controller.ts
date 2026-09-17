@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -15,6 +16,8 @@ import { UserRole } from '../../database/entities/enums';
 import { CreateFarmDto } from './dto/create-farm.dto';
 import { UpdateFarmDto } from './dto/update-farm.dto';
 import { CreatePondDto } from './dto/create-pond.dto';
+import { UpdatePondDto } from './dto/update-pond.dto';
+import { PaginationDto } from './dto/pagination.dto';
 import { FarmPondService } from './farm-pond.service';
 
 @Controller('farms')
@@ -24,8 +27,8 @@ export class FarmPondController {
 
   @Get()
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR)
-  findAllFarms() {
-    return this.farmPondService.findAllFarms();
+  findAllFarms(@Query() pagination: PaginationDto) {
+    return this.farmPondService.findAllFarms(pagination);
   }
 
   @Post()
@@ -54,8 +57,8 @@ export class FarmPondController {
 
   @Get(':farmId/ponds')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR)
-  findAllPondsByFarm(@Param('farmId') farmId: string) {
-    return this.farmPondService.findAllPondsByFarm(farmId);
+  findAllPondsByFarm(@Param('farmId') farmId: string, @Query() pagination: PaginationDto) {
+    return this.farmPondService.findAllPondsByFarm(farmId, pagination);
   }
 
   @Post(':farmId/ponds')
@@ -72,7 +75,7 @@ export class FarmPondController {
 
   @Patch(':farmId/ponds/:id')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  updatePond(@Param('id') id: string, @Body() updatePondDto: Partial<CreatePondDto>) {
+  updatePond(@Param('id') id: string, @Body() updatePondDto: UpdatePondDto) {
     return this.farmPondService.updatePond(id, updatePondDto);
   }
 

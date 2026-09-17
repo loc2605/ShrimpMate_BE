@@ -8,8 +8,8 @@ Các phần đã có:
 - [x] Đăng nhập tài khoản `POST /auth/login`.
 - [x] JWT authentication.
 - [x] Phân quyền theo role: `admin`, `manager`, `operator`.
-- [x] Tạo, xem danh sách, xem chi tiết, cập nhật và xóa Farm.
-- [x] Tạo, xem danh sách, xem chi tiết, cập nhật và xóa Pond.
+- [x] Tạo, xem danh sách, xem chi tiết, cập nhật và xóa mềm Farm.
+- [x] Tạo, xem danh sách, xem chi tiết, cập nhật và xóa mềm Pond.
 - [x] Tạo, xem, cập nhật và xóa Crop Season.
 - [x] Database migration và các entity chính.
 - [x] Seed dữ liệu Farm, Pond, Crop Season và tài khoản mẫu.
@@ -50,11 +50,13 @@ Kết quả cần đạt: đăng ký, đăng nhập và JWT hoạt động ổn 
 - [ ] Test đầy đủ CRUD Farm bằng Postman.
 - [ ] Test đầy đủ CRUD Pond theo từng Farm.
 - [ ] Kiểm tra không cho trùng mã Pond trong cùng một Farm.
-- [ ] Kiểm tra xóa Farm có xóa các Pond liên quan.
+- [x] Kiểm tra xóa mềm Farm đồng thời xóa mềm các Pond liên quan.
 - [ ] Test CRUD Crop Season.
 - [ ] Kiểm tra mỗi Pond chỉ có một Crop Season ở trạng thái `active`.
 - [ ] Bổ sung kiểm tra dữ liệu đầu vào và thông báo lỗi rõ ràng.
 - [ ] Xác định có cần thêm quan hệ người dùng với Farm hay không.
+- [x] Thêm phân trang `page`, `limit` cho danh sách Farm và Pond.
+- [x] Validate tên không rỗng và `areaM2 > 0`.
 
 Kết quả cần đạt: hoàn chỉnh phần quản lý trang trại, ao và vụ nuôi để demo được.
 
