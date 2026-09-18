@@ -28,7 +28,7 @@ export class FeedingService {
 		@InjectRepository(CropSeason)
 		private readonly cropSeasonRepository: Repository<CropSeason>,
 		private readonly pondAccessService: PondAccessService,
-	) {}
+	) { }
 
 	async createSchedule(pondId: string, dto: CreateFeedingScheduleDto, user?: User) {
 		await this.ensurePondCanReceiveFeeding(pondId, user);
@@ -169,8 +169,8 @@ export class FeedingService {
 		const schedules = await this.scheduleRepository.find({ where: { pondId } });
 		const conflict = schedules.find((schedule) =>
 			schedule.id !== excludedId
-				&& schedule.timeOfDay === timeOfDay
-				&& schedule.daysOfWeek.some((day) => daysOfWeek.includes(day)),
+			&& schedule.timeOfDay === timeOfDay
+			&& schedule.daysOfWeek.some((day) => daysOfWeek.includes(day)),
 		);
 		if (conflict) {
 			throw new BadRequestException('Pond đã có lịch cho ăn trùng giờ và ngày trong tuần');

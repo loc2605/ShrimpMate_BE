@@ -22,7 +22,7 @@ export class DevicesService {
     @InjectRepository(Pond)
     private readonly pondRepository: Repository<Pond>,
     private readonly pondAccessService: PondAccessService,
-  ) {}
+  ) { }
 
   async createDevice(createDeviceDto: CreateDeviceDto, user?: User) {
     const normalizedUid = createDeviceDto.deviceUid.trim();

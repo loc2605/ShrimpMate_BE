@@ -10,7 +10,7 @@ export class PondAccessService {
   constructor(
     @InjectRepository(UserPondAssignment)
     private readonly assignmentRepository: Repository<UserPondAssignment>,
-  ) {}
+  ) { }
 
   async ensureCanAccess(user: User, pondId: string) {
     if (![UserRole.OPERATOR, UserRole.MANAGER].includes(user.role)) {

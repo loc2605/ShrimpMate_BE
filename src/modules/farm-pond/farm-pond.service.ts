@@ -25,7 +25,7 @@ export class FarmPondService {
     @InjectRepository(Pond)
     private readonly pondRepository: Repository<Pond>,
     private readonly pondAccessService: PondAccessService,
-  ) {}
+  ) { }
 
   async createFarm(createFarmDto: CreateFarmDto) {
     const farm = this.farmRepository.create({

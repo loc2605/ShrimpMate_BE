@@ -2,13 +2,44 @@
 
 ## 1. Thong tin chung
 
-- Base URL: `http://localhost:3000`
+- Base URL: `http://localhost:3000` (hoặc `http://<IP_MAY_BACKEND>:3000` khi chạy khác máy trong mạng LAN)
 - Content-Type: `application/json`
 - Cac API duoc bao ve su dung JWT can header:
 
 ```http
 Authorization: Bearer <access_token>
 ```
+
+### Cau hinh ket noi Frontend (khi FE va BE chay tren 2 may khac nhau)
+
+Mac dinh tren cung 1 may, FE goi API qua `http://localhost:3000`. Khi FE va BE chay o 2 may rieng biet:
+
+#### 1. Cung mang Wi-Fi / LAN (Thuong dung khi lam viec nhom)
+- **Kiem tra IP may Backend**: Tren may Backend, mo terminal chay `ipconfig` de lay dia chi `IPv4 Address` (vi du: `192.168.24.35`).
+- **Cau hinh Base URL tren Frontend**: Trong file `.env` (hoac config Axios/Fetch) cua Frontend, thay `localhost` bang IP may Backend:
+  ```env
+  # Vi du voi Vite:
+  VITE_API_BASE_URL=http://192.168.24.35:3000
+
+  # Vi du voi Next.js:
+  NEXT_PUBLIC_API_URL=http://192.168.24.35:3000
+  ```
+- **Backend CORS & Host**: Backend da duoc cau hinh `app.enableCors({ origin: true, credentials: true })` va lang nghe tren host `0.0.0.0` tai `src/main.ts` de chap nhan request tu thiet bi khac trong mang.
+- **Luu y Tuong lua (Windows Firewall)**: Neu FE bao loi timeout (`ERR_CONNECTION_TIMED_OUT`), can mo cong 3000 tren Firewall cua may Backend:
+  1. Mo `Windows Defender Firewall with Advanced Security`.
+  2. Vao `Inbound Rules` -> `New Rule...` -> Chon `Port` -> Nhap `3000` -> Chon `Allow the connection`.
+
+#### 2. Khac mang (Ket noi tu xa qua Internet)
+- Khi 2 may o 2 noi khac nhau (khac Wi-Fi), dung Tunnel tren may Backend de tao link HTTPS public:
+  - **Cloudflare Tunnel (Mien phi, khong can tai khoan)**:
+    ```powershell
+    npx cloudflared tunnel --url http://localhost:3000
+    ```
+  - **Ngrok**:
+    ```powershell
+    npx ngrok http 3000
+    ```
+- Copy duong link HTTPS duoc tao ra (vi du: `https://xxxx.trycloudflare.com`) va gan vao Base URL cua Frontend.
 
 ### Role
 

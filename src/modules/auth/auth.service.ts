@@ -39,7 +39,7 @@ export class AuthService {
     @InjectRepository(UserPondAssignment) private readonly assignmentRepository: Repository<UserPondAssignment>,
     @InjectRepository(PasswordResetOtp) private readonly passwordResetOtpRepository: Repository<PasswordResetOtp>,
     private readonly otpDeliveryService: OtpDeliveryService,
-  ) {}
+  ) { }
 
   async register(registerDto: RegisterDto) {
     const email = registerDto.email.trim().toLowerCase();
