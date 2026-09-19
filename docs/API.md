@@ -1,156 +1,109 @@
 # ShrimpMate Backend API
 
-## 1. Thong tin chung
+## 1. Thông tin chung
 
 - Base URL: `http://localhost:3000` (hoặc `http://<IP_MAY_BACKEND>:3000` khi chạy khác máy trong mạng LAN)
 - Content-Type: `application/json`
-- Cac API duoc bao ve su dung JWT can header:
+- Các API được bảo vệ sử dụng JWT cần gửi kèm header:
 
 ```http
 Authorization: Bearer <access_token>
 ```
 
-### Cau hinh ket noi Frontend (khi FE va BE chay tren 2 may khac nhau)
+### Cấu hình kết nối Frontend (khi FE và BE chạy trên 2 máy khác nhau)
 
-Mac dinh tren cung 1 may, FE goi API qua `http://localhost:3000`. Khi FE va BE chay o 2 may rieng biet:
-
-#### 1. Cung mang Wi-Fi / LAN (Thuong dung khi lam viec nhom)
-- **Kiem tra IP may Backend**: Tren may Backend, mo terminal chay `ipconfig` de lay dia chi `IPv4 Address` (vi du: `192.168.24.35`).
-- **Cau hinh Base URL tren Frontend**: Trong file `.env` (hoac config Axios/Fetch) cua Frontend, thay `localhost` bang IP may Backend:
+#### 1. Cùng mạng Wi-Fi / LAN (Thường dùng khi làm việc nhóm)
+- **Kiểm tra IP máy Backend**: Trên máy Backend, mở terminal chạy `ipconfig` để lấy địa chỉ `IPv4 Address` (ví dụ: `192.168.24.35`).
+- **Cấu hình Base URL trên Frontend**: Trong file `.env` của Frontend, thay `localhost` bằng IP máy Backend:
   ```env
-  # Vi du voi Vite:
+  # Ví dụ với Vite:
   VITE_API_BASE_URL=http://192.168.24.35:3000
 
-  # Vi du voi Next.js:
+  # Ví dụ với Next.js:
   NEXT_PUBLIC_API_URL=http://192.168.24.35:3000
   ```
-- **Backend CORS & Host**: Backend da duoc cau hinh `app.enableCors({ origin: true, credentials: true })` va lang nghe tren host `0.0.0.0` tai `src/main.ts` de chap nhan request tu thiet bi khac trong mang.
-- **Luu y Tuong lua (Windows Firewall)**: Neu FE bao loi timeout (`ERR_CONNECTION_TIMED_OUT`), can mo cong 3000 tren Firewall cua may Backend:
-  1. Mo `Windows Defender Firewall with Advanced Security`.
-  2. Vao `Inbound Rules` -> `New Rule...` -> Chon `Port` -> Nhap `3000` -> Chon `Allow the connection`.
+- **Backend CORS & Host**: Backend đã được cấu hình `app.enableCors({ origin: true, credentials: true })` và lắng nghe trên host `0.0.0.0` tại `src/main.ts` để chấp nhận request từ thiết bị khác trong mạng.
+- **Tường lửa (Windows Firewall)**: Mở cổng `3000` trên Windows Defender Firewall nếu FE gặp lỗi timeout.
 
-#### 2. Khac mang (Ket noi tu xa qua Internet)
-- Khi 2 may o 2 noi khac nhau (khac Wi-Fi), dung Tunnel tren may Backend de tao link HTTPS public:
-  - **Cloudflare Tunnel (Mien phi, khong can tai khoan)**:
-    ```powershell
-    npx cloudflared tunnel --url http://localhost:3000
-    ```
-  - **Ngrok**:
-    ```powershell
-    npx ngrok http 3000
-    ```
-- Copy duong link HTTPS duoc tao ra (vi du: `https://xxxx.trycloudflare.com`) va gan vao Base URL cua Frontend.
+#### 2. Khác mạng (Kết nối từ xa qua Internet)
+- Dùng Cloudflare Tunnel:
+  ```powershell
+  npx cloudflared tunnel --url http://localhost:3000
+  ```
 
-### Role
+---
 
-- `admin`: toan quyen
-- `manager`: xem va cap nhat du lieu van hanh trong cac Pond duoc gan; Admin tao Farm/Pond va gan quyen
-- `operator`: chi xem du lieu trong cac Pond duoc gan, duoc phep dung emergency stop Device
+### Mô hình Phân quyền: 2 Roles chính
 
-Neu khong co token hoac token khong hop le, API tra ve `401 Unauthorized`.
-Neu role khong du quyen, API tra ve `403 Forbidden`.
+1. **Quản trị viên (Admin - `admin`)**:
+   - Quản trị viên cấp cao của nền tảng, chịu trách nhiệm duy trì sự ổn định của hệ thống máy chủ.
+   - **Quản lý trạng thái người dùng**: Theo dõi danh sách tài khoản đã đăng ký trên hệ thống; thực hiện khóa hoặc tạm ngưng quyền truy cập đối với các tài khoản vi phạm hoặc có nguy cơ mất an toàn thông tin (`GET /auth/users`, `PATCH /auth/users/:id/status`). Admin **không** tạo tài khoản hay chỉnh sửa thông tin cá nhân thay cho người nuôi.
+   - **Quản lý danh mục thiết bị IoT**: Khai báo và quản lý danh mục thiết bị phần cứng chuẩn được phép kết nối vào hệ thống (`feeder`, `sensor_node`, `camera`), cấu hình phiên bản firmware chuẩn và kiểm soát danh sách định danh thiết bị (`device_uid`).
+   - **Giám sát toàn diện & thống kê - báo cáo cấp hệ thống**: Theo dõi tổng quan số lượng tài khoản đăng ký, số lượng trang trại, ao nuôi đang kích hoạt, tỷ lệ thiết bị trực tuyến (online/offline) qua tín hiệu heartbeat; thống kê tổng thể tần suất cảnh báo và trích xuất báo cáo vận hành toàn nền tảng (`GET /admin/overview`, `GET /admin/reports/operational`).
+   - **Không can thiệp vào quy trình quản lý nội bộ của từng hộ nuôi** (không tạo ao, sửa ao, can thiệp lịch cho ăn hay điều khiển thiết bị của người nuôi).
 
-### Format loi chung
-
-Loi validation `400 Bad Request`:
-
-```json
-{
-  "statusCode": 400,
-  "message": [
-    "areaM2 must be a number conforming to the specified constraints",
-    "Diện tích ao phải lớn hơn 0"
-  ],
-  "error": "Bad Request"
-}
-```
-
-`message` la mang cac loi validation; FE nen hien thi hoac map theo tung truong input. Cac loi nghiep vu cung dung `400` nhung `message` co the la mot chuoi, vi du `Mỗi ao chỉ được có một vụ nuôi đang hoạt động`.
-
-Loi khong tim thay `404 Not Found`:
-
-```json
-{
-  "statusCode": 404,
-  "message": "Không tìm thấy ao nuôi với id <pondId>",
-  "error": "Not Found"
-}
-```
-
-FE nen xu ly `statusCode` truoc, sau do doc `message` de hien thi thong bao phu hop.
+2. **Người nuôi (Farmer - `farmer`)**:
+   - Chủ thể tự quản lý toàn bộ cơ sở nuôi của mình, sở hữu toàn quyền đối với dữ liệu trang trại và chu trình nuôi trồng trên cả Web Dashboard lẫn Mobile App:
+   - **Tự chủ tài khoản**: Trực tiếp đăng ký tài khoản bằng Email và Số điện thoại, tự đăng nhập, chủ động cập nhật thông tin cá nhân (`PATCH /auth/profile`), đổi mật khẩu và khôi phục tài khoản thông qua mã xác thực OTP.
+   - **Tự quản lý trang trại và ao nuôi**: Tự tạo mới và quản lý thông tin các trang trại thuộc quyền sở hữu của mình (`farms`); tự do khởi tạo, chỉnh sửa thông số diện tích ($m^2$), mã ao và cấu hình trạng thái của từng ao nuôi (`ponds`) mà không cần thông qua sự phê duyệt của Admin.
+   - **Quản lý vụ nuôi và lịch cho ăn**: Tự thiết lập các vụ nuôi mới cho từng ao (ngày thả giống, mật độ, số lượng thả, tỷ lệ sống ước tính); thiết lập và tinh chỉnh các lịch cho ăn tự động (khung giờ, định mức khối lượng thức ăn, tốc độ rải).
+   - **Gán thiết bị và điều khiển từ xa**: Đăng ký gán các thiết bị IoT vào từng ao nuôi cụ thể (`POST /devices/claim`); thực hiện điều khiển bật/tắt máy cho ăn, chuyển đổi chế độ tự động/thủ công và kích hoạt lệnh Dừng khẩn cấp (Emergency Stop) từ xa.
+   - **Giám sát môi trường và khai thác AI**: Theo dõi liên tục các chỉ số môi trường nước (pH, DO, nhiệt độ, độ mặn, NH₃, độ đục); tham khảo lượng thức ăn dự báo, cường độ bắt mồi (FIS) do AI phân tích để điều chỉnh cữ ăn.
+   - **Xử lý cảnh báo và thống kê vụ nuôi**: Tiếp nhận thông báo đẩy khi có chỉ số nguy hiểm hoặc sự cố thiết bị, xác nhận đã tiếp nhận / khắc phục sự cố và xem báo cáo thống kê FCR, lượng thức ăn tiêu thụ của từng ao/vụ nuôi (`GET /crop-seasons/:id/statistics`).
 
 ---
 
 ## 2. Health check
-
-### Kiem tra server
 
 ```http
 GET /
 ```
 
 Response:
-
 ```text
 Hello World!
 ```
 
 ---
 
-## 3. Authentication API
+## 3. Authentication & User Status API
 
-### Dang ky tai khoan
+### Đăng ký tài khoản (Người nuôi - Farmer)
 
 ```http
 POST /auth/register
 ```
 
 Body:
-
 ```json
 {
-  "email": "operator@example.com",
+  "email": "farmer1@example.com",
   "phoneNumber": "0901234567",
   "password": "password123",
-  "fullName": "Nguyen Van Operator"
+  "fullName": "Nguyen Van Farmer"
 }
 ```
 
-Quyen: khong can dang nhap.
+- **Quyền**: Không cần đăng nhập.
+- Tài khoản đăng ký mới mặc định nhận role **`farmer`**.
+- `phoneNumber` định dạng số điện thoại Việt Nam (10 chữ số, bắt đầu bằng `0`). Tự động chuẩn hóa từ `+84` hoặc `84`.
+- `email` và `phoneNumber` là duy nhất (trùng lặp trả về `409 Conflict`).
 
-Ghi chu:
-
-- Tai khoan dang ky moi mac dinh co role `operator`.
-- `phoneNumber` bat buoc, dinh dang so dien thoai Viet Nam (10 chu so, bat dau bang `0`, vi du `0901234567`). He thong tu chuan hoa dang `+84...` hoac `84...` ve dang `0xxxxxxxxx`.
-- `email` va `phoneNumber` deu phai unique; trung se tra ve `409 Conflict`.
-
-Tai khoan mau cho moi truong local duoc tao tu dong khi backend khoi dong:
-
-| Role | Email | So dien thoai | Mat khau |
-| --- | --- | --- | --- |
-| `admin` | `admin@shrimpmate.local` | `0901000001` | `Admin@123456` |
-| `manager` | `manager@shrimpmate.local` | `0901000002` | `Manager@123456` |
-| `operator` | `operator@shrimpmate.local` | `0901000003` | `Operator@123456` |
-
-Co the thay doi cac tai khoan mau bang cac bien moi truong `SEED_*_EMAIL`, `SEED_*_PHONE`, `SEED_*_PASSWORD`.
-
-### Dang nhap
+### Đăng nhập
 
 ```http
 POST /auth/login
 ```
 
-Body:
-
+Body (sử dụng email hoặc số điện thoại):
 ```json
 {
-  "identifier": "operator@example.com",
+  "identifier": "farmer1@example.com",
   "password": "password123"
 }
 ```
 
-Hoac dang nhap bang so dien thoai:
-
+Hoặc:
 ```json
 {
   "identifier": "0901234567",
@@ -158,149 +111,103 @@ Hoac dang nhap bang so dien thoai:
 }
 ```
 
-Quyen: khong can dang nhap.
-
-`identifier` nhan **email** hoac **so dien thoai** da dang ky. Sai thong tin dang nhap tra ve `401 Unauthorized` voi message `Email/số điện thoại hoặc mật khẩu không đúng`.
-
-Response gom `accessToken` va thong tin user an toan, khong bao gom `passwordHash`:
-
+Response:
 ```json
 {
   "accessToken": "eyJ...",
   "refreshToken": "eyJ...",
   "user": {
     "id": "uuid",
-    "email": "operator@example.com",
+    "email": "farmer1@example.com",
     "phoneNumber": "0901234567",
-    "fullName": "Nguyen Van Operator",
-    "role": "operator",
+    "fullName": "Nguyen Van Farmer",
+    "role": "farmer",
     "isActive": true,
-    "createdAt": "2026-09-17T05:20:14.217Z",
-    "updatedAt": "2026-09-17T05:20:14.217Z"
+    "createdAt": "2026-09-19T15:00:00.000Z",
+    "updatedAt": "2026-09-19T15:00:00.000Z"
   }
 }
 ```
 
-`accessToken` dung de goi API va co thoi han theo `JWT_EXPIRES_IN`. Khi access token het han, gui `refreshToken` den `POST /auth/refresh-token` de nhan cap token moi. Refresh token duoc rotate moi lan refresh.
-
-### Lam moi token
+### Làm mới token
 
 ```http
 POST /auth/refresh-token
 ```
 
-Quyen: khong can access token, nhung bat buoc co refresh token hop le.
-
 Body:
-
 ```json
 {
   "refreshToken": "eyJ..."
 }
 ```
 
-### Quen mat khau (UC002 - gui OTP)
+### Quên mật khẩu (Gửi OTP)
 
 ```http
 POST /auth/forgot-password
 ```
 
-Quyen: khong can dang nhap.
-
-Body (email):
-
+Body:
 ```json
 {
-  "identifier": "operator@example.com"
+  "identifier": "farmer1@example.com"
 }
 ```
 
-Body (so dien thoai):
-
-```json
-{
-  "identifier": "0901234567"
-}
-```
-
-Response luon tra ve cung mot thong bao, ke ca khi tai khoan khong ton tai hoac bi khoa (tranh lo thong tin):
-
+Response:
 ```json
 {
   "message": "Nếu tài khoản tồn tại trong hệ thống, mã OTP đã được gửi. Vui lòng kiểm tra email/SMS hoặc liên hệ quản trị viên."
 }
 ```
 
-Ghi chu van hanh:
-
-- `identifier` nhan email hoac so dien thoai da dang ky (cung quy tac voi dang nhap).
-- OTP gom 6 chu so, mac dinh het han sau `OTP_EXPIRES_IN_MINUTES` (mac dinh 5 phut).
-- Moi tai khoan chi co the yeu cau OTP moi sau `OTP_REQUEST_COOLDOWN_SECONDS` (mac dinh 60 giay).
-- Neu `identifier` la email va SMTP duoc cau hinh (`SMTP_HOST`, ...), he thong gui OTP qua email.
-- Neu `identifier` la so dien thoai, OTP duoc gui qua SMS (production can tich hop SMS gateway; dev/test in ra server log).
-- Trong moi truong `development`/`test`, ma OTP luon duoc in ra server log de test.
-- Yeu cau OTP moi se vo hieu hoa cac OTP chua dung truoc do cua cung user.
-
-### Dat lai mat khau bang OTP
+### Đặt lại mật khẩu bằng OTP
 
 ```http
 POST /auth/reset-password
 ```
 
-Quyen: khong can dang nhap.
+Body:
+```json
+{
+  "identifier": "farmer1@example.com",
+  "otp": "123456",
+  "newPassword": "password-moi-123"
+}
+```
+
+### Lấy thông tin tài khoản hiện tại
+
+```http
+GET /auth/me
+```
+
+Quyền: Đã đăng nhập (`admin`, `farmer`).
+
+### Cập nhật hồ sơ cá nhân (Người nuôi tự chủ)
+
+```http
+PATCH /auth/profile
+```
+
+Quyền: Đã đăng nhập (`admin`, `farmer`).
 
 Body:
-
 ```json
 {
-  "identifier": "operator@example.com",
-  "otp": "123456",
-  "newPassword": "password-moi-123"
+  "fullName": "Nguyen Van Farmer (Cap nhat)",
+  "phoneNumber": "0909888777"
 }
 ```
 
-Hoac dung so dien thoai (cung tai khoan):
-
-```json
-{
-  "identifier": "0901234567",
-  "otp": "123456",
-  "newPassword": "password-moi-123"
-}
-```
-
-`identifier` co the la email hoac so dien thoai cua tai khoan; OTP gan voi user, khong bat buoc trung kenh voi lan yeu cau OTP.
-
-Thanh cong:
-
-```json
-{
-  "message": "Đặt lại mật khẩu thành công, vui lòng đăng nhập lại"
-}
-```
-
-OTP sai, het han hoac vuot so lan thu (`OTP_MAX_ATTEMPTS`, mac dinh 5) tra ve `400 Bad Request`:
-
-```json
-{
-  "statusCode": 400,
-  "message": "Mã OTP không hợp lệ hoặc đã hết hạn",
-  "error": "Bad Request"
-}
-```
-
-Dat lai mat khau thanh cong se huy refresh token hien tai; user can dang nhap lai.
-
-### Doi mat khau
+### Đổi mật khẩu
 
 ```http
 PATCH /auth/change-password
 ```
 
-Quyen: user da dang nhap.
-
 Body:
-
 ```json
 {
   "currentPassword": "password-cu",
@@ -308,615 +215,506 @@ Body:
 }
 ```
 
-Doi mat khau se huy refresh token hien tai; user can dang nhap lai tren cac thiet bi.
-
-### Lay thong tin tai khoan hien tai
-
-```http
-GET /auth/me
-```
-
-Quyen: `admin`, `manager`, `operator`.
-
-### Kiem tra quyen Admin
-
-```http
-GET /auth/admin-check
-```
-
-Quyen: `admin`.
-
-### Admin tao tai khoan voi role cu the
-
-```http
-POST /auth/users
-```
-
-Quyen: `admin`.
-
-Body: `{ "email": "manager2@example.com", "phoneNumber": "0901234568", "password": "Manager@123456", "fullName": "Manager Moi", "role": "manager" }`.
-
-Gia tri `role`: `admin`, `manager`, `operator`. Dang ky cong khai qua `POST /auth/register` van mac dinh tao `operator`.
-
-### Admin doi role tai khoan
-
-```http
-PATCH /auth/users/:id/role
-```
-
-Quyen: `admin`.
-
-Body: `{ "role": "manager" }`.
-
-Response tra ve thong tin user an toan (khong bao gom `passwordHash`, `refreshTokenHash`):
-
-```json
-{
-  "id": "uuid",
-  "email": "manager2@example.com",
-  "phoneNumber": "0901234568",
-  "fullName": "Manager Moi",
-  "role": "manager",
-  "isActive": true,
-  "createdAt": "2026-09-17T05:20:14.217Z",
-  "updatedAt": "2026-09-17T05:20:14.217Z"
-}
-```
-
-### Lay danh sach tai khoan
+### [Admin] Xem danh sách tài khoản đã đăng ký
 
 ```http
 GET /auth/users
 ```
 
-Quyen: `admin`.
+Quyền: `admin`.
 
-### Khoa hoac mo khoa tai khoan
+### [Admin] Khóa hoặc Mở khóa tài khoản
 
 ```http
 PATCH /auth/users/:id/status
 ```
 
-Quyen: `admin`.
+Quyền: `admin`.
 
 Body:
-
 ```json
 {
   "isActive": false
 }
 ```
+*Tài khoản bị khóa sẽ không thể đăng nhập và toàn bộ refresh token hiện có sẽ bị hủy.*
 
-Tai khoan bi khoa khong the dang nhap va cac refresh token cua tai khoan do bi huy. Admin khong the tu khoa tai khoan dang dang nhap.
-
-### Gan User vao Pond
-
-```http
-POST /auth/users/:userId/ponds
-```
-
-Quyen: `admin`.
-
-Body: `{ "pondId": "uuid-cua-pond" }`.
-
-### Huy gan User khoi Pond
+### [Admin] Cập nhật vai trò tài khoản
 
 ```http
-DELETE /auth/users/:userId/ponds/:pondId
+PATCH /auth/users/:id/role
 ```
 
-Quyen: `admin`.
+Quyền: `admin`.
 
-Manager va operator chi xem/thao tac tren cac Pond duoc gan; admin co quyen toan he thong. Neu user khong co assignment, danh sach Pond-scoped tra ve rong va truy cap chi tiet bi tu choi `403`.
+Body:
+```json
+{
+  "role": "admin"
+}
+```
+*Giá trị cho phép: `admin` hoặc `farmer`.*
 
 ---
 
-## 4. Farm API
+## 4. Admin Monitoring & System Reports API
 
-### Lay danh sach Farm
+### [Admin] Thống kê tổng quan toàn nền tảng
+
+```http
+GET /admin/overview
+```
+
+Quyền: `admin`.
+
+Response:
+```json
+{
+  "serverTime": "2026-09-19T15:30:00.000Z",
+  "users": {
+    "total": 120,
+    "active": 115,
+    "locked": 5,
+    "farmers": 118,
+    "admins": 2
+  },
+  "farms": {
+    "total": 45,
+    "active": 42,
+    "inactive": 3
+  },
+  "ponds": {
+    "total": 150,
+    "active": 138,
+    "maintenance": 8,
+    "inactive": 4
+  },
+  "devices": {
+    "total": 210,
+    "online": 195,
+    "offline": 15,
+    "onlineRatePercent": 92.9
+  },
+  "alerts": {
+    "total": 60,
+    "open": 8,
+    "acknowledged": 12,
+    "resolved": 40,
+    "bySeverity": {
+      "critical": 5,
+      "warning": 25,
+      "monitoring": 30
+    }
+  }
+}
+```
+
+### [Admin] Báo cáo vận hành toàn nền tảng
+
+```http
+GET /admin/reports/operational
+```
+
+Quyền: `admin`. Trả về báo cáo tổng quan, danh sách cảnh báo sự cố gần đây và danh sách các thiết bị ngoại tuyến (offline) cần kiểm tra bảo trì.
+
+---
+
+## 5. Farm API (Người nuôi tự quản lý)
+
+### Lấy danh sách trang trại của Farmer
 
 ```http
 GET /farms
 ```
 
-Quyen: `admin`, `manager`, `operator`.
+Quyền: `farmer`. Chỉ trả về các trang trại do chính người nuôi này sở hữu (`ownerId = user.id`).
 
-Query tuy chon: `page` (mac dinh `1`) va `limit` (mac dinh `20`, toi da `100`). Vi du: `GET /farms?page=1&limit=20`.
-Response gom `data` va `meta` (`page`, `limit`, `total`, `pageCount`).
-Voi `manager`, `data` chi gom cac Farm do manager so huu (`owner_id`); voi `operator`, chi gom cac Farm co Pond duoc gan; `admin` thay toan bo Farm.
-
-### Tao Farm
+### Tạo trang trại mới
 
 ```http
 POST /farms
 ```
 
-Quyen: `admin`, `manager`. Farm tao boi `manager` se tu dong gan `owner_id = manager.id`.
+Quyền: `farmer`. Tự động gán `ownerId` là người tạo.
 
 Body:
-
 ```json
 {
-  "name": "Trang trai Tom Hung Phat",
-  "address": "Bac Lieu, Viet Nam",
+  "name": "Trang trại Tôm Bạc Liêu 1",
+  "address": "Bạc Liêu, Việt Nam",
   "status": "active"
 }
 ```
 
-Gia tri `status`: `active`, `inactive`.
+### Lấy chi tiết / Cập nhật / Xóa trang trại
 
-`name` khong duoc rong hoac chi gom khoang trang.
-
-### Lay chi tiet Farm
-
-```http
-GET /farms/:id
-```
-
-Quyen: `admin`, `manager`, `operator`. `manager` chi truy cap duoc Farm cua minh.
-
-Vi du:
-
-```http
-GET /farms/788b3aaf-8235-45fb-8214-abe3aaed2bb5
-```
-
-### Cap nhat Farm
-
-```http
-PATCH /farms/:id
-```
-
-Quyen: `admin`, `manager` so huu Farm.
-
-Body co the gui mot phan:
-
-```json
-{
-  "name": "Trang trai Tom Hung Phat - Mo rong",
-  "status": "active"
-}
-```
-
-### Xoa Farm
-
-```http
-DELETE /farms/:id
-```
-
-Quyen: `admin`, `manager` so huu Farm.
-
-Luu y: Farm va cac Pond thuoc Farm duoc soft delete bang `deletedAt`, khong xoa cung du lieu lich su Crop Season, Feeding Record, Telemetry va Alert.
+- `GET /farms/:id`: Lấy chi tiết trang trại (chỉ chủ sở hữu).
+- `PATCH /farms/:id`: Cập nhật tên, địa chỉ, trạng thái.
+- `DELETE /farms/:id`: Xóa mềm trang trại (soft delete) và các ao thuộc trang trại.
 
 ---
 
-## 5. Pond API
+## 6. Pond API (Người nuôi tự quản lý)
 
-### Lay danh sach Pond cua Farm
+### Lấy danh sách ao nuôi thuộc trang trại
 
 ```http
 GET /farms/:farmId/ponds
 ```
 
-Quyen: `admin`, `manager`, `operator`.
+Quyền: `farmer` (chủ sở hữu trang trại).
 
-Query tuy chon: `page` (mac dinh `1`) va `limit` (mac dinh `20`, toi da `100`). Vi du: `GET /farms/:farmId/ponds?page=1&limit=20`.
-Response gom `data` va `meta` (`page`, `limit`, `total`, `pageCount`).
-`manager` chi nhan cac Pond thuoc Farm do minh so huu; `operator` chi nhan cac Pond da duoc gan; `admin` nhan toan bo Pond cua Farm.
-
-Vi du:
-
-```http
-GET /farms/788b3aaf-8235-45fb-8214-abe3aaed2bb5/ponds
-```
-
-### Tao Pond
+### Tạo ao nuôi mới
 
 ```http
 POST /farms/:farmId/ponds
 ```
 
-Quyen: `admin`, `manager` so huu Farm.
+Quyền: `farmer` (không cần sự phê duyệt của Admin).
 
 Body:
-
 ```json
 {
-  "code": "POND-05",
-  "name": "Ao 5 - Nuoi thu nghiem",
-  "areaM2": 2500,
+  "code": "POND-01",
+  "name": "Ao nuôi số 1 - Khu A",
+  "areaM2": 3000,
   "status": "active"
 }
 ```
+*Trạng thái: `active`, `inactive`, `maintenance`.*
 
-Gia tri `status`: `active`, `inactive`, `maintenance`.
+### Lấy chi tiết / Cập nhật / Xóa ao nuôi
 
-`name` khong duoc rong hoac chi gom khoang trang; `areaM2` phai lon hon `0`.
-
-### Lay chi tiet Pond
-
-```http
-GET /farms/:farmId/ponds/:id
-```
-
-Quyen: `admin`, `manager`, `operator`. `manager` chi truy cap duoc Pond thuoc Farm cua minh.
-
-### Cap nhat Pond
-
-```http
-PATCH /farms/:farmId/ponds/:id
-```
-
-Quyen: `admin`, `manager` so huu Farm chua Pond.
-
-Body:
-
-```json
-{
-  "name": "Ao 1 - Da cap nhat",
-  "areaM2": 3500,
-  "status": "active"
-}
-```
-
-### Xoa Pond
-
-```http
-DELETE /farms/:farmId/ponds/:id
-```
-
-Quyen: `admin`, `manager` so huu Farm chua Pond.
+- `GET /farms/:farmId/ponds/:id`: Lấy thông tin ao nuôi.
+- `PATCH /farms/:farmId/ponds/:id`: Cập nhật diện tích ($m^2$), tên ao, mã ao, trạng thái.
+- `DELETE /farms/:farmId/ponds/:id`: Xóa ao nuôi.
 
 ---
 
-## 6. Device API
+## 7. Device & IoT Hardware Catalog API
 
-### Lay danh sach Device
-
-```http
-GET /devices
-```
-
-Quyen: `admin`, `manager`, `operator`.
-`manager` va `operator` chi nhan Device co `pondId` thuoc assignment; Device chua gan Pond khong hien thi va khong duoc tao boi hai role nay. `admin` nhan toan bo Device.
-
-### Tao Device
+### [Admin] Khai báo thiết bị chuẩn vào danh mục hệ thống
 
 ```http
 POST /devices
 ```
 
-Quyen: `admin`, `manager`.
+Quyền: `admin`.
 
 Body:
-
 ```json
 {
-  "deviceUid": "DEV-FEEDER-001",
-  "name": "May cho an Ao 1",
+  "deviceUid": "DEV-FEEDER-VN-001",
+  "name": "Máy cho ăn chuẩn Model A1",
   "type": "feeder",
-  "status": "online",
-  "mode": "automatic",
-  "pondId": "f2a0d8a7-9a19-4b6d-90f6-8c7dbe6d7d91",
-  "firmwareVersion": "1.0.0",
+  "firmwareVersion": "v1.2.0",
   "metadata": {
-    "zone": "north",
-    "batteryLevel": 88
+    "manufacturer": "ShrimpMate IoT",
+    "batch": "2026-Q1"
   }
 }
 ```
+*`type`: `feeder`, `sensor_node`, `camera`, `edge_gateway`.*
+*Thiết bị tạo mới mặc định `pondId: null`, sẵn sàng để người nuôi đăng ký gán vào ao.*
 
-Gia tri `type`: `feeder`, `sensor_node`, `camera`, `edge_gateway`.
-Gia tri `status`: `online`, `offline`, `error`, `maintenance`.
-Gia tri `mode`: `automatic`, `manual`, `emergency_stop`.
+### [Admin] Quản trị danh mục phần cứng
 
-Neu `pondId` duoc gui thi phai ton tai trong `ponds`.
-`deviceUid` phai unique trong he thong. Rang buoc unique duoc dat o database, nen truong hop hai request dong thoi dang ky cung UID van bi chan.
+- `GET /devices`: Admin xem toàn bộ thiết bị trong danh mục hệ thống và trạng thái kết nối.
+- `PATCH /devices/:id`: Admin cập nhật firmware version, tên, metadata, hoặc trạng thái.
+- `DELETE /devices/:id`: Admin xóa thiết bị khỏi danh mục hệ thống.
 
-### Lay chi tiet Device
+### [Farmer] Xem danh sách thiết bị thuộc các ao của mình
 
 ```http
-GET /devices/:id
+GET /devices
 ```
 
-Quyen: `admin`, `manager`, `operator`.
-Device ngoai assignment cua `manager`/`operator` tra ve `403`.
+Quyền: `farmer`. Hệ thống tự động lọc và chỉ hiển thị các thiết bị đã được gán vào các ao của Farmer.
 
-### Cap nhat Device
+### [Farmer] Đăng ký gán thiết bị IoT vào ao nuôi
+
+```http
+POST /devices/claim
+```
+
+Quyền: `farmer`.
+
+Body:
+```json
+{
+  "deviceUid": "DEV-FEEDER-VN-001",
+  "pondId": "uuid-cua-ao-nuoi"
+}
+```
+*Ao nuôi phải thuộc sở hữu của người nuôi. Thiết bị phải tồn tại trong danh mục phần cứng chuẩn và chưa bị gán vào ao của người khác.*
+
+### [Farmer] Hủy gán thiết bị khỏi ao nuôi
+
+```http
+POST /devices/:id/unassign
+```
+
+Quyền: `farmer`. Đưa thiết bị về trạng thái chưa gán (`pondId: null`).
+
+### [Farmer] Điều khiển chế độ và máy cho ăn
 
 ```http
 PATCH /devices/:id
 ```
 
-Quyen: `admin`, `manager`.
+Quyền: `farmer` (với thiết bị trong ao của mình).
 
-Body co the gui mot phan:
-
+Body ví dụ chuyển chế độ:
 ```json
 {
-  "status": "maintenance",
-  "mode": "manual",
-  "pondId": null
+  "mode": "automatic"
 }
 ```
+*`mode`: `automatic`, `manual`, `emergency_stop`.*
 
-### Xoa Device
-
-```http
-DELETE /devices/:id
-```
-
-Quyen: `admin`.
-
-### Dừng khẩn cấp Device
+### [Farmer] Kích hoạt Dừng khẩn cấp từ xa (Emergency Stop)
 
 ```http
 POST /devices/:id/emergency-stop
 ```
 
-Quyen: `admin`, `manager`, `operator`.
+Quyền: `farmer`. Chuyển ngay lập tức chế độ thiết bị sang `emergency_stop`.
 
-Endpoint này chỉ đổi `mode` sang `emergency_stop`; operator không được dùng `PATCH /devices/:id` để thay đổi các thuộc tính quản trị khác.
-
-### Cập nhật heartbeat Device
+### [IoT / Simulator] Gửi tín hiệu nhịp tim (Heartbeat)
 
 ```http
 POST /devices/:id/heartbeat
 ```
 
-Quyen: `admin`, `manager` cho thao tác REST test/thủ công. Operator không gọi endpoint này. Thiết bị thật nên gửi heartbeat qua MQTT; khi đó MQTT là nguồn cập nhật `lastSeenAt` chính.
-
-Endpoint cập nhật `lastSeenAt` thành thời điểm hiện tại để theo dõi thiết bị mất kết nối. MQTT có thể gọi cùng service này khi tích hợp.
+Cập nhật thời điểm `lastSeenAt` và đánh dấu `status = 'online'`.
 
 ---
 
-## 7. Crop Season API
+## 8. Crop Season & FCR Statistics API (Người nuôi)
 
-Crop Season la thong tin mot vu nuoi gan voi mot Pond.
-
-### Lay danh sach vu nuoi cua Pond
-
-```http
-GET /ponds/:pondId/crop-seasons
-```
-
-Quyen: `admin`, `manager`, `operator`.
-`manager` va `operator` chi truy van duoc Crop Season cua Pond duoc gan; `admin` truy cap toan bo.
-
-Vi du:
-
-```http
-GET /ponds/208cf3b7-a60f-4c83-83b0-54d06fee3d97/crop-seasons
-```
-
-### Tao vu nuoi
+### Tạo vụ nuôi mới cho ao nuôi
 
 ```http
 POST /ponds/:pondId/crop-seasons
 ```
 
-Quyen: `admin`, `manager`.
+Quyền: `farmer`.
 
 Body:
-
 ```json
 {
-  "name": "Vu tom the chan trang 2026 - Dot 3",
-  "stockingDate": "2026-09-15",
+  "name": "Vụ tôm thẻ chân trắng 2026 - Đợt 1",
+  "stockingDate": "2026-09-01",
   "initialCount": 200000,
-  "stockingDensity": 62.5,
+  "stockingDensity": 66.6,
   "initialAverageWeightG": 0.02,
   "estimatedSurvivalRate": 85,
-  "status": "planned"
+  "status": "active"
 }
 ```
+*Mỗi ao chỉ được có tối đa 1 vụ nuôi ở trạng thái `active`.*
 
-Gia tri `status`: `planned`, `active`, `completed`, `cancelled`.
+### Xem danh sách / Chi tiết vụ nuôi
 
-`name` khong duoc rong; `stockingDate` khong duoc vuot qua mot nam trong tuong lai; `initialCount` va `stockingDensity` phai lon hon `0`. Moi Pond chi duoc co mot Crop Season o trang thai `active`, duoc bao ve boi unique partial index o database.
+- `GET /ponds/:pondId/crop-seasons`: Danh sách vụ nuôi của ao.
+- `GET /crop-seasons/:id`: Chi tiết vụ nuôi.
+- `PATCH /crop-seasons/:id`: Cập nhật thông số vụ nuôi (hoặc đổi trạng thái sang `completed`).
+- `DELETE /crop-seasons/:id`: Xóa vụ nuôi.
 
-### Lay chi tiet vu nuoi
-
-```http
-GET /crop-seasons/:id
-```
-
-Quyen: `admin`, `manager`, `operator`.
-
-### Cap nhat vu nuoi
+### Thống kê vụ nuôi & Hệ số chuyển đổi thức ăn (FCR)
 
 ```http
-PATCH /crop-seasons/:id
+GET /crop-seasons/:id/statistics
 ```
 
-Quyen: `admin`, `manager`.
+Quyền: `farmer`.
 
-Body:
-
+Response:
 ```json
 {
-  "status": "completed"
+  "cropSeasonId": "uuid",
+  "name": "Vụ tôm thẻ chân trắng 2026 - Đợt 1",
+  "status": "active",
+  "stockingDate": "2026-09-01",
+  "daysOfCulture": 18,
+  "initialCount": 200000,
+  "estimatedSurvivingCount": 170000,
+  "survivalRatePercent": 85,
+  "totalFeedConsumedKg": 750.5,
+  "totalFeedingSessions": 54,
+  "estimatedCurrentBiomassKg": 768.4,
+  "fcr": 1.08
 }
 ```
-
-### Xoa vu nuoi
-
-```http
-DELETE /crop-seasons/:id
-```
-
-Quyen: `admin`, `manager` trong pham vi ao so huu.
 
 ---
 
-## 8. Feeding API
+## 9. Feeding API (Lịch cho ăn & Nhật ký)
 
-### Lay danh sach lich cho an cua Pond
+### Lịch cho ăn tự động
 
-```http
-GET /ponds/:pondId/feeding-schedules
-```
+- `GET /ponds/:pondId/feeding-schedules`: Danh sách lịch cho ăn.
+- `POST /ponds/:pondId/feeding-schedules`: Tạo lịch (khung giờ, định mức kg, tốc độ rải kg/phút, các ngày trong tuần).
+  ```json
+  {
+    "name": "Cữ sáng",
+    "timeOfDay": "07:30",
+    "feedAmountKg": 15.0,
+    "spreadRateKgPerMinute": 1.5,
+    "daysOfWeek": [1, 2, 3, 4, 5, 6, 0],
+    "isEnabled": true
+  }
+  ```
+- `PATCH /feeding-schedules/:id`: Tinh chỉnh cữ ăn.
+- `DELETE /feeding-schedules/:id`: Xóa lịch.
 
-Quyen: `admin`, `manager`, `operator`.
-`manager` va `operator` chi xem lich cua Pond duoc gan.
+### Nhật ký cho ăn (Feeding Records)
 
-### Tao lich cho an
-
-```http
-POST /ponds/:pondId/feeding-schedules
-```
-
-Quyen: `admin`, `manager`.
-
-Body:
-
-```json
-{
-  "name": "Lich cho an sang",
-  "timeOfDay": "08:00",
-  "feedAmountKg": 12.5,
-  "spreadRateKgPerMinute": 1.25,
-  "daysOfWeek": [1, 2, 3, 4, 5, 6, 0],
-  "isEnabled": true
-}
-```
-
-`timeOfDay` dung dinh dang `HH:mm` hoac `HH:mm:ss`. `daysOfWeek` dung gia tri tu `0` den `6`, trong do `0` la Chu Nhat. Khoi luong phai lon hon `0`.
-Khong the tao hoac cap nhat hai lich cua cung Pond neu trung `timeOfDay` va co it nhat mot ngay trong `daysOfWeek` trung nhau.
-
-### Cap nhat lich cho an
-
-```http
-PATCH /feeding-schedules/:id
-```
-
-Quyen: `admin`, `manager`.
-
-### Xoa lich cho an
-
-```http
-DELETE /feeding-schedules/:id
-```
-
-Quyen: `admin`, `manager` trong pham vi ao so huu.
-
-### Tao Feeding Record
-
-```http
-POST /ponds/:pondId/feeding-records
-```
-
-Quyen: `admin`, `manager`.
-
-Body:
-
-```json
-{
-  "deviceId": "uuid-cua-device",
-  "scheduleId": "uuid-cua-schedule",
-  "requestedAmountKg": 12.5,
-  "actualAmountKg": 12.3,
-  "source": "schedule"
-}
-```
-
-Gia tri `source`: `schedule`, `manual`, `ai`. Gia tri `status`: `requested`, `running`, `completed`, `stopped`, `failed`.
-
-Record moi luon bat dau o trang thai `requested`; dung PATCH de chuyen sang `running`, `completed`, `stopped` hoac `failed`.
-
-`deviceId` va `scheduleId` la tuy chon, nhung neu gui thi phai ton tai va thuoc cung Pond. Pond phai co Crop Season dang `active`; sau khi vu chuyen sang `completed`, he thong khong cho tao Feeding Schedule/Record moi. Neu khong gui `startedAt`, he thong tu dong dung thoi diem hien tai.
-
-`appetiteLevel` va `leftoverPercent` hien la input thu cong de phuc vu demo/vận hành. Khi tich hop AI, AI service co the cap nhat cung record qua PATCH nay; khong can doi schema hay tao luong ghi moi.
-
-### Lay lich su cho an cua Pond
-
-```http
-GET /ponds/:pondId/feeding-records
-```
-
-Quyen: `admin`, `manager`, `operator`.
-`manager` va `operator` chi xem record cua Pond duoc gan.
-
-### Cap nhat Feeding Record
-
-```http
-PATCH /feeding-records/:id
-```
-
-Quyen: `admin`, `manager`.
-
-Dung de cap nhat trang thai theo luong `requested` -> `running` -> `completed` (hoac `stopped`/`failed`) va bo sung `actualAmountKg` khi thiet bi bao ket qua.
-
-Body:
-
-```json
-{
-  "status": "completed",
-  "actualAmountKg": 12.3,
-  "appetiteLevel": 2,
-  "leftoverPercent": 3.5
-}
-```
-
-Khong the chuyen nguoc trang thai hoac cap nhat record da ket thuc sang trang thai khac.
+- `GET /ponds/:pondId/feeding-records`: Lịch sử các cữ cho ăn.
+- `POST /ponds/:pondId/feeding-records`: Ghi nhận cữ cho ăn mới (`requestedAmountKg`, `source`: `schedule`/`manual`/`ai`).
+- `PATCH /feeding-records/:id`: Cập nhật tiến trình (`running`, `completed`, `stopped`), cập nhật `actualAmountKg` thực tế và ghi nhận `leftoverPercent`.
 
 ---
 
-## 9. Du lieu seed hien tai
+## 10. Water Quality Telemetry API (Chất lượng nước)
 
-Ung dung tu dong tao du lieu mau khi khoi dong neu database chua co du lieu:
+### Lấy chỉ số môi trường nước mới nhất của ao
 
-- 3 Farm mau
-- 4 Pond mau
-- 2 Crop Season mau
-- 3 Device mau
-- 3 Feeding Schedule mau
-- 3 tai khoan mau trong moi truong khong phai production
+```http
+GET /ponds/:pondId/telemetry/latest
+```
 
-Du lieu seed nam tai:
+Quyền: `farmer`.
 
-- `src/database/seeds/farm-pond.seed.ts`
-- `src/database/seeds/crop-season.seed.ts`
-- `src/database/seeds/device.seed.ts`
-- `src/database/seeds/feeding.seed.ts`
-- `src/database/seeds/user.seed.ts`
-- `src/database/seeds/user-pond-assignment.seed.ts`
+Response:
+```json
+{
+  "id": "uuid",
+  "pondId": "uuid",
+  "deviceId": "uuid",
+  "measuredAt": "2026-09-19T15:25:00.000Z",
+  "ph": 7.8,
+  "dissolvedOxygenMgL": 5.6,
+  "temperatureC": 28.5,
+  "salinityPpt": 15.2,
+  "ammoniaMgL": 0.02,
+  "turbidityNtu": 12.4
+}
+```
 
-Seed co tinh idempotent: neu bang da co du lieu thi khong tao trung lan nua.
-User manager va operator mau duoc gan hai Pond dau tien boi `user-pond-assignment.seed.ts`; cac user dang ky moi khong duoc gan Pond tu dong va can Admin gan qua API assignment.
+### Lấy lịch sử đo môi trường nước (Vẽ đồ thị)
 
-Heartbeat thiet bi that se duoc chuyen sang MQTT khi module MQTT duoc trien khai; endpoint REST hien chi phuc vu test/thao tac thu cong.
+```http
+GET /ponds/:pondId/telemetry/history?limit=50
+```
+
+Quyền: `farmer`.
+
+### Ghi nhận chỉ số đo cảm biến (Cảm biến / Simulator)
+
+```http
+POST /ponds/:pondId/telemetry
+```
+
+Quyền: `admin`, `farmer`.
+
+Body:
+```json
+{
+  "deviceId": "uuid",
+  "ph": 7.9,
+  "dissolvedOxygenMgL": 5.4,
+  "temperatureC": 28.7,
+  "salinityPpt": 15.0,
+  "ammoniaMgL": 0.03,
+  "turbidityNtu": 11.8
+}
+```
 
 ---
 
-## 10. Module dang cho trien khai
+## 11. AI Recommendations & Feeding Intensity (FIS) API
 
-Cac module/controller da hoan thien:
+### Lấy khuyến nghị AI mới nhất cho ao nuôi
 
-- `/devices` - hoan thien
-- `/feeding` - hoan thien
+```http
+GET /ponds/:pondId/ai/recommendations/latest
+```
 
-Cac controller/service sau hien la placeholder, chua co endpoint nghiep vu:
+Quyền: `farmer`.
 
-- `/telemetry`
-- `/mqtt`
-- `AlertsModule`
-- `SafetyRuleModule`
-- `AiIntegrationModule`
-- `NotificationsModule`
+Response:
+```json
+{
+  "id": "uuid",
+  "pondId": "uuid",
+  "modelName": "ShrimpMate-FeedOpt-v2",
+  "modelVersion": "2.1.0",
+  "predictedFeedAmountKg": 16.2,
+  "spreadRateKgPerMinute": 1.6,
+  "appetiteLevel": 3,
+  "biomassKg": 780.0,
+  "anomalyScore": 0.04,
+  "confidence": 0.94,
+  "safetyDecision": "allowed",
+  "explanation": "Tôm bắt mồi mạnh (FIS cao), DO và nhiệt độ nước trong ngưỡng tối ưu. Đề xuất tăng nhẹ lượng thức ăn 5%."
+}
+```
+*`appetiteLevel` (Cường độ bắt mồi - FIS): `0` (None), `1` (Weak), `2` (Normal), `3` (Strong).*
 
-Khong nen dung cac module nay de test API nghiep vu cho den khi co implementation.
+### Lịch sử các khuyến nghị AI
+
+```http
+GET /ponds/:pondId/ai/recommendations?limit=10
+```
+
+Quyền: `farmer`.
 
 ---
 
-## 11. Cach test nhanh bang Postman
+## 12. Alerts & Incident Handling API
 
-1. Goi `POST /auth/login` de lay `accessToken`.
-2. Trong Postman chon tab `Authorization`.
-3. Chon type `Bearer Token`.
-4. Paste phan token bat dau bang `eyJ...`, khong paste chu `Bearer` va khong them dau `< >`.
-5. Test `GET /farms`.
-6. Lay `farmId`, sau do test `GET /farms/:farmId/ponds`.
-7. Lay `pondId`, sau do test `GET /ponds/:pondId/crop-seasons`.
+### Lấy danh sách cảnh báo của toàn bộ trang trại
 
-Token co thoi han. Neu gap `401 Unauthorized` do access token het han, goi `POST /auth/refresh-token` thay vi bat user dang nhap lai.
+```http
+GET /alerts
+```
+
+Quyền: `farmer`. Trả về danh sách cảnh báo (nguy hiểm, bất thường môi trường, sự cố thiết bị) trên tất cả các ao của người nuôi.
+
+### Lấy danh sách cảnh báo theo từng ao
+
+```http
+GET /ponds/:pondId/alerts
+```
+
+Quyền: `farmer`.
+
+### Xác nhận đã tiếp nhận cảnh báo (Acknowledge)
+
+```http
+PATCH /alerts/:id/acknowledge
+```
+
+Quyền: `farmer`. Chuyển trạng thái sang `acknowledged` và ghi nhận thời gian `acknowledgedAt`.
+
+### Xác nhận đã giải quyết xong sự cố (Resolve)
+
+```http
+PATCH /alerts/:id/resolve
+```
+
+Quyền: `farmer`. Chuyển trạng thái sang `resolved` và ghi nhận thời gian `resolvedAt`.
+
+---
+
+## 13. Dữ liệu Seed mẫu
+
+Hệ thống tự động khởi tạo dữ liệu mẫu khi khởi động (nếu DB chưa có dữ liệu):
+
+| Role | Email | Số điện thoại | Mật khẩu | Mô tả |
+| --- | --- | --- | --- | --- |
+| `admin` | `admin@shrimpmate.local` | `0901000001` | `Admin@123456` | Quản trị viên hệ thống, quản lý catalog thiết bị và giám sát toàn diện |
+| `farmer` | `farmer@shrimpmate.local` | `0901000002` | `Farmer@123456` | Người nuôi tôm, sở hữu các Farm và Pond mẫu |
+
+*Có thể tùy chỉnh tài khoản mẫu thông qua biến môi trường `SEED_ADMIN_*` và `SEED_FARMER_*`.*

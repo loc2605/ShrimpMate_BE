@@ -10,13 +10,11 @@ import { User } from '../../database/entities/user.entity';
 import { UserRole } from '../../database/entities/enums';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
-import { Pond } from '../../database/entities/pond.entity';
-import { UserPondAssignment } from '../../database/entities/user-pond-assignment.entity';
 import { PasswordResetOtp } from '../../database/entities/password-reset-otp.entity';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
-import { AdminCreateUserDto } from './dto/admin-create-user.dto';
 import { UpdateUserRoleDto } from './dto/update-user-role.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { OtpDeliveryService } from './otp-delivery.service';
@@ -35,8 +33,6 @@ export class AuthService {
     @InjectRepository(User) private readonly userRepository: Repository<User>,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
-    @InjectRepository(Pond) private readonly pondRepository: Repository<Pond>,
-    @InjectRepository(UserPondAssignment) private readonly assignmentRepository: Repository<UserPondAssignment>,
     @InjectRepository(PasswordResetOtp) private readonly passwordResetOtpRepository: Repository<PasswordResetOtp>,
     private readonly otpDeliveryService: OtpDeliveryService,
   ) { }
@@ -53,7 +49,7 @@ export class AuthService {
       phoneNumber,
       passwordHash,
       fullName: registerDto.fullName.trim(),
-      role: UserRole.OPERATOR,
+      role: UserRole.FARMER,
       isActive: true,
     });
 
@@ -61,22 +57,20 @@ export class AuthService {
     return this.createAuthResponse(savedUser);
   }
 
-  async adminCreateUser(dto: AdminCreateUserDto) {
-    const email = dto.email.trim().toLowerCase();
-    const phoneNumber = normalizePhoneNumber(dto.phoneNumber);
-    await this.ensureUniqueEmail(email);
-    await this.ensureUniquePhoneNumber(phoneNumber);
-
-    const user = this.userRepository.create({
-      email,
-      phoneNumber,
-      passwordHash: await bcrypt.hash(dto.password, 12),
-      fullName: dto.fullName.trim(),
-      role: dto.role,
-      isActive: true,
-      refreshTokenHash: null,
-    });
-    return this.toSafeUser(await this.userRepository.save(user));
+  async updateProfile(userId: string, dto: UpdateProfileDto) {
+    const user = await this.findUser(userId);
+    if (dto.fullName) {
+      user.fullName = dto.fullName.trim();
+    }
+    if (dto.phoneNumber) {
+      const phoneNumber = normalizePhoneNumber(dto.phoneNumber);
+      if (phoneNumber !== user.phoneNumber) {
+        await this.ensureUniquePhoneNumber(phoneNumber);
+        user.phoneNumber = phoneNumber;
+      }
+    }
+    await this.userRepository.save(user);
+    return this.toSafeUser(user);
   }
 
   async login(loginDto: LoginDto) {
@@ -209,23 +203,6 @@ export class AuthService {
     user.role = dto.role;
     await this.userRepository.save(user);
     return this.toSafeUser(user);
-  }
-
-  async assignPond(userId: string, pondId: string) {
-    await this.findUser(userId);
-    if (!(await this.pondRepository.findOne({ where: { id: pondId } }))) {
-      throw new NotFoundException(`Không tìm thấy ao nuôi với id ${pondId}`);
-    }
-    const existing = await this.assignmentRepository.findOne({ where: { userId, pondId } });
-    if (existing) return existing;
-    return this.assignmentRepository.save(this.assignmentRepository.create({ userId, pondId }));
-  }
-
-  async removePondAssignment(userId: string, pondId: string) {
-    const assignment = await this.assignmentRepository.findOne({ where: { userId, pondId } });
-    if (!assignment) throw new NotFoundException('Không tìm thấy phân quyền Pond');
-    await this.assignmentRepository.remove(assignment);
-    return { message: 'Đã hủy phân quyền Pond' };
   }
 
   private async createAuthResponse(user: User) {

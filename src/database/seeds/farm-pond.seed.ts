@@ -9,17 +9,17 @@ export async function seedFarmPondData(dataSource: DataSource) {
   const pondRepository = dataSource.getRepository(Pond);
   const userRepository = dataSource.getRepository(User);
 
-  const managerUser = await userRepository.findOne({
-    where: { role: UserRole.MANAGER },
+  const farmerUser = await userRepository.findOne({
+    where: { role: UserRole.FARMER },
   });
 
   const count = await farmRepository.count();
   if (count > 0) {
-    if (managerUser) {
+    if (farmerUser) {
       await farmRepository
         .createQueryBuilder()
         .update(Farm)
-        .set({ ownerId: managerUser.id })
+        .set({ ownerId: farmerUser.id })
         .where('owner_id IS NULL')
         .execute();
     }
@@ -31,13 +31,13 @@ export async function seedFarmPondData(dataSource: DataSource) {
       name: 'Trang trại Sóng Xanh',
       address: 'Bạc Liêu, Việt Nam',
       status: FarmStatus.ACTIVE,
-      ownerId: managerUser?.id ?? null,
+      ownerId: farmerUser?.id ?? null,
     },
     {
       name: 'Ao Nước Trong',
       address: 'Cà Mau, Việt Nam',
       status: FarmStatus.ACTIVE,
-      ownerId: managerUser?.id ?? null,
+      ownerId: farmerUser?.id ?? null,
     },
     {
       name: 'Vườn Tôm Minh Phú',  

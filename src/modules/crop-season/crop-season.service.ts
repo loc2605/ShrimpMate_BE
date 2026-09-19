@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { QueryFailedError, Repository } from 'typeorm';
 import { CropSeason } from '../../database/entities/crop-season.entity';
 import { Pond } from '../../database/entities/pond.entity';
+import { FeedingRecord } from '../../database/entities/feeding-record.entity';
 import { CropSeasonStatus } from '../../database/entities/enums';
 import { CreateCropSeasonDto } from './dto/create-crop-season.dto';
 import { UpdateCropSeasonDto } from './dto/update-crop-season.dto';
@@ -16,6 +17,8 @@ export class CropSeasonService {
     private readonly cropSeasonRepository: Repository<CropSeason>,
     @InjectRepository(Pond)
     private readonly pondRepository: Repository<Pond>,
+    @InjectRepository(FeedingRecord)
+    private readonly feedingRecordRepository: Repository<FeedingRecord>,
     private readonly pondAccessService: PondAccessService,
   ) {}
 
@@ -90,6 +93,53 @@ export class CropSeasonService {
     const cropSeason = await this.findOne(id, user);
     await this.cropSeasonRepository.remove(cropSeason);
     return { message: `Đã xoá vụ nuôi ${cropSeason.name}` };
+  }
+
+  async getStatistics(id: string, user?: User) {
+    const cropSeason = await this.findOne(id, user);
+    const stockingDateTime = new Date(`${cropSeason.stockingDate}T00:00:00Z`);
+
+    const feedingRecords = await this.feedingRecordRepository
+      .createQueryBuilder('record')
+      .where('record.pond_id = :pondId', { pondId: cropSeason.pondId })
+      .andWhere('record.started_at >= :stockingDate', { stockingDate: stockingDateTime })
+      .getMany();
+
+    const totalFeedKg = feedingRecords.reduce((sum, r) => {
+      const amount = Number(r.actualAmountKg ?? r.requestedAmountKg ?? 0);
+      return sum + amount;
+    }, 0);
+
+    const now = new Date();
+    const durationDays = Math.max(
+      1,
+      Math.ceil((now.getTime() - stockingDateTime.getTime()) / (1000 * 60 * 60 * 24)),
+    );
+
+    const initialWeightKg = ((Number(cropSeason.initialAverageWeightG) || 0.02) * Number(cropSeason.initialCount)) / 1000;
+    const survivalRatePercent = Number(cropSeason.estimatedSurvivalRate) || 80;
+    const estimatedSurvivingShrimp = Math.round((Number(cropSeason.initialCount) * survivalRatePercent) / 100);
+    
+    // Estimate current weight based on days of culture (e.g. 0.25g to 25g over 90 days)
+    const estimatedCurrentWeightG = Math.min(30, (Number(cropSeason.initialAverageWeightG) || 0.02) + durationDays * 0.25);
+    const estimatedCurrentBiomassKg = (estimatedSurvivingShrimp * estimatedCurrentWeightG) / 1000;
+    const biomassGainKg = Math.max(1, estimatedCurrentBiomassKg - initialWeightKg);
+    const fcr = totalFeedKg > 0 ? Number((totalFeedKg / biomassGainKg).toFixed(2)) : null;
+
+    return {
+      cropSeasonId: cropSeason.id,
+      name: cropSeason.name,
+      status: cropSeason.status,
+      stockingDate: cropSeason.stockingDate,
+      daysOfCulture: durationDays,
+      initialCount: Number(cropSeason.initialCount),
+      estimatedSurvivingCount: estimatedSurvivingShrimp,
+      survivalRatePercent,
+      totalFeedConsumedKg: Number(totalFeedKg.toFixed(2)),
+      totalFeedingSessions: feedingRecords.length,
+      estimatedCurrentBiomassKg: Number(estimatedCurrentBiomassKg.toFixed(2)),
+      fcr,
+    };
   }
 
   private async findPond(id: string) {

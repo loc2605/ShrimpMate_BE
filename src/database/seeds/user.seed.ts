@@ -12,24 +12,17 @@ const defaultUsers = [
     role: UserRole.ADMIN,
   },
   {
-    email: process.env.SEED_MANAGER_EMAIL ?? 'manager@shrimpmate.local',
-    phoneNumber: process.env.SEED_MANAGER_PHONE ?? '0901000002',
-    password: process.env.SEED_MANAGER_PASSWORD ?? 'Manager@123456',
-    fullName: 'ShrimpMate Manager',
-    role: UserRole.MANAGER,
-  },
-  {
-    email: process.env.SEED_OPERATOR_EMAIL ?? 'operator@shrimpmate.local',
-    phoneNumber: process.env.SEED_OPERATOR_PHONE ?? '0901000003',
-    password: process.env.SEED_OPERATOR_PASSWORD ?? 'Operator@123456',
-    fullName: 'ShrimpMate Operator',
-    role: UserRole.OPERATOR,
+    email: process.env.SEED_FARMER_EMAIL ?? 'farmer@shrimpmate.local',
+    phoneNumber: process.env.SEED_FARMER_PHONE ?? '0901000002',
+    password: process.env.SEED_FARMER_PASSWORD ?? 'Farmer@123456',
+    fullName: 'ShrimpMate Farmer',
+    role: UserRole.FARMER,
   },
 ];
 
 if (process.env.NODE_ENV === 'production') {
   const hasDefaultPassword = defaultUsers.some((user) =>
-    ['Admin@123456', 'Manager@123456', 'Operator@123456'].includes(user.password),
+    ['Admin@123456', 'Farmer@123456'].includes(user.password),
   );
   if (hasDefaultPassword) {
     console.warn('WARNING: production is using a default seed password. Set SEED_*_PASSWORD before deployment.');
@@ -42,11 +35,26 @@ export async function seedUserData(dataSource: DataSource) {
 
   for (const seedUser of defaultUsers) {
     const email = seedUser.email.trim().toLowerCase();
-    const existingUser = await userRepository.findOne({ where: { email } });
+    const existingUser = await userRepository.findOne({
+      where: [{ email }, { phoneNumber: seedUser.phoneNumber }],
+    });
 
     if (existingUser) {
-      if (!existingUser.phoneNumber) {
+      let updated = false;
+      if (existingUser.email !== email && ['manager@shrimpmate.local', 'operator@shrimpmate.local'].includes(existingUser.email)) {
+        existingUser.email = email;
+        existingUser.fullName = seedUser.fullName;
+        updated = true;
+      }
+      if (!existingUser.phoneNumber && seedUser.phoneNumber) {
         existingUser.phoneNumber = seedUser.phoneNumber;
+        updated = true;
+      }
+      if (existingUser.role !== seedUser.role) {
+        existingUser.role = seedUser.role;
+        updated = true;
+      }
+      if (updated) {
         await userRepository.save(existingUser);
       }
       continue;

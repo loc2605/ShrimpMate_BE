@@ -47,20 +47,8 @@ export class FarmPondService {
       .take(limit);
 
     if (user) {
-      if (user.role === UserRole.MANAGER) {
+      if (user.role === UserRole.FARMER) {
         farmQuery.andWhere('farm.owner_id = :ownerId', { ownerId: user.id });
-      } else if (user.role === UserRole.OPERATOR) {
-        const assignedPondIds = await this.pondAccessService.findAssignedPondIds(user);
-        if (assignedPondIds && assignedPondIds.length > 0) {
-          farmQuery.innerJoin(
-            'ponds',
-            'pond',
-            'pond.farm_id = farm.id AND pond.id IN (:...assignedPondIds)',
-            { assignedPondIds },
-          );
-        } else {
-          farmQuery.andWhere('1 = 0');
-        }
       }
     }
 
@@ -73,18 +61,8 @@ export class FarmPondService {
     if (!farm) {
       throw new NotFoundException(`Không tìm thấy trang trại với id ${id}`);
     }
-    if (user) {
-      if (user.role === UserRole.MANAGER) {
-        if (farm.ownerId !== user.id) {
-          throw new ForbiddenException('Bạn không có quyền truy cập Farm này');
-        }
-      } else if (user.role === UserRole.OPERATOR) {
-        const ponds = await this.pondRepository.find({ where: { farmId: id } });
-        const assignedPondIds = await this.pondAccessService.findAssignedPondIds(user);
-        if (!assignedPondIds || !ponds.some((pond) => assignedPondIds.includes(pond.id))) {
-          throw new ForbiddenException('Bạn không có quyền truy cập Farm này');
-        }
-      }
+    if (user && user.role === UserRole.FARMER && farm.ownerId !== user.id) {
+      throw new ForbiddenException('Bạn không có quyền truy cập Farm này');
     }
     return farm;
   }
@@ -134,14 +112,13 @@ export class FarmPondService {
   async findAllPondsByFarm(farmId: string, { page = 1, limit = 20 }: PaginationDto = new PaginationDto(), user?: User) {
     await this.findFarmById(farmId, user);
 
-    const query = this.pondRepository.createQueryBuilder('pond').where('pond.farm_id = :farmId', { farmId });
-    if (user && user.role === UserRole.OPERATOR) {
-      const assignedPondIds = await this.pondAccessService.findAssignedPondIds(user);
-      query.andWhere('pond.id IN (:...assignedPondIds)', {
-        assignedPondIds: assignedPondIds?.length ? assignedPondIds : ['00000000-0000-0000-0000-000000000000'],
-      });
-    }
-    query.orderBy('pond.code', 'ASC').skip((page - 1) * limit).take(limit);
+    const query = this.pondRepository
+      .createQueryBuilder('pond')
+      .where('pond.farm_id = :farmId', { farmId })
+      .orderBy('pond.code', 'ASC')
+      .skip((page - 1) * limit)
+      .take(limit);
+
     const [data, total] = await query.getManyAndCount();
     return { data, meta: { page, limit, total, pageCount: Math.ceil(total / limit) } };
   }

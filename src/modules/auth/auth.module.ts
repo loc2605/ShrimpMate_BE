@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
@@ -6,17 +6,16 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import type { SignOptions } from 'jsonwebtoken';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { User } from '../../database/entities/user.entity';
-import { Pond } from '../../database/entities/pond.entity';
-import { UserPondAssignment } from '../../database/entities/user-pond-assignment.entity';
 import { PasswordResetOtp } from '../../database/entities/password-reset-otp.entity';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
 import { OtpDeliveryService } from './otp-delivery.service';
 
+@Global()
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, Pond, UserPondAssignment, PasswordResetOtp]),
+    TypeOrmModule.forFeature([User, PasswordResetOtp]),
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],

@@ -7,7 +7,6 @@ import { seedCropSeasonData } from './database/seeds/crop-season.seed';
 import { seedDeviceData } from './database/seeds/device.seed';
 import { seedFeedingData } from './database/seeds/feeding.seed';
 import { seedUserData } from './database/seeds/user.seed';
-import { seedUserPondAssignments } from './database/seeds/user-pond-assignment.seed';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
@@ -27,7 +26,6 @@ async function bootstrap() {
   await seedCropSeasonData(dataSource);
   await seedDeviceData(dataSource);
   await seedFeedingData(dataSource);
-  await seedUserPondAssignments(dataSource);
 
   const port = process.env.PORT ?? 3000;
   await app.listen(port, '0.0.0.0');

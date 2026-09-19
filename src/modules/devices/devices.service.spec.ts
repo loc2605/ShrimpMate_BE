@@ -4,12 +4,14 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Device } from '../../database/entities/device.entity';
 import { Pond } from '../../database/entities/pond.entity';
 import { DeviceMode, DeviceStatus, DeviceType } from '../../database/entities/enums';
+import { PondAccessService } from '../../common/guards/pond-access.service';
 import { DevicesService } from './devices.service';
 
 describe('DevicesService', () => {
   let service: DevicesService;
   let deviceRepository: any;
   let pondRepository: any;
+  let pondAccessService: any;
 
   beforeEach(async () => {
     deviceRepository = {
@@ -24,6 +26,11 @@ describe('DevicesService', () => {
       findOne: jest.fn(),
     };
 
+    pondAccessService = {
+      ensureCanAccess: jest.fn(),
+      findAssignedPondIds: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         DevicesService,
@@ -34,6 +41,10 @@ describe('DevicesService', () => {
         {
           provide: getRepositoryToken(Pond),
           useValue: pondRepository,
+        },
+        {
+          provide: PondAccessService,
+          useValue: pondAccessService,
         },
       ],
     }).compile();

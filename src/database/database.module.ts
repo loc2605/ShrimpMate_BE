@@ -14,7 +14,7 @@ import { entities } from './entities';
         entities,
         migrations: [__dirname + '/migrations/*{.js,.ts}'],
         synchronize: false,
-        migrationsRun: false,
+        migrationsRun: true,
       }),
     }),
   ],

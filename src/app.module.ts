@@ -10,8 +10,7 @@ import { SafetyRuleModule } from './modules/safety-rule/safety-rule.module';
 import { AlertsModule } from './modules/alerts/alerts.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { DevicesModule } from './modules/devices/devices.module';
-import { TelemetryController } from './modules/telemetry/telemetry.controller';
-import { TelemetryService } from './modules/telemetry/telemetry.service';
+import { TelemetryModule } from './modules/telemetry/telemetry.module';
 import { MqttController } from './mqtt/mqtt.controller';
 import { MqttService } from './mqtt/mqtt.service';
 import { DatabaseModule } from './database/database.module';
@@ -19,6 +18,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { FarmPondModule } from './modules/farm-pond/farm-pond.module';
 import { CropSeasonModule } from './modules/crop-season/crop-season.module';
 import { FeedingModule } from './modules/feeding/feeding.module';
+import { AdminModule } from './modules/admin/admin.module';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -51,10 +51,12 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     }),
     DatabaseModule,
     AuthModule,
+    AdminModule,
     FarmPondModule,
     CropSeasonModule,
-    DevicesModule,
     FeedingModule,
+    DevicesModule,
+    TelemetryModule,
     // Distributed tracing, auto-correlated logs, request/job metrics, error
     // telemetry, alarms, and more — out of the box. Sign up at https://observe.nestjs.com
     ObserveModule.forRoot({
@@ -67,7 +69,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     AlertsModule,
     NotificationsModule,
   ],
-  controllers: [AppController, TelemetryController, MqttController],
-  providers: [AppService, TelemetryService, MqttService],
+  controllers: [AppController, MqttController],
+  providers: [AppService, MqttService],
 })
 export class AppModule {}

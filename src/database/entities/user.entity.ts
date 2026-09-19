@@ -21,7 +21,7 @@ export class User {
   @Column({ name: 'full_name', length: 150 })
   fullName!: string;
 
-  @Column({ type: 'enum', enum: UserRole, default: UserRole.OPERATOR })
+  @Column({ type: 'enum', enum: UserRole, default: UserRole.FARMER })
   role!: UserRole;
 
   @Column({ default: true })

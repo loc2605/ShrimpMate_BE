@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -10,9 +10,8 @@ import { RegisterDto } from './dto/register.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
-import { AssignPondDto } from './dto/assign-pond.dto';
-import { AdminCreateUserDto } from './dto/admin-create-user.dto';
 import { UpdateUserRoleDto } from './dto/update-user-role.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 
@@ -56,6 +55,12 @@ export class AuthController {
     return safeUser;
   }
 
+  @Patch('profile')
+  @UseGuards(JwtAuthGuard)
+  updateProfile(@CurrentUser() user: User, @Body() dto: UpdateProfileDto) {
+    return this.authService.updateProfile(user.id, dto);
+  }
+
   @Patch('change-password')
   @UseGuards(JwtAuthGuard)
   changePassword(@CurrentUser() user: User, @Body() dto: ChangePasswordDto) {
@@ -67,13 +72,6 @@ export class AuthController {
   @Roles(UserRole.ADMIN)
   findAllUsers() {
     return this.authService.findAllUsers();
-  }
-
-  @Post('users')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
-  adminCreateUser(@Body() dto: AdminCreateUserDto) {
-    return this.authService.adminCreateUser(dto);
   }
 
   @Patch('users/:id/status')
@@ -98,24 +96,10 @@ export class AuthController {
     return this.authService.updateUserRole(id, dto, currentUser.id);
   }
 
-  @Post('users/:userId/ponds')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
-  assignPond(@Param('userId') userId: string, @Body() dto: AssignPondDto) {
-    return this.authService.assignPond(userId, dto.pondId);
-  }
-
-  @Delete('users/:userId/ponds/:pondId')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
-  removePondAssignment(@Param('userId') userId: string, @Param('pondId') pondId: string) {
-    return this.authService.removePondAssignment(userId, pondId);
-  }
-
   @Get('admin-check')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
   adminCheck() {
     return { message: 'Bạn có quyền Admin' };
   }
-}
+}

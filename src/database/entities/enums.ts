@@ -1,7 +1,6 @@
 export enum UserRole {
   ADMIN = 'admin',
-  MANAGER = 'manager',
-  OPERATOR = 'operator',
+  FARMER = 'farmer',
 }
 
 export enum FarmStatus {

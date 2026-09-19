@@ -8,9 +8,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { QueryFailedError, Repository } from 'typeorm';
 import { Device } from '../../database/entities/device.entity';
 import { Pond } from '../../database/entities/pond.entity';
-import { DeviceMode, UserRole } from '../../database/entities/enums';
+import { DeviceMode, DeviceStatus, UserRole } from '../../database/entities/enums';
 import { CreateDeviceDto } from './dto/create-device.dto';
 import { UpdateDeviceDto } from './dto/update-device.dto';
+import { ClaimDeviceDto } from './dto/claim-device.dto';
 import { User } from '../../database/entities/user.entity';
 import { PondAccessService } from '../../common/guards/pond-access.service';
 
@@ -24,23 +25,19 @@ export class DevicesService {
     private readonly pondAccessService: PondAccessService,
   ) { }
 
-  async createDevice(createDeviceDto: CreateDeviceDto, user?: User) {
+  async createDevice(createDeviceDto: CreateDeviceDto, _user?: User) {
     const normalizedUid = createDeviceDto.deviceUid.trim();
     const existingDevice = await this.deviceRepository.findOne({
       where: { deviceUid: normalizedUid },
     });
 
     if (existingDevice) {
-      throw new BadRequestException(`device_uid ${normalizedUid} đã tồn tại`);
+      throw new BadRequestException(`device_uid ${normalizedUid} đã tồn tại trong hệ thống`);
     }
 
     const pondId = createDeviceDto.pondId ?? null;
-    if (user && [UserRole.MANAGER, UserRole.OPERATOR].includes(user.role) && !pondId) {
-      throw new BadRequestException('Manager/operator phải gán Device vào Pond được phân công');
-    }
     if (pondId) {
       await this.ensurePondExists(pondId);
-      if (user) await this.pondAccessService.ensureCanAccess(user, pondId);
     }
 
     const device = this.deviceRepository.create({
@@ -60,14 +57,20 @@ export class DevicesService {
   }
 
   async findAllDevices(user?: User) {
+    if (user && user.role === UserRole.ADMIN) {
+      return this.deviceRepository.find({
+        order: { createdAt: 'DESC' },
+        relations: { pond: true },
+      });
+    }
+
     const assignedPondIds = user ? await this.pondAccessService.findAssignedPondIds(user) : null;
-    const where = assignedPondIds
-      ? assignedPondIds.length > 0
-        ? assignedPondIds.map((pondId) => ({ pondId }))
-        : { id: '00000000-0000-0000-0000-000000000000' }
-      : undefined;
+    if (!assignedPondIds || assignedPondIds.length === 0) {
+      return [];
+    }
+
     return this.deviceRepository.find({
-      where,
+      where: assignedPondIds.map((pondId) => ({ pondId })),
       order: { createdAt: 'DESC' },
       relations: { pond: true },
     });
@@ -82,9 +85,10 @@ export class DevicesService {
     if (!device) {
       throw new NotFoundException(`Không tìm thấy thiết bị với id ${id}`);
     }
-    if (user && [UserRole.MANAGER, UserRole.OPERATOR].includes(user.role)) {
+
+    if (user && user.role === UserRole.FARMER) {
       if (!device.pondId) {
-        throw new ForbiddenException('Bạn không có quyền truy cập Device chưa được gán Pond');
+        throw new ForbiddenException('Bạn không có quyền truy cập thiết bị chưa được gán vào ao nuôi');
       }
       await this.pondAccessService.ensureCanAccess(user, device.pondId);
     }
@@ -92,8 +96,47 @@ export class DevicesService {
     return device;
   }
 
+  async claimDevice(dto: ClaimDeviceDto, user: User) {
+    await this.ensurePondExists(dto.pondId);
+    await this.pondAccessService.ensureCanAccess(user, dto.pondId);
+
+    const device = await this.deviceRepository.findOne({
+      where: { deviceUid: dto.deviceUid.trim() },
+    });
+
+    if (!device) {
+      throw new NotFoundException(`Không tìm thấy thiết bị chuẩn với UID ${dto.deviceUid} trong danh mục hệ thống`);
+    }
+
+    if (device.pondId && device.pondId !== dto.pondId) {
+      try {
+        await this.pondAccessService.ensureCanAccess(user, device.pondId);
+      } catch {
+        throw new BadRequestException('Thiết bị này hiện đang được gán vào ao nuôi của một người dùng khác');
+      }
+    }
+
+    device.pondId = dto.pondId;
+    return this.deviceRepository.save(device);
+  }
+
+  async unassignDevice(id: string, user: User) {
+    const device = await this.findDeviceById(id, user);
+    device.pondId = null;
+    return this.deviceRepository.save(device);
+  }
+
   async updateDevice(id: string, updateDeviceDto: UpdateDeviceDto, user?: User) {
     const device = await this.findDeviceById(id, user);
+
+    if (user && user.role === UserRole.FARMER) {
+      if (updateDeviceDto.deviceUid && updateDeviceDto.deviceUid !== device.deviceUid) {
+        throw new ForbiddenException('Người nuôi không thể tự thay đổi device_uid chuẩn của phần cứng');
+      }
+      if (updateDeviceDto.firmwareVersion && updateDeviceDto.firmwareVersion !== device.firmwareVersion) {
+        throw new ForbiddenException('Chỉ Quản trị viên mới được cấu hình phiên bản firmware chuẩn');
+      }
+    }
 
     if (updateDeviceDto.deviceUid && updateDeviceDto.deviceUid.trim() !== device.deviceUid) {
       const existing = await this.deviceRepository.findOne({
@@ -142,9 +185,13 @@ export class DevicesService {
     return this.deviceRepository.save(device);
   }
 
-  async heartbeat(id: string, user?: User) {
-    const device = await this.findDeviceById(id, user);
+  async heartbeat(id: string, _user?: User) {
+    const device = await this.deviceRepository.findOne({ where: { id } });
+    if (!device) {
+      throw new NotFoundException(`Không tìm thấy thiết bị với id ${id}`);
+    }
     device.lastSeenAt = new Date();
+    device.status = DeviceStatus.ONLINE;
     return this.deviceRepository.save(device);
   }
 
@@ -163,3 +210,4 @@ export class DevicesService {
     throw error;
   }
 }
+
