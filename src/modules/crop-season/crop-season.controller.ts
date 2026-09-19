@@ -39,7 +39,7 @@ export class CropSeasonController {
   }
 
   @Delete('crop-seasons/:id')
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   remove(@Param('id') id: string, @CurrentUser() user: User) {
     return this.cropSeasonService.remove(id, user);
   }

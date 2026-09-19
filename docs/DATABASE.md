@@ -70,11 +70,12 @@ Index: `(user_id, created_at)`.
 
 ### `farms`
 
-Lưu thông tin trang trại.
+Lưu thông tin trang trại. Mỗi trang trại được gắn với một Manager sở hữu (`owner_id`), phục vụ mô hình phân quyền sở hữu ao/trang trại.
 
 | Cột | Kiểu | Ràng buộc / Mô tả |
 |---|---|---|
 | `id` | UUID | PK |
+| `owner_id` | UUID | FK -> `users.id`, có thể rỗng, lưu ID Manager sở hữu Farm |
 | `name` | VARCHAR(150) | Bắt buộc |
 | `address` | TEXT | Có thể rỗng |
 | `status` | ENUM | `active`, `inactive` |

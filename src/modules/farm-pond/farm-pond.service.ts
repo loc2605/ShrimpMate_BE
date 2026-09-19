@@ -8,7 +8,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Farm } from '../../database/entities/farm.entity';
 import { Pond } from '../../database/entities/pond.entity';
-import { FarmStatus, PondStatus } from '../../database/entities/enums';
+import { FarmStatus, PondStatus, UserRole } from '../../database/entities/enums';
 import { CreateFarmDto } from './dto/create-farm.dto';
 import { UpdateFarmDto } from './dto/update-farm.dto';
 import { CreatePondDto } from './dto/create-pond.dto';
@@ -25,29 +25,45 @@ export class FarmPondService {
     @InjectRepository(Pond)
     private readonly pondRepository: Repository<Pond>,
     private readonly pondAccessService: PondAccessService,
-  ) { }
+  ) {}
 
-  async createFarm(createFarmDto: CreateFarmDto) {
+  async createFarm(createFarmDto: CreateFarmDto, user?: User) {
     const farm = this.farmRepository.create({
       ...createFarmDto,
       name: createFarmDto.name.trim(),
       address: createFarmDto.address?.trim() || null,
       status: createFarmDto.status ?? FarmStatus.ACTIVE,
+      ownerId: user?.id ?? null,
     });
 
     return this.farmRepository.save(farm);
   }
 
   async findAllFarms({ page = 1, limit = 20 }: PaginationDto = new PaginationDto(), user?: User) {
-    const assignedPondIds = user ? await this.pondAccessService.findAssignedPondIds(user) : null;
-    const farmQuery = this.farmRepository.createQueryBuilder('farm').orderBy('farm.created_at', 'DESC').skip((page - 1) * limit).take(limit);
-    if (assignedPondIds) {
-      if (assignedPondIds.length > 0) {
-        farmQuery.innerJoin('ponds', 'pond', 'pond.farm_id = farm.id AND pond.id IN (:...assignedPondIds)', { assignedPondIds });
-      } else {
-        farmQuery.andWhere('1 = 0');
+    const farmQuery = this.farmRepository
+      .createQueryBuilder('farm')
+      .orderBy('farm.created_at', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    if (user) {
+      if (user.role === UserRole.MANAGER) {
+        farmQuery.andWhere('farm.owner_id = :ownerId', { ownerId: user.id });
+      } else if (user.role === UserRole.OPERATOR) {
+        const assignedPondIds = await this.pondAccessService.findAssignedPondIds(user);
+        if (assignedPondIds && assignedPondIds.length > 0) {
+          farmQuery.innerJoin(
+            'ponds',
+            'pond',
+            'pond.farm_id = farm.id AND pond.id IN (:...assignedPondIds)',
+            { assignedPondIds },
+          );
+        } else {
+          farmQuery.andWhere('1 = 0');
+        }
       }
     }
+
     const [data, total] = await farmQuery.getManyAndCount();
     return { data, meta: { page, limit, total, pageCount: Math.ceil(total / limit) } };
   }
@@ -58,10 +74,16 @@ export class FarmPondService {
       throw new NotFoundException(`Không tìm thấy trang trại với id ${id}`);
     }
     if (user) {
-      const ponds = await this.pondRepository.find({ where: { farmId: id } });
-      const assignedPondIds = await this.pondAccessService.findAssignedPondIds(user);
-      if (assignedPondIds && !ponds.some((pond) => assignedPondIds.includes(pond.id))) {
-        throw new ForbiddenException('Bạn không có quyền truy cập Farm này');
+      if (user.role === UserRole.MANAGER) {
+        if (farm.ownerId !== user.id) {
+          throw new ForbiddenException('Bạn không có quyền truy cập Farm này');
+        }
+      } else if (user.role === UserRole.OPERATOR) {
+        const ponds = await this.pondRepository.find({ where: { farmId: id } });
+        const assignedPondIds = await this.pondAccessService.findAssignedPondIds(user);
+        if (!assignedPondIds || !ponds.some((pond) => assignedPondIds.includes(pond.id))) {
+          throw new ForbiddenException('Bạn không có quyền truy cập Farm này');
+        }
       }
     }
     return farm;
@@ -77,8 +99,8 @@ export class FarmPondService {
     return this.farmRepository.save(farm);
   }
 
-  async removeFarm(id: string) {
-    const farm = await this.findFarmById(id);
+  async removeFarm(id: string, user?: User) {
+    const farm = await this.findFarmById(id, user);
     const ponds = await this.pondRepository.find({ where: { farmId: farm.id } });
     if (ponds.length > 0) {
       await this.pondRepository.softRemove(ponds);
@@ -87,8 +109,8 @@ export class FarmPondService {
     return { message: `Đã xoá trang trại ${farm.name}` };
   }
 
-  async createPond(farmId: string, createPondDto: CreatePondDto) {
-    const farm = await this.findFarmById(farmId);
+  async createPond(farmId: string, createPondDto: CreatePondDto, user?: User) {
+    const farm = await this.findFarmById(farmId, user);
 
     const existingPond = await this.pondRepository.findOne({
       where: { farmId, code: createPondDto.code.trim() },
@@ -110,14 +132,14 @@ export class FarmPondService {
   }
 
   async findAllPondsByFarm(farmId: string, { page = 1, limit = 20 }: PaginationDto = new PaginationDto(), user?: User) {
-    await this.findFarmById(farmId);
+    await this.findFarmById(farmId, user);
 
     const query = this.pondRepository.createQueryBuilder('pond').where('pond.farm_id = :farmId', { farmId });
-    if (user) {
+    if (user && user.role === UserRole.OPERATOR) {
       const assignedPondIds = await this.pondAccessService.findAssignedPondIds(user);
-      if (assignedPondIds) {
-        query.andWhere('pond.id IN (:...assignedPondIds)', { assignedPondIds: assignedPondIds.length ? assignedPondIds : ['00000000-0000-0000-0000-000000000000'] });
-      }
+      query.andWhere('pond.id IN (:...assignedPondIds)', {
+        assignedPondIds: assignedPondIds?.length ? assignedPondIds : ['00000000-0000-0000-0000-000000000000'],
+      });
     }
     query.orderBy('pond.code', 'ASC').skip((page - 1) * limit).take(limit);
     const [data, total] = await query.getManyAndCount();

@@ -1,14 +1,28 @@
 import { DataSource } from 'typeorm';
 import { Farm } from '../entities/farm.entity';
 import { Pond } from '../entities/pond.entity';
-import { FarmStatus, PondStatus } from '../entities/enums';
+import { User } from '../entities/user.entity';
+import { FarmStatus, PondStatus, UserRole } from '../entities/enums';
 
 export async function seedFarmPondData(dataSource: DataSource) {
   const farmRepository = dataSource.getRepository(Farm);
   const pondRepository = dataSource.getRepository(Pond);
+  const userRepository = dataSource.getRepository(User);
+
+  const managerUser = await userRepository.findOne({
+    where: { role: UserRole.MANAGER },
+  });
 
   const count = await farmRepository.count();
   if (count > 0) {
+    if (managerUser) {
+      await farmRepository
+        .createQueryBuilder()
+        .update(Farm)
+        .set({ ownerId: managerUser.id })
+        .where('owner_id IS NULL')
+        .execute();
+    }
     return;
   }
 
@@ -17,16 +31,19 @@ export async function seedFarmPondData(dataSource: DataSource) {
       name: 'Trang trại Sóng Xanh',
       address: 'Bạc Liêu, Việt Nam',
       status: FarmStatus.ACTIVE,
+      ownerId: managerUser?.id ?? null,
     },
     {
       name: 'Ao Nước Trong',
       address: 'Cà Mau, Việt Nam',
       status: FarmStatus.ACTIVE,
+      ownerId: managerUser?.id ?? null,
     },
     {
       name: 'Vườn Tôm Minh Phú',  
       address: 'Sóc Trăng, Việt Nam',
       status: FarmStatus.INACTIVE,
+      ownerId: null,
     },
   ]);
 

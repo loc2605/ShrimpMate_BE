@@ -35,7 +35,7 @@ export class FeedingController {
 	}
 
 	@Delete('feeding-schedules/:id')
-	@Roles(UserRole.ADMIN)
+	@Roles(UserRole.ADMIN, UserRole.MANAGER)
 	removeSchedule(@Param('id') id: string, @CurrentUser() user: User) {
 		return this.feedingService.removeSchedule(id, user);
 	}

@@ -1,11 +1,20 @@
-import { Column, CreateDateColumn, DeleteDateColumn, Entity, Index, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import { Column, CreateDateColumn, DeleteDateColumn, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 import { FarmStatus } from './enums';
+import { User } from './user.entity';
 
 @Entity('farms')
 @Index('IDX_farms_status', ['status'])
+@Index('IDX_farms_owner_id', ['ownerId'])
 export class Farm {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
+
+  @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'owner_id' })
+  owner!: User | null;
+
+  @Column({ name: 'owner_id', type: 'uuid', nullable: true })
+  ownerId!: string | null;
 
   @Column({ length: 150 })
   name!: string;

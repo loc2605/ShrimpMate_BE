@@ -34,9 +34,9 @@ export class FarmPondController {
   }
 
   @Post()
-  @Roles(UserRole.ADMIN)
-  createFarm(@Body() createFarmDto: CreateFarmDto) {
-    return this.farmPondService.createFarm(createFarmDto);
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  createFarm(@Body() createFarmDto: CreateFarmDto, @CurrentUser() user: User) {
+    return this.farmPondService.createFarm(createFarmDto, user);
   }
 
   @Get(':id')
@@ -52,9 +52,9 @@ export class FarmPondController {
   }
 
   @Delete(':id')
-  @Roles(UserRole.ADMIN)
-  removeFarm(@Param('id') id: string) {
-    return this.farmPondService.removeFarm(id);
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  removeFarm(@Param('id') id: string, @CurrentUser() user: User) {
+    return this.farmPondService.removeFarm(id, user);
   }
 
   @Get(':farmId/ponds')
@@ -64,9 +64,9 @@ export class FarmPondController {
   }
 
   @Post(':farmId/ponds')
-  @Roles(UserRole.ADMIN)
-  createPond(@Param('farmId') farmId: string, @Body() createPondDto: CreatePondDto) {
-    return this.farmPondService.createPond(farmId, createPondDto);
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  createPond(@Param('farmId') farmId: string, @Body() createPondDto: CreatePondDto, @CurrentUser() user: User) {
+    return this.farmPondService.createPond(farmId, createPondDto, user);
   }
 
   @Get(':farmId/ponds/:id')
@@ -82,7 +82,7 @@ export class FarmPondController {
   }
 
   @Delete(':farmId/ponds/:id')
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   deletePond(@Param('id') id: string, @CurrentUser() user: User) {
     return this.farmPondService.removePond(id, user);
   }

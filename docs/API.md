@@ -423,7 +423,7 @@ Quyen: `admin`, `manager`, `operator`.
 
 Query tuy chon: `page` (mac dinh `1`) va `limit` (mac dinh `20`, toi da `100`). Vi du: `GET /farms?page=1&limit=20`.
 Response gom `data` va `meta` (`page`, `limit`, `total`, `pageCount`).
-Voi `manager` va `operator`, `data` chi gom cac Farm co Pond duoc gan; `admin` thay toan bo Farm.
+Voi `manager`, `data` chi gom cac Farm do manager so huu (`owner_id`); voi `operator`, chi gom cac Farm co Pond duoc gan; `admin` thay toan bo Farm.
 
 ### Tao Farm
 
@@ -431,7 +431,7 @@ Voi `manager` va `operator`, `data` chi gom cac Farm co Pond duoc gan; `admin` t
 POST /farms
 ```
 
-Quyen: `admin`.
+Quyen: `admin`, `manager`. Farm tao boi `manager` se tu dong gan `owner_id = manager.id`.
 
 Body:
 
@@ -453,7 +453,7 @@ Gia tri `status`: `active`, `inactive`.
 GET /farms/:id
 ```
 
-Quyen: `admin`, `manager`, `operator`.
+Quyen: `admin`, `manager`, `operator`. `manager` chi truy cap duoc Farm cua minh.
 
 Vi du:
 
@@ -467,7 +467,7 @@ GET /farms/788b3aaf-8235-45fb-8214-abe3aaed2bb5
 PATCH /farms/:id
 ```
 
-Quyen: `admin`, `manager` trong pham vi Pond duoc gan.
+Quyen: `admin`, `manager` so huu Farm.
 
 Body co the gui mot phan:
 
@@ -484,7 +484,7 @@ Body co the gui mot phan:
 DELETE /farms/:id
 ```
 
-Quyen: `admin`.
+Quyen: `admin`, `manager` so huu Farm.
 
 Luu y: Farm va cac Pond thuoc Farm duoc soft delete bang `deletedAt`, khong xoa cung du lieu lich su Crop Season, Feeding Record, Telemetry va Alert.
 
@@ -502,7 +502,7 @@ Quyen: `admin`, `manager`, `operator`.
 
 Query tuy chon: `page` (mac dinh `1`) va `limit` (mac dinh `20`, toi da `100`). Vi du: `GET /farms/:farmId/ponds?page=1&limit=20`.
 Response gom `data` va `meta` (`page`, `limit`, `total`, `pageCount`).
-`manager` va `operator` chi nhan cac Pond da duoc gan; `admin` nhan toan bo Pond cua Farm.
+`manager` chi nhan cac Pond thuoc Farm do minh so huu; `operator` chi nhan cac Pond da duoc gan; `admin` nhan toan bo Pond cua Farm.
 
 Vi du:
 
@@ -516,7 +516,7 @@ GET /farms/788b3aaf-8235-45fb-8214-abe3aaed2bb5/ponds
 POST /farms/:farmId/ponds
 ```
 
-Quyen: `admin`.
+Quyen: `admin`, `manager` so huu Farm.
 
 Body:
 
@@ -539,7 +539,7 @@ Gia tri `status`: `active`, `inactive`, `maintenance`.
 GET /farms/:farmId/ponds/:id
 ```
 
-Quyen: `admin`, `manager`, `operator`.
+Quyen: `admin`, `manager`, `operator`. `manager` chi truy cap duoc Pond thuoc Farm cua minh.
 
 ### Cap nhat Pond
 
@@ -547,7 +547,7 @@ Quyen: `admin`, `manager`, `operator`.
 PATCH /farms/:farmId/ponds/:id
 ```
 
-Quyen: `admin`, `manager`.
+Quyen: `admin`, `manager` so huu Farm chua Pond.
 
 Body:
 
@@ -565,7 +565,7 @@ Body:
 DELETE /farms/:farmId/ponds/:id
 ```
 
-Quyen: `admin`.
+Quyen: `admin`, `manager` so huu Farm chua Pond.
 
 ---
 
@@ -745,7 +745,7 @@ Body:
 DELETE /crop-seasons/:id
 ```
 
-Quyen: `admin`.
+Quyen: `admin`, `manager` trong pham vi ao so huu.
 
 ---
 
@@ -798,7 +798,7 @@ Quyen: `admin`, `manager`.
 DELETE /feeding-schedules/:id
 ```
 
-Quyen: `admin`.
+Quyen: `admin`, `manager` trong pham vi ao so huu.
 
 ### Tao Feeding Record
 
