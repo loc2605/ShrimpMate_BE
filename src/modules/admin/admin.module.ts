@@ -5,12 +5,14 @@ import { Farm } from '../../database/entities/farm.entity';
 import { Pond } from '../../database/entities/pond.entity';
 import { Device } from '../../database/entities/device.entity';
 import { Alert } from '../../database/entities/alert.entity';
+import { CropSeason } from '../../database/entities/crop-season.entity';
+import { FeedingRecord } from '../../database/entities/feeding-record.entity';
 import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, Farm, Pond, Device, Alert]),
+    TypeOrmModule.forFeature([User, Farm, Pond, Device, Alert, CropSeason, FeedingRecord]),
   ],
   controllers: [AdminController],
   providers: [AdminService],

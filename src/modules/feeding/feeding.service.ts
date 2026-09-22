@@ -6,13 +6,16 @@ import { CropSeason } from '../../database/entities/crop-season.entity';
 import { FeedingRecord } from '../../database/entities/feeding-record.entity';
 import { FeedingSchedule } from '../../database/entities/feeding-schedule.entity';
 import { Pond } from '../../database/entities/pond.entity';
-import { CropSeasonStatus, FeedingStatus } from '../../database/entities/enums';
+import { AlertSeverity, CropSeasonStatus, FeedingStatus, SafetyDecision } from '../../database/entities/enums';
 import { CreateFeedingRecordDto } from './dto/create-feeding-record.dto';
 import { CreateFeedingScheduleDto } from './dto/create-feeding-schedule.dto';
 import { UpdateFeedingScheduleDto } from './dto/update-feeding-schedule.dto';
 import { UpdateFeedingRecordDto } from './dto/update-feeding-record.dto';
 import { User } from '../../database/entities/user.entity';
 import { PondAccessService } from '../../common/guards/pond-access.service';
+import { SafetyRuleEngineService } from '../safety-rule/safety-rule-engine.service';
+import { MqttService } from '../../mqtt/mqtt.service';
+import { AlertsService } from '../alerts/alerts.service';
 
 @Injectable()
 export class FeedingService {
@@ -28,6 +31,9 @@ export class FeedingService {
 		@InjectRepository(CropSeason)
 		private readonly cropSeasonRepository: Repository<CropSeason>,
 		private readonly pondAccessService: PondAccessService,
+		private readonly safetyRuleEngineService: SafetyRuleEngineService,
+		private readonly mqttService: MqttService,
+		private readonly alertsService: AlertsService,
 	) { }
 
 	async createSchedule(pondId: string, dto: CreateFeedingScheduleDto, user?: User) {
@@ -79,8 +85,9 @@ export class FeedingService {
 			throw new BadRequestException('Feeding Record mới phải bắt đầu ở trạng thái requested; dùng PATCH để cập nhật tiến trình');
 		}
 
+		let device: Device | null = null;
 		if (dto.deviceId) {
-			const device = await this.deviceRepository.findOne({ where: { id: dto.deviceId } });
+			device = await this.deviceRepository.findOne({ where: { id: dto.deviceId } });
 			if (!device) {
 				throw new NotFoundException(`Không tìm thấy thiết bị với id ${dto.deviceId}`);
 			}
@@ -99,22 +106,74 @@ export class FeedingService {
 			}
 		}
 
-		const status = FeedingStatus.REQUESTED;
+		// Đánh giá Safety Rule Engine trước khi tạo và kích hoạt cho ăn
+		const requestedAmount = Number(dto.requestedAmountKg) || 10.0;
+		const safetyResult = await this.safetyRuleEngineService.evaluateFeedingSafety(
+			pondId,
+			dto.deviceId ?? undefined,
+			requestedAmount,
+		);
+
+		let initialStatus = FeedingStatus.REQUESTED;
+		let stoppedReason: string | null = null;
+
+		if (safetyResult.decision === SafetyDecision.BLOCKED) {
+			initialStatus = FeedingStatus.STOPPED;
+			stoppedReason = `Bị chặn bởi Safety Engine: ${safetyResult.reasons.join('; ')}`;
+
+			// Tự động tạo Alert mức CRITICAL để thông báo cho người nuôi
+			await this.alertsService.createAlert({
+				pondId,
+				deviceId: dto.deviceId ?? undefined,
+				type: 'FEEDING_SAFETY_BLOCKED',
+				severity: AlertSeverity.CRITICAL,
+				message: `Cữ cho ăn bị chặn an toàn: ${safetyResult.reasons[0] || 'Chỉ số môi trường không đạt chuẩn'}`,
+				metadata: {
+					safetyResult,
+					requestedAmountKg: requestedAmount,
+				},
+			});
+		}
+
+		const actualAmount = safetyResult.decision === SafetyDecision.BLOCKED
+			? 0
+			: (safetyResult.decision === SafetyDecision.ADJUSTED ? safetyResult.allowedAmountKg : (dto.actualAmountKg ?? null));
+
 		const record = this.recordRepository.create({
 			...dto,
 			pondId,
 			deviceId: dto.deviceId ?? null,
 			scheduleId: dto.scheduleId ?? null,
 			startedAt: dto.startedAt ? new Date(dto.startedAt) : new Date(),
-			actualAmountKg: dto.actualAmountKg ?? null,
-			status,
+			actualAmountKg: actualAmount,
+			status: initialStatus,
+			safetyDecision: safetyResult.decision,
+			safetyReason: safetyResult.reasons.length > 0 ? safetyResult.reasons.join('; ') : 'Môi trường nước an toàn',
 			appetiteLevel: dto.appetiteLevel ?? null,
 			leftoverPercent: dto.leftoverPercent ?? null,
-			stoppedReason: dto.stoppedReason?.trim() ?? null,
-			finishedAt: [FeedingStatus.COMPLETED, FeedingStatus.STOPPED, FeedingStatus.FAILED].includes(status)
-				? new Date() : null,
+			stoppedReason: stoppedReason ?? (dto.stoppedReason?.trim() ?? null),
+			finishedAt: initialStatus === FeedingStatus.STOPPED ? new Date() : null,
 		});
-		return this.recordRepository.save(record);
+
+		const savedRecord = await this.recordRepository.save(record);
+
+		// Nếu an toàn và có thiết bị Feeder -> Gửi lệnh MQTT xuống thiết bị
+		if (safetyResult.decision !== SafetyDecision.BLOCKED && device?.deviceUid) {
+			const commandSent = await this.mqttService.publishFeederCommand(device.deviceUid, {
+				command: 'FEED',
+				recordId: savedRecord.id,
+				feedAmountKg: safetyResult.allowedAmountKg,
+				spreadRateKgPerMinute: 1.5,
+				timestamp: new Date().toISOString(),
+			});
+
+			if (commandSent) {
+				savedRecord.status = FeedingStatus.RUNNING;
+				await this.recordRepository.save(savedRecord);
+			}
+		}
+
+		return savedRecord;
 	}
 
 	async findRecordsByPond(pondId: string, user?: User) {

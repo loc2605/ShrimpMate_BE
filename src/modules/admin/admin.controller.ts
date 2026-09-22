@@ -20,4 +20,9 @@ export class AdminController {
   getOperationalReport() {
     return this.adminService.getOperationalReport();
   }
+
+  @Get('reports/fcr')
+  getFcrReport() {
+    return this.adminService.getFcrReport();
+  }
 }

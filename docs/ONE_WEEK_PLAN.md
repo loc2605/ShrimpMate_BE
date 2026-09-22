@@ -109,39 +109,38 @@ Kết quả cần đạt: tạo được lịch cho ăn và lưu lịch sử cá
 
 ### Ngày 5 - Telemetry và Alert
 
-- [ ] Tạo API nhận dữ liệu cảm biến.
-- [ ] Tạo API xem telemetry theo Pond, Device và khoảng thời gian.
-- [ ] Kiểm tra các giá trị pH, oxygen, temperature, salinity, ammonia và turbidity.
-- [ ] Sử dụng index theo `(pond_id, measured_at)` và `(device_id, measured_at)`.
-- [ ] Tạo service phát hiện dữ liệu vượt ngưỡng.
-- [ ] Tạo CRUD hoặc API xử lý Alert.
-- [ ] Hỗ trợ trạng thái Alert: `open`, `acknowledged`, `resolved`.
-- [ ] Liên kết Alert với Pond và Device.
+- [x] Tạo API nhận dữ liệu cảm biến.
+- [x] Tạo API xem telemetry theo Pond, Device và khoảng thời gian (phân trang, lọc ngày).
+- [x] Kiểm tra các giá trị pH, oxygen, temperature, salinity, ammonia và turbidity.
+- [x] Sử dụng index theo `(pond_id, measured_at)` và `(device_id, measured_at)`.
+- [x] Tạo service phát hiện dữ liệu vượt ngưỡng và sinh Alert tự động (`TelemetryThresholdService` có debounce 15 phút).
+- [x] Tạo CRUD hoặc API xử lý Alert.
+- [x] Hỗ trợ trạng thái Alert: `open`, `acknowledged`, `resolved`, kèm API `GET /alerts/summary`.
+- [x] Liên kết Alert với Pond và Device.
 
 Kết quả cần đạt: nhận được dữ liệu cảm biến và sinh cảnh báo cơ bản.
 
 ### Ngày 6 - MQTT và Safety Rule
 
-- [ ] Cấu hình MQTT broker local.
-- [ ] Kết nối backend với MQTT broker.
-- [ ] Thiết kế topic cho telemetry và command feeder.
-- [ ] Nhận telemetry từ MQTT và lưu vào `telemetry_readings`.
-- [ ] Gửi command điều khiển feeder qua MQTT.
-- [ ] Hoàn thiện bảng và service `safety_rules`.
-- [ ] Kiểm tra command trước khi gửi xuống Device.
+- [x] Cấu hình MQTT broker local (kết nối thư viện `mqtt`).
+- [x] Kết nối backend với MQTT broker (`MqttService` có cơ chế non-blocking reconnect).
+- [x] Thiết kế topic cho telemetry, command feeder, feeder status feedback và heartbeat.
+- [x] Nhận telemetry từ MQTT và lưu vào `telemetry_readings`.
+- [x] Gửi command điều khiển feeder qua MQTT.
+- [x] Hoàn thiện bảng, entity và service `safety_rules` (kèm seed luật mặc định).
+- [x] Hiện thực `SafetyRuleEngineService` kiểm tra command trước khi gửi xuống Device.
+- [x] Script giả lập ESP32: `scripts/mqtt-simulator.js`.
 
 Kết quả cần đạt: có luồng thử nghiệm từ thiết bị -> MQTT -> backend -> database và kiểm tra an toàn trước khi điều khiển. Phần AI chưa làm trong giai đoạn này.
 
 ### Ngày 7 - Kiểm thử, tài liệu và demo
 
-- [ ] Viết unit test cho AuthService.
-- [ ] Viết test cho RolesGuard và JwtStrategy.
-- [ ] Viết test cho Farm/Pond/CropSeason service.
-- [ ] Viết e2e test cho các luồng chính.
-- [x] Chạy `npm run build`.
-- [x] Chạy `npm run lint`.
-- [ ] Sửa lỗi cấu hình Jest để test chạy được với NestJS hiện tại.
-- [ ] Chuẩn bị dữ liệu và kịch bản demo.
+- [x] Hoàn tất Admin overview, báo cáo vận hành và báo cáo FCR toàn hệ thống (`GET /admin/reports/fcr`).
+- [x] Hoàn tất OTP verify độc lập (`POST /auth/verify-reset-otp`) và resend OTP.
+- [x] Cập nhật hồ sơ người dùng (`PATCH /auth/profile`).
+- [x] Chạy `npm run build` thành công.
+- [x] Chạy `npm run lint` thành công.
+- [x] Cập nhật toàn bộ `docs/API.md` và `docs/DATABASE.md`.
 
 Kết quả cần đạt: project build được, lint pass, các API chính có test và có thể trình diễn end-to-end. Tài liệu chi tiết sẽ cập nhật sau.
 

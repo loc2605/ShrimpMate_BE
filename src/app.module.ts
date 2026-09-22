@@ -11,8 +11,7 @@ import { AlertsModule } from './modules/alerts/alerts.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { DevicesModule } from './modules/devices/devices.module';
 import { TelemetryModule } from './modules/telemetry/telemetry.module';
-import { MqttController } from './mqtt/mqtt.controller';
-import { MqttService } from './mqtt/mqtt.service';
+import { MqttModule } from './mqtt/mqtt.module';
 import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { FarmPondModule } from './modules/farm-pond/farm-pond.module';
@@ -57,6 +56,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     FeedingModule,
     DevicesModule,
     TelemetryModule,
+    MqttModule,
     // Distributed tracing, auto-correlated logs, request/job metrics, error
     // telemetry, alarms, and more — out of the box. Sign up at https://observe.nestjs.com
     ObserveModule.forRoot({
@@ -69,7 +69,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     AlertsModule,
     NotificationsModule,
   ],
-  controllers: [AppController, MqttController],
-  providers: [AppService, MqttService],
+  controllers: [AppController],
+  providers: [AppService],
 })
 export class AppModule {}

@@ -9,9 +9,13 @@ export async function seedFarmPondData(dataSource: DataSource) {
   const pondRepository = dataSource.getRepository(Pond);
   const userRepository = dataSource.getRepository(User);
 
-  const farmerUser = await userRepository.findOne({
-    where: { role: UserRole.FARMER },
-  });
+  const farmerUser =
+    (await userRepository.findOne({
+      where: { email: process.env.SEED_FARMER_EMAIL ?? 'farmer@shrimpmate.local' },
+    })) ??
+    (await userRepository.findOne({
+      where: { role: UserRole.FARMER },
+    }));
 
   const count = await farmRepository.count();
   if (count > 0) {
@@ -20,7 +24,9 @@ export async function seedFarmPondData(dataSource: DataSource) {
         .createQueryBuilder()
         .update(Farm)
         .set({ ownerId: farmerUser.id })
-        .where('owner_id IS NULL')
+        .where('owner_id IS NULL OR name IN (:...seedFarmNames)', {
+          seedFarmNames: ['Trang trại Sóng Xanh', 'Ao Nước Trong', 'Vườn Tôm Minh Phú', 'Trang trai Tom Hung Phat'],
+        })
         .execute();
     }
     return;

@@ -173,6 +173,8 @@ Lưu nhật ký từng lần cho ăn thực tế của ao nuôi.
 | `appetite_level` | SMALLINT | Cường độ bắt mồi (FIS): `0` none, `1` weak, `2` normal, `3` strong |
 | `leftover_percent` | NUMERIC(5,2) | Tỷ lệ thức ăn thừa trên vó (%) |
 | `stopped_reason` | TEXT | Lý do dừng (nếu dừng khẩn cấp hoặc sự cố) |
+| `safety_decision` | ENUM | Đánh giá từ Safety Rule Engine: `allowed`, `adjusted`, `blocked` |
+| `safety_reason` | TEXT | Lý do điều chỉnh / chặn lệnh an toàn |
 | `created_at` | TIMESTAMPTZ | Thời gian tạo |
 | `updated_at` | TIMESTAMPTZ | Thời gian cập nhật |
 
@@ -412,6 +414,8 @@ erDiagram
         smallint appetite_level
         numeric leftover_percent
         text stopped_reason
+        enum safety_decision
+        text safety_reason
         timestamptz created_at
         timestamptz updated_at
     }

@@ -44,7 +44,15 @@ export async function seedUserData(dataSource: DataSource) {
       if (existingUser.email !== email && ['manager@shrimpmate.local', 'operator@shrimpmate.local'].includes(existingUser.email)) {
         existingUser.email = email;
         existingUser.fullName = seedUser.fullName;
+        existingUser.passwordHash = await bcrypt.hash(seedUser.password, 12);
         updated = true;
+      }
+      if (['admin@shrimpmate.local', 'farmer@shrimpmate.local'].includes(existingUser.email)) {
+        const passwordMatches = await bcrypt.compare(seedUser.password, existingUser.passwordHash);
+        if (!passwordMatches) {
+          existingUser.passwordHash = await bcrypt.hash(seedUser.password, 12);
+          updated = true;
+        }
       }
       if (!existingUser.phoneNumber && seedUser.phoneNumber) {
         existingUser.phoneNumber = seedUser.phoneNumber;

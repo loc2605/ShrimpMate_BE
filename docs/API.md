@@ -162,6 +162,41 @@ Response:
 }
 ```
 
+### Gửi lại mã OTP (Resend OTP)
+
+```http
+POST /auth/resend-otp
+```
+
+Body:
+```json
+{
+  "identifier": "farmer1@example.com"
+}
+```
+
+### Xác thực mã OTP (Kiểm tra trước khi đổi mật khẩu)
+
+```http
+POST /auth/verify-reset-otp
+```
+
+Body:
+```json
+{
+  "identifier": "farmer1@example.com",
+  "otp": "123456"
+}
+```
+
+Response:
+```json
+{
+  "valid": true,
+  "message": "Mã OTP chính xác và hợp lệ"
+}
+```
+
 ### Đặt lại mật khẩu bằng OTP
 
 ```http
@@ -316,6 +351,43 @@ GET /admin/reports/operational
 ```
 
 Quyền: `admin`. Trả về báo cáo tổng quan, danh sách cảnh báo sự cố gần đây và danh sách các thiết bị ngoại tuyến (offline) cần kiểm tra bảo trì.
+
+### [Admin] Báo cáo hiệu quả chuyển đổi thức ăn (FCR) toàn hệ thống
+
+```http
+GET /admin/reports/fcr
+```
+
+Quyền: `admin`.
+
+Response:
+```json
+{
+  "generatedAt": "2026-09-22T09:30:00.000Z",
+  "summary": {
+    "totalSeasonsEvaluated": 12,
+    "totalFeedConsumedSystemKg": 18500.5,
+    "totalBiomassGainSystemKg": 15400.0,
+    "averageSystemFcr": 1.20,
+    "systemQualityRating": "Xuất sắc"
+  },
+  "seasons": [
+    {
+      "cropSeasonId": "uuid",
+      "seasonName": "Vụ Mùa Mưa 2026",
+      "status": "active",
+      "farmName": "Trang trại Sóng Xanh",
+      "pondName": "Ao Nuôi Số 1",
+      "daysOfCulture": 45,
+      "totalFeedConsumedKg": 1250.0,
+      "estimatedCurrentBiomassKg": 1100.0,
+      "biomassGainKg": 1050.0,
+      "fcr": 1.19,
+      "qualityRating": "Xuất sắc (< 1.3)"
+    }
+  ]
+}
+```
 
 ---
 
@@ -549,7 +621,7 @@ Response:
 
 ---
 
-## 9. Feeding API (Lịch cho ăn & Nhật ký)
+## 9. Feeding API (Lịch cho ăn & Nhật ký & Đánh giá An toàn)
 
 ### Lịch cho ăn tự động
 
@@ -568,15 +640,26 @@ Response:
 - `PATCH /feeding-schedules/:id`: Tinh chỉnh cữ ăn.
 - `DELETE /feeding-schedules/:id`: Xóa lịch.
 
-### Nhật ký cho ăn (Feeding Records)
+### Nhật ký cho ăn (Feeding Records) & Kích hoạt qua Safety Rule Engine
 
 - `GET /ponds/:pondId/feeding-records`: Lịch sử các cữ cho ăn.
-- `POST /ponds/:pondId/feeding-records`: Ghi nhận cữ cho ăn mới (`requestedAmountKg`, `source`: `schedule`/`manual`/`ai`).
-- `PATCH /feeding-records/:id`: Cập nhật tiến trình (`running`, `completed`, `stopped`), cập nhật `actualAmountKg` thực tế và ghi nhận `leftoverPercent`.
+- `POST /ponds/:pondId/feeding-records`: Tạo và kích hoạt cữ cho ăn mới.
+  - Tự động đánh giá qua **Safety Rule Engine** (kiểm tra DO, pH, Nhiệt độ, Khí độc NH3, trạng thái thiết bị).
+  - Nếu `BLOCKED`: Lưu record ở trạng thái `stopped`, ghi nhận `safetyDecision = 'blocked'`, tự động sinh Alert mức `CRITICAL` và **không phát lệnh MQTT**.
+  - Nếu `ADJUSTED`: Điều chỉnh khối lượng (`actualAmountKg = requestedAmountKg * factor`), lưu `safetyDecision = 'adjusted'` và phát lệnh MQTT tới máy cho ăn.
+  - Nếu `ALLOWED`: Cho phép xả 100% định mức, phát lệnh MQTT tới máy cho ăn và chuyển sang `running`.
+  ```json
+  {
+    "deviceId": "uuid",
+    "requestedAmountKg": 12.5,
+    "source": "manual"
+  }
+  ```
+- `PATCH /feeding-records/:id`: Cập nhật tiến trình (`running`, `completed`, `stopped`, `failed`), cập nhật `actualAmountKg` thực tế và ghi nhận `leftoverPercent`.
 
 ---
 
-## 10. Water Quality Telemetry API (Chất lượng nước)
+## 10. Water Quality Telemetry API (Chất lượng nước & Kiểm tra Ngưỡng)
 
 ### Lấy chỉ số môi trường nước mới nhất của ao
 
@@ -584,7 +667,7 @@ Response:
 GET /ponds/:pondId/telemetry/latest
 ```
 
-Quyền: `farmer`.
+Quyền: `admin`, `farmer`.
 
 Response:
 ```json
@@ -592,7 +675,7 @@ Response:
   "id": "uuid",
   "pondId": "uuid",
   "deviceId": "uuid",
-  "measuredAt": "2026-09-19T15:25:00.000Z",
+  "measuredAt": "2026-09-22T09:25:00.000Z",
   "ph": 7.8,
   "dissolvedOxygenMgL": 5.6,
   "temperatureC": 28.5,
@@ -602,15 +685,33 @@ Response:
 }
 ```
 
-### Lấy lịch sử đo môi trường nước (Vẽ đồ thị)
+### Lấy lịch sử đo môi trường nước (Vẽ đồ thị & Phân trang theo thời gian)
 
 ```http
-GET /ponds/:pondId/telemetry/history?limit=50
+GET /ponds/:pondId/telemetry/history?startDate=2026-09-01T00:00:00.000Z&endDate=2026-09-22T23:59:59.000Z&deviceId=uuid&page=1&limit=50
 ```
 
-Quyền: `farmer`.
+Quyền: `admin`, `farmer`.
 
-### Ghi nhận chỉ số đo cảm biến (Cảm biến / Simulator)
+Query Parameters:
+- `startDate` (ISO String): Lọc từ thời điểm.
+- `endDate` (ISO String): Lọc đến thời điểm.
+- `deviceId` (UUID): Lọc theo cảm biến đo.
+- `page` (number, default: 1): Trang hiện tại.
+- `limit` (number, default: 50, max: 500): Số lượng bản ghi mỗi trang.
+
+Response:
+```json
+{
+  "data": [ ... ],
+  "total": 120,
+  "page": 1,
+  "limit": 50,
+  "totalPages": 3
+}
+```
+
+### Ghi nhận chỉ số đo cảm biến (Cảm biến / REST Simulator)
 
 ```http
 POST /ponds/:pondId/telemetry
@@ -623,13 +724,15 @@ Body:
 {
   "deviceId": "uuid",
   "ph": 7.9,
-  "dissolvedOxygenMgL": 5.4,
+  "dissolvedOxygenMgL": 3.2,
   "temperatureC": 28.7,
   "salinityPpt": 15.0,
   "ammoniaMgL": 0.03,
   "turbidityNtu": 11.8
 }
 ```
+
+*Hệ thống tự động chạy qua **TelemetryThresholdService**: Nếu chỉ số vượt ngưỡng an toàn (ví dụ DO = 3.2 mg/L < 3.5 mg/L), hệ thống sẽ tự động tạo `Alert` cảnh báo mức `CRITICAL` và áp dụng debounce 15 phút chống spam.*
 
 ---
 
@@ -660,7 +763,6 @@ Response:
   "explanation": "Tôm bắt mồi mạnh (FIS cao), DO và nhiệt độ nước trong ngưỡng tối ưu. Đề xuất tăng nhẹ lượng thức ăn 5%."
 }
 ```
-*`appetiteLevel` (Cường độ bắt mồi - FIS): `0` (None), `1` (Weak), `2` (Normal), `3` (Strong).*
 
 ### Lịch sử các khuyến nghị AI
 
@@ -674,21 +776,52 @@ Quyền: `farmer`.
 
 ## 12. Alerts & Incident Handling API
 
+### Lấy số lượng tổng kết cảnh báo (Summary Badge)
+
+```http
+GET /alerts/summary?pondId=uuid
+```
+
+Quyền: `admin`, `farmer`.
+
+Response:
+```json
+{
+  "total": 15,
+  "open": 3,
+  "acknowledged": 2,
+  "resolved": 10,
+  "bySeverity": {
+    "critical": 1,
+    "warning": 4,
+    "monitoring": 10
+  }
+}
+```
+
 ### Lấy danh sách cảnh báo của toàn bộ trang trại
 
 ```http
-GET /alerts
+GET /alerts?status=open&severity=3&page=1&limit=20
 ```
 
-Quyền: `farmer`. Trả về danh sách cảnh báo (nguy hiểm, bất thường môi trường, sự cố thiết bị) trên tất cả các ao của người nuôi.
+Quyền: `admin`, `farmer`. (Farmer chỉ thấy ao của mình; Admin thấy toàn hệ thống).
+
+Query Parameters:
+- `status`: `open`, `acknowledged`, `resolved`.
+- `severity`: `1` (monitoring), `2` (warning), `3` (critical).
+- `pondId`: Lọc theo ao.
+- `deviceId`: Lọc theo thiết bị.
+- `type`: Lọc theo loại cảnh báo.
+- `page`, `limit`: Phân trang.
 
 ### Lấy danh sách cảnh báo theo từng ao
 
 ```http
-GET /ponds/:pondId/alerts
+GET /ponds/:pondId/alerts?status=open
 ```
 
-Quyền: `farmer`.
+Quyền: `admin`, `farmer`.
 
 ### Xác nhận đã tiếp nhận cảnh báo (Acknowledge)
 
@@ -696,7 +829,7 @@ Quyền: `farmer`.
 PATCH /alerts/:id/acknowledge
 ```
 
-Quyền: `farmer`. Chuyển trạng thái sang `acknowledged` và ghi nhận thời gian `acknowledgedAt`.
+Quyền: `admin`, `farmer`. Chuyển trạng thái sang `acknowledged` và ghi nhận thời gian `acknowledgedAt`.
 
 ### Xác nhận đã giải quyết xong sự cố (Resolve)
 
@@ -704,17 +837,172 @@ Quyền: `farmer`. Chuyển trạng thái sang `acknowledged` và ghi nhận th�
 PATCH /alerts/:id/resolve
 ```
 
-Quyền: `farmer`. Chuyển trạng thái sang `resolved` và ghi nhận thời gian `resolvedAt`.
+Quyền: `admin`, `farmer`. Chuyển trạng thái sang `resolved` và ghi nhận thời gian `resolvedAt`.
 
 ---
 
-## 13. Dữ liệu Seed mẫu
+## 13. Safety Rule Engine API
 
-Hệ thống tự động khởi tạo dữ liệu mẫu khi khởi động (nếu DB chưa có dữ liệu):
+### [Admin & Farmer] Xem danh mục quy tắc an toàn
+
+```http
+GET /safety-rules
+```
+
+### [Admin] Tạo quy tắc an toàn mới
+
+```http
+POST /safety-rules
+```
+
+Quyền: `admin`.
+
+Body:
+```json
+{
+  "code": "DO_CRITICAL_CUSTOM",
+  "name": "Chặn cho ăn khi DO dưới 3.5 mg/L",
+  "priority": 1,
+  "isEnabled": true,
+  "condition": {
+    "field": "dissolvedOxygenMgL",
+    "operator": "<",
+    "value": 3.5
+  },
+  "action": {
+    "decision": "blocked",
+    "reason": "Oxy hòa tan quá thấp, cấm xả thức ăn."
+  }
+}
+```
+
+### [Admin & Farmer] Thử nghiệm đánh giá an toàn trước khi cho ăn
+
+```http
+POST /ponds/:pondId/safety-rules/evaluate
+```
+
+Quyền: `admin`, `farmer`. Cho phép Web/Mobile app preview điều kiện an toàn và lý do trước khi bấm xác nhận cho ăn.
+
+Body:
+```json
+{
+  "deviceId": "uuid",
+  "requestedAmountKg": 15.0
+}
+```
+
+Response:
+```json
+{
+  "decision": "blocked",
+  "allowedAmountKg": 0,
+  "requestedAmountKg": 15.0,
+  "reasons": [
+    "Nồng độ oxy hòa tan (DO) quá thấp (< 3.5 mg/L). Cấm cho ăn để tránh tôm bị ngạt và dư thừa thức ăn gây ô nhiễm đáy ao."
+  ],
+  "appliedRules": [
+    "DO_BELOW_CRITICAL"
+  ],
+  "telemetrySnapshot": {
+    "id": "uuid",
+    "dissolvedOxygenMgL": 3.2,
+    "ph": 7.8,
+    "temperatureC": 29.0
+  }
+}
+```
+
+---
+
+## 14. MQTT & IoT Communication Protocol
+
+### Kiểm tra trạng thái kết nối MQTT Broker
+
+```http
+GET /mqtt/status
+```
+
+Response:
+```json
+{
+  "connected": true,
+  "message": "Đã kết nối tới MQTT Broker"
+}
+```
+
+### [Admin] Gửi lệnh kiểm thử Feeder qua MQTT
+
+```http
+POST /mqtt/devices/:deviceUid/feeder-test
+```
+
+Body:
+```json
+{
+  "command": "FEED",
+  "feedAmountKg": 2.0,
+  "spreadRateKgPerMinute": 1.5,
+  "durationSeconds": 60
+}
+```
+
+### Quy chuẩn Topic MQTT & Payloads:
+
+1. **Thu nhận Telemetry**: `shrimpmate/telemetry/{deviceUid}` hoặc `shrimpmate/ponds/{pondId}/devices/{deviceUid}/telemetry`
+   ```json
+   {
+     "deviceUid": "ESP32_SENSOR_01",
+     "ph": 7.9,
+     "dissolvedOxygenMgL": 5.8,
+     "temperatureC": 29.2,
+     "salinityPpt": 16.0,
+     "ammoniaMgL": 0.02,
+     "turbidityNtu": 25.0,
+     "measuredAt": "2026-09-22T09:00:00.000Z"
+   }
+   ```
+2. **Lệnh cho ăn (Feeder Command)**: `shrimpmate/devices/{deviceUid}/feeder/command`
+   ```json
+   {
+     "command": "FEED",
+     "recordId": "uuid",
+     "feedAmountKg": 10.0,
+     "spreadRateKgPerMinute": 1.5,
+     "timestamp": "2026-09-22T09:00:00.000Z"
+   }
+   ```
+3. **Phản hồi từ Feeder**: `shrimpmate/devices/{deviceUid}/feeder/status`
+   ```json
+   {
+     "deviceUid": "ESP32_FEEDER_01",
+     "recordId": "uuid",
+     "status": "completed",
+     "actualAmountKg": 10.0,
+     "timestamp": "2026-09-22T09:05:00.000Z"
+   }
+   ```
+4. **Heartbeat thiết bị**: `shrimpmate/devices/{deviceUid}/heartbeat`
+   ```json
+   {
+     "deviceUid": "ESP32_FEEDER_01",
+     "status": "online",
+     "firmwareVersion": "1.2.0",
+     "timestamp": "2026-09-22T09:00:00.000Z"
+   }
+   ```
+
+*Chạy script mô phỏng ESP32: `node scripts/mqtt-simulator.js [feeder | telemetry | abnormal]`.*
+
+---
+
+## 15. Dữ liệu Seed mẫu
+
+Hệ thống tự động khởi tạo dữ liệu mẫu khi khởi động:
 
 | Role | Email | Số điện thoại | Mật khẩu | Mô tả |
 | --- | --- | --- | --- | --- |
-| `admin` | `admin@shrimpmate.local` | `0901000001` | `Admin@123456` | Quản trị viên hệ thống, quản lý catalog thiết bị và giám sát toàn diện |
+| `admin` | `admin@shrimpmate.local` | `0901000001` | `Admin@123456` | Quản trị viên hệ thống, quản lý catalog thiết bị, luật an toàn và giám sát toàn diện |
 | `farmer` | `farmer@shrimpmate.local` | `0901000002` | `Farmer@123456` | Người nuôi tôm, sở hữu các Farm và Pond mẫu |
 
 *Có thể tùy chỉnh tài khoản mẫu thông qua biến môi trường `SEED_ADMIN_*` và `SEED_FARMER_*`.*

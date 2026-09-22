@@ -17,6 +17,7 @@ import { UpdateUserRoleDto } from './dto/update-user-role.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { OtpDeliveryService } from './otp-delivery.service';
 import { isEmailIdentifier, normalizePhoneNumber } from '../../common/utils/phone.util';
 
@@ -118,6 +119,41 @@ export class AuthService {
     }
 
     return { message: PASSWORD_RESET_SUCCESS_MESSAGE };
+  }
+
+  async verifyResetOtp(dto: VerifyOtpDto) {
+    const user = await this.findUserByIdentifier(dto.identifier);
+
+    if (!user?.isActive) {
+      throw new BadRequestException(INVALID_OTP_MESSAGE);
+    }
+
+    const otpRecord = await this.passwordResetOtpRepository.findOne({
+      where: {
+        userId: user.id,
+        usedAt: IsNull(),
+        expiresAt: MoreThan(new Date()),
+      },
+      order: { createdAt: 'DESC' },
+    });
+
+    if (!otpRecord) {
+      throw new BadRequestException(INVALID_OTP_MESSAGE);
+    }
+
+    const maxAttempts = this.configService.get<number>('auth.passwordReset.otpMaxAttempts', 5);
+    if (otpRecord.attemptCount >= maxAttempts) {
+      throw new BadRequestException(INVALID_OTP_MESSAGE);
+    }
+
+    const otpMatches = await bcrypt.compare(dto.otp, otpRecord.otpHash);
+    if (!otpMatches) {
+      otpRecord.attemptCount += 1;
+      await this.passwordResetOtpRepository.save(otpRecord);
+      throw new BadRequestException(INVALID_OTP_MESSAGE);
+    }
+
+    return { valid: true, message: 'Mã OTP chính xác và hợp lệ' };
   }
 
   async resetPassword(dto: ResetPasswordDto) {

@@ -2,7 +2,7 @@ import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, Primary
 import { Device } from './device.entity';
 import { FeedingSchedule } from './feeding-schedule.entity';
 import { Pond } from './pond.entity';
-import { AppetiteLevel, FeedingSource, FeedingStatus } from './enums';
+import { AppetiteLevel, FeedingSource, FeedingStatus, SafetyDecision } from './enums';
 
 @Entity('feeding_records')
 @Index('IDX_feeding_records_pond_started', ['pondId', 'startedAt'])
@@ -60,6 +60,17 @@ export class FeedingRecord {
 
   @Column({ name: 'stopped_reason', type: 'text', nullable: true })
   stoppedReason!: string | null;
+
+  @Column({
+    name: 'safety_decision',
+    type: 'enum',
+    enum: SafetyDecision,
+    nullable: true,
+  })
+  safetyDecision!: SafetyDecision | null;
+
+  @Column({ name: 'safety_reason', type: 'text', nullable: true })
+  safetyReason!: string | null;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;

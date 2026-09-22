@@ -6,6 +6,7 @@ import { seedFarmPondData } from './database/seeds/farm-pond.seed';
 import { seedCropSeasonData } from './database/seeds/crop-season.seed';
 import { seedDeviceData } from './database/seeds/device.seed';
 import { seedFeedingData } from './database/seeds/feeding.seed';
+import { seedSafetyRuleData } from './database/seeds/safety-rule.seed';
 import { seedUserData } from './database/seeds/user.seed';
 
 async function bootstrap() {
@@ -26,6 +27,7 @@ async function bootstrap() {
   await seedCropSeasonData(dataSource);
   await seedDeviceData(dataSource);
   await seedFeedingData(dataSource);
+  await seedSafetyRuleData(dataSource);
 
   const port = process.env.PORT ?? 3000;
   await app.listen(port, '0.0.0.0');
