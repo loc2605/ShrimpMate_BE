@@ -47,6 +47,8 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
     return this.isConnected;
   }
 
+  private hasLoggedConnectionError = false;
+
   private connectBroker() {
     const brokerUrl = this.configService.get<string>('mqtt.brokerUrl', 'mqtt://localhost:1883');
     this.logger.log(`Đang khởi tạo kết nối MQTT Broker tại ${brokerUrl}...`);
@@ -56,11 +58,12 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
         clientId: `shrimpmate_backend_${Math.random().toString(16).slice(2, 8)}`,
         clean: true,
         connectTimeout: 5000,
-        reconnectPeriod: 5000,
+        reconnectPeriod: 10000,
       });
 
       this.client.on('connect', () => {
         this.isConnected = true;
+        this.hasLoggedConnectionError = false;
         this.logger.log(`[MQTT] Đã kết nối thành công tới MQTT Broker: ${brokerUrl}`);
         this.subscribeTopics();
       });
@@ -71,16 +74,18 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
 
       this.client.on('error', (err) => {
         this.isConnected = false;
-        this.logger.warn(`[MQTT] Lỗi kết nối Broker: ${err.message}. Backend vẫn hoạt động và sẽ tự động thử lại.`);
+        if (!this.hasLoggedConnectionError) {
+          this.logger.warn(`[MQTT] Chưa phát hiện MQTT Broker tại ${brokerUrl}. Backend vẫn hoạt động bình thường và sẽ tự động kết nối khi broker bật.`);
+          this.hasLoggedConnectionError = true;
+        }
       });
 
       this.client.on('offline', () => {
         this.isConnected = false;
-        this.logger.debug('[MQTT] Client đang ở trạng thái offline');
       });
 
       this.client.on('reconnect', () => {
-        this.logger.debug('[MQTT] Đang thử kết nối lại tới Broker...');
+        // Tự động kết nối lại ở background, không in log làm đầy màn hình
       });
     } catch (err) {
       this.logger.error('[MQTT] Không thể khởi tạo MQTT client', err);

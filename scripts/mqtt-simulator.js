@@ -9,8 +9,8 @@
 const mqtt = require('mqtt');
 
 const BROKER_URL = process.env.MQTT_BROKER_URL || 'mqtt://localhost:1883';
-const SENSOR_UID = process.env.SENSOR_UID || 'ESP32_SENSOR_01';
-const FEEDER_UID = process.env.FEEDER_UID || 'ESP32_FEEDER_01';
+const SENSOR_UID = process.env.SENSOR_UID || process.argv[3] || 'DEV-SENSOR-001';
+const FEEDER_UID = process.env.FEEDER_UID || process.argv[3] || 'DEV-FEEDER-001';
 
 console.log(`[Simulator] Đang kết nối tới MQTT Broker: ${BROKER_URL}...`);
 const client = mqtt.connect(BROKER_URL, {
