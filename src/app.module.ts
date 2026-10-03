@@ -18,6 +18,7 @@ import { FarmPondModule } from './modules/farm-pond/farm-pond.module';
 import { CropSeasonModule } from './modules/crop-season/crop-season.module';
 import { FeedingModule } from './modules/feeding/feeding.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { CameraModule } from './modules/camera/camera.module';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -68,6 +69,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     SafetyRuleModule,
     AlertsModule,
     NotificationsModule,
+    CameraModule,
   ],
   controllers: [AppController],
   providers: [AppService],
