@@ -212,6 +212,11 @@ export class TelemetryThresholdService {
     return violations;
   }
 
+  private readonly debounceStateMap = new Map<
+    string,
+    { severity: AlertSeverity; lastValue: number; lastLogTime: number }
+  >();
+
   private async processViolationAlert(reading: TelemetryReading, violation: ThresholdViolation) {
     const debounceSince = new Date(Date.now() - this.DEBOUNCE_WINDOW_MS);
 
@@ -225,12 +230,47 @@ export class TelemetryThresholdService {
       },
     });
 
+    const cacheKey = `${reading.pondId}:${violation.alertType}`;
+
     if (existingAlert) {
-      this.logger.debug(
-        `[Debounce] Bỏ qua sinh alert trùng lặp cho pond ${reading.pondId}, type ${violation.alertType}`,
-      );
+      const prev = this.debounceStateMap.get(cacheKey);
+
+      // 1. Lần đầu tiên phát hiện trùng lặp trong chu kỳ debounce: log 1 lần duy nhất
+      if (!prev) {
+        this.debounceStateMap.set(cacheKey, {
+          severity: violation.severity,
+          lastValue: violation.currentValue,
+          lastLogTime: Date.now(),
+        });
+        this.logger.debug(
+          `[Debounce] Bắt đầu kích hoạt debounce cho ao ${reading.pondId}, loại ${violation.alertType} (giá trị: ${violation.currentValue} ${violation.unit})`,
+        );
+        return;
+      }
+
+      // 2. Chỉ log tiếp theo nếu có sự thay đổi (mức độ severity thay đổi hoặc giá trị thay đổi đáng kể >= 5%)
+      const isSeverityChanged = prev.severity !== violation.severity;
+      const valDiff = Math.abs(violation.currentValue - prev.lastValue);
+      const isSignificantValueChange =
+        prev.lastValue !== 0 ? valDiff / Math.abs(prev.lastValue) >= 0.05 : valDiff >= 0.2;
+
+      if (isSeverityChanged || isSignificantValueChange) {
+        this.debounceStateMap.set(cacheKey, {
+          severity: violation.severity,
+          lastValue: violation.currentValue,
+          lastLogTime: Date.now(),
+        });
+        this.logger.debug(
+          `[Debounce] Ao ${reading.pondId} - ${violation.alertType}: giá trị có sự thay đổi (${prev.lastValue} -> ${violation.currentValue} ${violation.unit}), tiếp tục bỏ qua alert trùng lặp`,
+        );
+      }
+
+      // Nếu không có thay đổi -> Im lặng hoàn toàn, không spam terminal
       return;
     }
+
+    // Khi không bị debounce (tạo alert mới hoặc hết chu kỳ debounce)
+    this.debounceStateMap.delete(cacheKey);
 
     await this.alertsService.createAlert({
       pondId: reading.pondId,

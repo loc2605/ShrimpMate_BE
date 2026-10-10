@@ -7,11 +7,20 @@ export async function seedDeviceData(dataSource: DataSource) {
   const deviceRepository = dataSource.getRepository(Device);
   const pondRepository = dataSource.getRepository(Pond);
 
+  const ponds = await pondRepository.find({ order: { code: 'ASC' } });
+
+  // Tự động gán sẵn camera DEV-CAMERA-001 vào Ao 1 nếu chưa được gán
+  const existingCamera = await deviceRepository.findOne({ where: { deviceUid: 'DEV-CAMERA-001' } });
+  if (existingCamera && !existingCamera.pondId && ponds.length > 0) {
+    existingCamera.pondId = ponds[0].id;
+    existingCamera.name = 'Camera giám sát Ao 1';
+    existingCamera.status = DeviceStatus.ONLINE;
+    await deviceRepository.save(existingCamera);
+  }
+
   if ((await deviceRepository.count()) > 0) {
     return;
   }
-
-  const ponds = await pondRepository.find({ order: { code: 'ASC' } });
 
   const devices = await deviceRepository.save([
     {
@@ -35,14 +44,14 @@ export async function seedDeviceData(dataSource: DataSource) {
       metadata: { parameter: 'ph', batteryLevel: 71 },
     },
     {
-      pondId: null,
+      pondId: ponds[0]?.id ?? null,
       deviceUid: 'DEV-CAMERA-001',
-      name: 'Camera giám sát chung',
+      name: 'Camera giám sát Ao 1',
       type: DeviceType.CAMERA,
-      status: DeviceStatus.OFFLINE,
-      mode: DeviceMode.MANUAL,
+      status: DeviceStatus.ONLINE,
+      mode: DeviceMode.AUTOMATIC,
       firmwareVersion: '3.2.1',
-      metadata: { location: 'warehouse' },
+      metadata: { location: 'pond_1_tray' },
     },
   ]);
 
