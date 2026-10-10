@@ -1,80 +1,101 @@
-# ShrimpMate Backend API
+# ShrimpMate Backend API Specification
+
+Tài liệu đặc tả toàn diện và chi tiết tất cả các REST API và giao thức truyền thông MQTT hiện có trong hệ thống **ShrimpMate Backend**.
+
+---
 
 ## 1. Thông tin chung
 
-- Base URL: `http://localhost:3000` (hoặc `http://<IP_MAY_BACKEND>:3000` khi chạy khác máy trong mạng LAN)
-- Content-Type: `application/json`
-- Các API được bảo vệ sử dụng JWT cần gửi kèm header:
+- **Base URL**: `http://localhost:3000` (hoặc `http://<IP_MAY_BACKEND>:3000` khi chạy trong mạng LAN/Wi-Fi)
+- **Content-Type**: `application/json`
+- **Authentication**: Các API bảo vệ sử dụng JSON Web Token (JWT Bearer Token), truyền qua Header:
+  ```http
+  Authorization: Bearer <access_token>
+  ```
 
-```http
-Authorization: Bearer <access_token>
-```
-
-### Cấu hình kết nối Frontend (khi FE và BE chạy trên 2 máy khác nhau)
+### Cấu hình kết nối Frontend (Khi FE và BE chạy trên 2 máy khác nhau)
 
 #### 1. Cùng mạng Wi-Fi / LAN (Thường dùng khi làm việc nhóm)
-- **Kiểm tra IP máy Backend**: Trên máy Backend, mở terminal chạy `ipconfig` để lấy địa chỉ `IPv4 Address` (ví dụ: `192.168.24.35`).
-- **Cấu hình Base URL trên Frontend**: Trong file `.env` của Frontend, thay `localhost` bằng IP máy Backend:
+- **Kiểm tra IP máy Backend**: Trên máy Backend, mở terminal chạy `ipconfig` để lấy địa chỉ `IPv4 Address` (ví dụ: `192.168.1.15`).
+- **Cấu hình Base URL trên Frontend**: Trong file `.env` của Frontend:
   ```env
   # Ví dụ với Vite:
-  VITE_API_BASE_URL=http://192.168.24.35:3000
+  VITE_API_BASE_URL=http://192.168.1.15:3000
 
   # Ví dụ với Next.js:
-  NEXT_PUBLIC_API_URL=http://192.168.24.35:3000
+  NEXT_PUBLIC_API_URL=http://192.168.1.15:3000
   ```
-- **Backend CORS & Host**: Backend đã được cấu hình `app.enableCors({ origin: true, credentials: true })` và lắng nghe trên host `0.0.0.0` tại `src/main.ts` để chấp nhận request từ thiết bị khác trong mạng.
-- **Tường lửa (Windows Firewall)**: Mở cổng `3000` trên Windows Defender Firewall nếu FE gặp lỗi timeout.
+- **Backend CORS & Host**: Backend đã cấu hình `app.enableCors({ origin: true, credentials: true })` và lắng nghe trên `0.0.0.0` tại `src/main.ts` để chấp nhận request từ thiết bị khác trong mạng LAN.
+- **Tường lửa (Windows Firewall)**: Cho phép kết nối Inbound cổng `3000` trên Windows Defender Firewall nếu FE gặp lỗi timeout/network error.
 
 #### 2. Khác mạng (Kết nối từ xa qua Internet)
-- Dùng Cloudflare Tunnel:
-  ```powershell
-  npx cloudflared tunnel --url http://localhost:3000
-  ```
+Sử dụng Cloudflare Tunnel:
+```powershell
+npx cloudflared tunnel --url http://localhost:3000
+```
 
 ---
 
 ### Mô hình Phân quyền: 2 Roles chính
 
 1. **Quản trị viên (Admin - `admin`)**:
-   - Quản trị viên cấp cao của nền tảng, chịu trách nhiệm duy trì sự ổn định của hệ thống máy chủ.
-   - **Quản lý trạng thái người dùng**: Theo dõi danh sách tài khoản đã đăng ký trên hệ thống; thực hiện khóa hoặc tạm ngưng quyền truy cập đối với các tài khoản vi phạm hoặc có nguy cơ mất an toàn thông tin (`GET /auth/users`, `PATCH /auth/users/:id/status`). Admin **không** tạo tài khoản hay chỉnh sửa thông tin cá nhân thay cho người nuôi.
-   - **Quản lý danh mục thiết bị IoT**: Khai báo và quản lý danh mục thiết bị phần cứng chuẩn được phép kết nối vào hệ thống (`feeder`, `sensor_node`, `camera`), cấu hình phiên bản firmware chuẩn và kiểm soát danh sách định danh thiết bị (`device_uid`).
-   - **Giám sát toàn diện & thống kê - báo cáo cấp hệ thống**: Theo dõi tổng quan số lượng tài khoản đăng ký, số lượng trang trại, ao nuôi đang kích hoạt, tỷ lệ thiết bị trực tuyến (online/offline) qua tín hiệu heartbeat; thống kê tổng thể tần suất cảnh báo và trích xuất báo cáo vận hành toàn nền tảng (`GET /admin/overview`, `GET /admin/reports/operational`).
-   - **Không can thiệp vào quy trình quản lý nội bộ của từng hộ nuôi** (không tạo ao, sửa ao, can thiệp lịch cho ăn hay điều khiển thiết bị của người nuôi).
+   - Quản trị viên cấp cao của nền tảng, duy trì sự ổn định và an toàn hệ thống máy chủ.
+   - **Quản lý tài khoản**: Theo dõi danh sách tài khoản (`GET /auth/users`), thực hiện khóa/mở khóa tài khoản vi phạm (`PATCH /auth/users/:id/status`) và phân vai trò (`PATCH /auth/users/:id/role`).
+   - **Quản lý danh mục thiết bị IoT chuẩn (Hardware Catalog)**: Khai báo thiết bị chuẩn vào danh mục (`POST /devices`), cấu hình phiên bản firmware chuẩn và kiểm soát định danh phần cứng duy nhất (`device_uid`).
+   - **Quản lý quy tắc an toàn chuẩn**: Thiết lập các quy tắc an toàn môi trường nước áp dụng cho toàn hệ thống (`POST /safety-rules`, `PATCH /safety-rules/:id`, `DELETE /safety-rules/:id`).
+   - **Giám sát toàn diện & Báo cáo cấp hệ thống**: Xem thống kê tổng quan toàn nền tảng (`GET /admin/overview`), báo cáo vận hành & thiết bị ngoại tuyến (`GET /admin/reports/operational`), và báo cáo FCR toàn hệ thống (`GET /admin/reports/fcr`).
+   - **Kiểm thử phần cứng MQTT**: Phát lệnh test điều khiển máy cho ăn trực tiếp tới thiết bị (`POST /mqtt/devices/:deviceUid/feeder-test`).
+   - **Không can thiệp vào quy trình nội bộ của hộ nuôi**: Không tự ý tạo/sửa ao, lịch ăn hay can thiệp vào cơ sở dữ liệu riêng của người nuôi.
 
 2. **Người nuôi (Farmer - `farmer`)**:
-   - Chủ thể tự quản lý toàn bộ cơ sở nuôi của mình, sở hữu toàn quyền đối với dữ liệu trang trại và chu trình nuôi trồng trên cả Web Dashboard lẫn Mobile App:
-   - **Tự chủ tài khoản**: Trực tiếp đăng ký tài khoản bằng Email và Số điện thoại, tự đăng nhập, chủ động cập nhật thông tin cá nhân (`PATCH /auth/profile`), đổi mật khẩu và khôi phục tài khoản thông qua mã xác thực OTP.
-   - **Tự quản lý trang trại và ao nuôi**: Tự tạo mới và quản lý thông tin các trang trại thuộc quyền sở hữu của mình (`farms`); tự do khởi tạo, chỉnh sửa thông số diện tích ($m^2$), mã ao và cấu hình trạng thái của từng ao nuôi (`ponds`) mà không cần thông qua sự phê duyệt của Admin.
-   - **Quản lý vụ nuôi và lịch cho ăn**: Tự thiết lập các vụ nuôi mới cho từng ao (ngày thả giống, mật độ, số lượng thả, tỷ lệ sống ước tính); thiết lập và tinh chỉnh các lịch cho ăn tự động (khung giờ, định mức khối lượng thức ăn, tốc độ rải).
-   - **Gán thiết bị và điều khiển từ xa**: Đăng ký gán các thiết bị IoT vào từng ao nuôi cụ thể (`POST /devices/claim`); thực hiện điều khiển bật/tắt máy cho ăn, chuyển đổi chế độ tự động/thủ công và kích hoạt lệnh Dừng khẩn cấp (Emergency Stop) từ xa.
-   - **Giám sát môi trường và khai thác AI**: Theo dõi liên tục các chỉ số môi trường nước (pH, DO, nhiệt độ, độ mặn, NH₃, độ đục); tham khảo lượng thức ăn dự báo, cường độ bắt mồi (FIS) do AI phân tích để điều chỉnh cữ ăn.
-   - **Xử lý cảnh báo và thống kê vụ nuôi**: Tiếp nhận thông báo đẩy khi có chỉ số nguy hiểm hoặc sự cố thiết bị, xác nhận đã tiếp nhận / khắc phục sự cố và xem báo cáo thống kê FCR, lượng thức ăn tiêu thụ của từng ao/vụ nuôi (`GET /crop-seasons/:id/statistics`).
+   - Chủ thể tự chủ toàn quyền đối với cơ sở nuôi của mình trên cả Web Dashboard lẫn Mobile App:
+   - **Tự chủ tài khoản**: Đăng ký, đăng nhập bằng Email hoặc Số điện thoại, cập nhật hồ sơ (`PATCH /auth/profile`), đổi mật khẩu (`PATCH /auth/change-password`) và khôi phục mật khẩu bằng OTP 6 chữ số.
+   - **Tự quản lý trang trại và ao nuôi**: Tự khởi tạo và quản lý trang trại (`/farms`), tự do tạo, chỉnh sửa thông số diện tích ($m^2$), mã ao và cấu hình trạng thái từng ao nuôi (`/farms/:farmId/ponds`) mà không cần Admin phê duyệt.
+   - **Quản lý vụ nuôi và tính toán FCR**: Thiết lập vụ nuôi mới (`/ponds/:pondId/crop-seasons`), quản lý mật độ, ngày thả giống và theo dõi hệ số chuyển đổi thức ăn FCR (`GET /crop-seasons/:id/statistics`).
+   - **Gán thiết bị và điều khiển từ xa**: Tìm mã `device_uid` phần cứng đã lắp đặt để gán (`claim`) vào ao nuôi (`POST /devices/claim`), gỡ thiết bị khi cần (`POST /devices/:id/unassign`), điều khiển chế độ và kích hoạt lệnh Dừng khẩn cấp (`POST /devices/:id/emergency-stop`).
+   - **Quản lý lịch cho ăn & Nhật ký**: Thiết lập cữ ăn tự động (`/feeding-schedules`), kích hoạt lần cho ăn mới (`POST /ponds/:pondId/feeding-records`) được bảo vệ tự động bởi Safety Rule Engine.
+   - **Giám sát môi trường & Khai thác AI / Camera Computer Vision**: Theo dõi chất lượng nước pH, DO, nhiệt độ, độ mặn, NH₃, độ đục (`/telemetry`); phân tích khung hình camera qua AI 2 luồng song song (YOLO11n-seg + MobileNetV3-Small) để nhận diện cường độ bắt mồi FIS và phát hiện thức ăn thừa (`/camera`).
+   - **Tiếp nhận cảnh báo**: Nhận thông báo tức thời, tiếp nhận (`PATCH /alerts/:id/acknowledge`) và giải quyết sự cố (`PATCH /alerts/:id/resolve`).
 
 ---
 
-## 2. Health check
+## 2. Health Check API
+
+### Kiểm tra trạng thái hoạt động của máy chủ
 
 ```http
 GET /
 ```
 
-Response:
-```text
-Hello World!
-```
+- **Quyền**: Public (Không cần đăng nhập).
+- **Công dụng**: Kiểm tra máy chủ backend có đang chạy và phản hồi hay không.
+
+#### Phản hồi (Response):
+- **Status Code**: `200 OK`
+- **Body**:
+  ```text
+  Hello World!
+  ```
 
 ---
 
-## 3. Authentication & User Status API
+## 3. Module Authentication & User Management (`/auth`)
 
-### Đăng ký tài khoản (Người nuôi - Farmer)
+### 3.1. Đăng ký tài khoản (Người nuôi - Farmer)
 
 ```http
 POST /auth/register
 ```
 
-Body:
+- **Quyền**: Public.
+- **Công dụng**: Người nuôi tự đăng ký tài khoản mới trên hệ thống. Tài khoản mới mặc định nhận role `farmer` và `isActive: true`.
+- **Yêu cầu đầu vào**:
+  - `email`: Định dạng email hợp lệ, duy nhất trong hệ thống.
+  - `phoneNumber`: Số điện thoại di động Việt Nam (10 chữ số, bắt đầu bằng `0`, tự động chuẩn hóa từ `+84` hoặc `84`), duy nhất.
+  - `password`: Tối thiểu 6 ký tự.
+  - `fullName`: Họ và tên người nuôi.
+
+#### Body:
 ```json
 {
   "email": "farmer1@example.com",
@@ -84,18 +105,40 @@ Body:
 }
 ```
 
-- **Quyền**: Không cần đăng nhập.
-- Tài khoản đăng ký mới mặc định nhận role **`farmer`**.
-- `phoneNumber` định dạng số điện thoại Việt Nam (10 chữ số, bắt đầu bằng `0`). Tự động chuẩn hóa từ `+84` hoặc `84`.
-- `email` và `phoneNumber` là duy nhất (trùng lặp trả về `409 Conflict`).
+#### Phản hồi thành công (`201 Created`):
+```json
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "user": {
+    "id": "e674512e-360d-45f8-8bbd-7d079dbe39f1",
+    "email": "farmer1@example.com",
+    "phoneNumber": "0901234567",
+    "fullName": "Nguyen Van Farmer",
+    "role": "farmer",
+    "isActive": true,
+    "createdAt": "2026-10-10T08:00:00.000Z",
+    "updatedAt": "2026-10-10T08:00:00.000Z"
+  }
+}
+```
 
-### Đăng nhập
+#### Mã lỗi:
+- `400 Bad Request`: Định dạng email hoặc số điện thoại không hợp lệ, mật khẩu quá ngắn.
+- `409 Conflict`: Email hoặc số điện thoại đã được đăng ký trong hệ thống.
+
+---
+
+### 3.2. Đăng nhập hệ thống
 
 ```http
 POST /auth/login
 ```
 
-Body (sử dụng email hoặc số điện thoại):
+- **Quyền**: Public.
+- **Công dụng**: Xác thực người dùng bằng Email hoặc Số điện thoại cùng Mật khẩu. Trả về cặp `accessToken` và `refreshToken`.
+
+#### Body (Dùng Email):
 ```json
 {
   "identifier": "farmer1@example.com",
@@ -103,7 +146,7 @@ Body (sử dụng email hoặc số điện thoại):
 }
 ```
 
-Hoặc:
+#### Body (Dùng Số điện thoại):
 ```json
 {
   "identifier": "0901234567",
@@ -111,77 +154,119 @@ Hoặc:
 }
 ```
 
-Response:
+#### Phản hồi thành công (`200 OK`):
 ```json
 {
-  "accessToken": "eyJ...",
-  "refreshToken": "eyJ...",
+  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "user": {
-    "id": "uuid",
+    "id": "e674512e-360d-45f8-8bbd-7d079dbe39f1",
     "email": "farmer1@example.com",
     "phoneNumber": "0901234567",
     "fullName": "Nguyen Van Farmer",
     "role": "farmer",
     "isActive": true,
-    "createdAt": "2026-09-19T15:00:00.000Z",
-    "updatedAt": "2026-09-19T15:00:00.000Z"
+    "createdAt": "2026-10-10T08:00:00.000Z",
+    "updatedAt": "2026-10-10T08:00:00.000Z"
   }
 }
 ```
 
-### Làm mới token
+#### Mã lỗi:
+- `401 Unauthorized`: Sai tài khoản hoặc mật khẩu; hoặc tài khoản đã bị Quản trị viên khóa (`isActive: false`).
+
+---
+
+### 3.3. Làm mới Access Token (Refresh Token)
 
 ```http
 POST /auth/refresh-token
 ```
 
-Body:
+- **Quyền**: Public (Cần gửi `refreshToken` còn hiệu lực).
+- **Công dụng**: Lấy `accessToken` mới khi token cũ hết hạn mà không cần đăng nhập lại.
+
+#### Body:
 ```json
 {
-  "refreshToken": "eyJ..."
+  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 }
 ```
 
-### Quên mật khẩu (Gửi OTP)
+#### Phản hồi thành công (`200 OK`):
+```json
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "user": {
+    "id": "e674512e-360d-45f8-8bbd-7d079dbe39f1",
+    "email": "farmer1@example.com",
+    "phoneNumber": "0901234567",
+    "fullName": "Nguyen Van Farmer",
+    "role": "farmer",
+    "isActive": true
+  }
+}
+```
+
+#### Mã lỗi:
+- `401 Unauthorized`: Refresh token không hợp lệ, đã hết hạn hoặc tài khoản bị khóa.
+
+---
+
+### 3.4. Yêu cầu mã OTP khôi phục mật khẩu (Forgot Password)
 
 ```http
 POST /auth/forgot-password
 ```
 
-Body:
+- **Quyền**: Public.
+- **Công dụng**: Khởi tạo mã OTP ngẫu nhiên gồm 6 chữ số có hiệu lực trong 5 phút. Mã OTP được gửi qua email/SMS mô phỏng.
+
+#### Body:
 ```json
 {
   "identifier": "farmer1@example.com"
 }
 ```
 
-Response:
+#### Phản hồi thành công (`200 OK`):
 ```json
 {
   "message": "Nếu tài khoản tồn tại trong hệ thống, mã OTP đã được gửi. Vui lòng kiểm tra email/SMS hoặc liên hệ quản trị viên."
 }
 ```
 
-### Gửi lại mã OTP (Resend OTP)
+---
+
+### 3.5. Gửi lại mã OTP (Resend OTP)
 
 ```http
 POST /auth/resend-otp
 ```
 
-Body:
+- **Quyền**: Public.
+- **Công dụng**: Vô hiệu hóa OTP cũ và phát hành mã OTP mới cho tài khoản.
+
+#### Body:
 ```json
 {
   "identifier": "farmer1@example.com"
 }
 ```
 
-### Xác thực mã OTP (Kiểm tra trước khi đổi mật khẩu)
+---
+
+### 3.6. Xác thực mã OTP trước khi đổi mật khẩu
 
 ```http
 POST /auth/verify-reset-otp
 ```
 
-Body:
+- **Quyền**: Public.
+- **Công dụng**: Cho phép giao diện Frontend kiểm tra xem mã OTP người dùng nhập vào có chính xác và còn hạn hay không trước khi chuyển sang bước nhập mật khẩu mới.
+
+#### Body:
 ```json
 {
   "identifier": "farmer1@example.com",
@@ -189,7 +274,7 @@ Body:
 }
 ```
 
-Response:
+#### Phản hồi thành công (`200 OK`):
 ```json
 {
   "valid": true,
@@ -197,178 +282,315 @@ Response:
 }
 ```
 
-### Đặt lại mật khẩu bằng OTP
+#### Mã lỗi:
+- `400 Bad Request`: Mã OTP sai quá số lần cho phép (tối đa 5 lần), OTP đã hết hạn hoặc OTP không đúng.
+
+---
+
+### 3.7. Đặt lại mật khẩu bằng mã OTP
 
 ```http
 POST /auth/reset-password
 ```
 
-Body:
+- **Quyền**: Public.
+- **Công dụng**: Đặt lại mật khẩu mới cho tài khoản khi cung cấp đúng mã OTP. Toàn bộ refresh token hiện tại bị hủy để đảm bảo an toàn.
+
+#### Body:
 ```json
 {
   "identifier": "farmer1@example.com",
   "otp": "123456",
-  "newPassword": "password-moi-123"
+  "newPassword": "newSecretPassword123"
 }
 ```
 
-### Lấy thông tin tài khoản hiện tại
+#### Phản hồi thành công (`200 OK`):
+```json
+{
+  "message": "Đặt lại mật khẩu thành công, vui lòng đăng nhập lại"
+}
+```
+
+---
+
+### 3.8. Lấy thông tin tài khoản hiện tại
 
 ```http
 GET /auth/me
 ```
 
-Quyền: Đã đăng nhập (`admin`, `farmer`).
+- **Quyền**: Đã đăng nhập (`admin`, `farmer`).
+- **Công dụng**: Lấy thông tin hồ sơ của tài khoản đang đăng nhập từ access token (đã loại bỏ password hash và refresh token hash).
 
-### Cập nhật hồ sơ cá nhân (Người nuôi tự chủ)
+#### Phản hồi thành công (`200 OK`):
+```json
+{
+  "id": "e674512e-360d-45f8-8bbd-7d079dbe39f1",
+  "email": "farmer1@example.com",
+  "phoneNumber": "0901234567",
+  "fullName": "Nguyen Van Farmer",
+  "role": "farmer",
+  "isActive": true,
+  "createdAt": "2026-10-10T08:00:00.000Z",
+  "updatedAt": "2026-10-10T08:00:00.000Z"
+}
+```
+
+---
+
+### 3.9. Cập nhật hồ sơ cá nhân
 
 ```http
 PATCH /auth/profile
 ```
 
-Quyền: Đã đăng nhập (`admin`, `farmer`).
+- **Quyền**: Đã đăng nhập (`admin`, `farmer`).
+- **Công dụng**: Người dùng tự cập nhật họ tên hoặc số điện thoại cá nhân.
 
-Body:
+#### Body:
 ```json
 {
-  "fullName": "Nguyen Van Farmer (Cap nhat)",
-  "phoneNumber": "0909888777"
+  "fullName": "Nguyen Van Farmer (Đã cập nhật)",
+  "phoneNumber": "0909888999"
 }
 ```
 
-### Đổi mật khẩu
+#### Phản hồi thành công (`200 OK`): Trả về thông tin user đã cập nhật.
+
+---
+
+### 3.10. Đổi mật khẩu tài khoản
 
 ```http
 PATCH /auth/change-password
 ```
 
-Body:
+- **Quyền**: Đã đăng nhập (`admin`, `farmer`).
+- **Công dụng**: Người dùng chủ động đổi mật khẩu bằng cách nhập mật khẩu hiện tại và mật khẩu mới.
+
+#### Body:
 ```json
 {
-  "currentPassword": "password-cu",
-  "newPassword": "password-moi-123"
+  "currentPassword": "password123",
+  "newPassword": "newPassword456"
 }
 ```
 
-### [Admin] Xem danh sách tài khoản đã đăng ký
+#### Phản hồi thành công (`200 OK`):
+```json
+{
+  "message": "Đổi mật khẩu thành công, vui lòng đăng nhập lại"
+}
+```
+
+---
+
+### 3.11. [Admin] Kiểm tra quyền Admin nhanh
+
+```http
+GET /auth/admin-check
+```
+
+- **Quyền**: `admin`.
+- **Công dụng**: Kiểm tra nhanh xem token hiện tại có quyền Quản trị viên hay không, thường dùng cho Auth Guard phía Frontend.
+
+#### Phản hồi thành công (`200 OK`):
+```json
+{
+  "message": "Bạn có quyền Admin"
+}
+```
+
+#### Mã lỗi:
+- `403 Forbidden`: Người dùng mang role `farmer` sẽ bị từ chối truy cập.
+
+---
+
+### 3.12. [Admin] Xem danh sách tất cả tài khoản trong hệ thống
 
 ```http
 GET /auth/users
 ```
 
-Quyền: `admin`.
+- **Quyền**: `admin`.
+- **Công dụng**: Quản trị viên giám sát toàn bộ tài khoản người dùng đã đăng ký trên hệ thống, sắp xếp theo thời gian tạo mới nhất.
 
-### [Admin] Khóa hoặc Mở khóa tài khoản
+#### Phản hồi thành công (`200 OK`):
+```json
+[
+  {
+    "id": "e674512e-360d-45f8-8bbd-7d079dbe39f1",
+    "email": "farmer1@example.com",
+    "phoneNumber": "0901234567",
+    "fullName": "Nguyen Van Farmer",
+    "role": "farmer",
+    "isActive": true,
+    "createdAt": "2026-10-10T08:00:00.000Z",
+    "updatedAt": "2026-10-10T08:00:00.000Z"
+  }
+]
+```
+
+---
+
+### 3.13. [Admin] Khóa hoặc mở khóa tài khoản người dùng
 
 ```http
 PATCH /auth/users/:id/status
 ```
 
-Quyền: `admin`.
+- **Quyền**: `admin`.
+- **Công dụng**: Khóa (`isActive: false`) hoặc mở khóa (`isActive: true`) tài khoản người dùng. Khi khóa tài khoản, hệ thống tự động xóa refresh token của người dùng đó. Chặn Admin tự khóa tài khoản của chính mình.
 
-Body:
+#### Body:
 ```json
 {
   "isActive": false
 }
 ```
-*Tài khoản bị khóa sẽ không thể đăng nhập và toàn bộ refresh token hiện có sẽ bị hủy.*
 
-### [Admin] Cập nhật vai trò tài khoản
+#### Phản hồi thành công (`200 OK`): Trả về thông tin user với trạng thái `isActive` mới.
+
+#### Mã lỗi:
+- `403 Forbidden`: Admin cố tình tự khóa tài khoản của chính mình.
+- `404 Not Found`: Không tìm thấy user với `id` được chỉ định.
+
+---
+
+### 3.14. [Admin] Phân bổ vai trò tài khoản
 
 ```http
 PATCH /auth/users/:id/role
 ```
 
-Quyền: `admin`.
+- **Quyền**: `admin`.
+- **Công dụng**: Thay đổi vai trò người dùng giữa `admin` và `farmer`. Chặn Admin tự hạ quyền tài khoản của chính mình.
 
-Body:
+#### Body:
 ```json
 {
   "role": "admin"
 }
 ```
-*Giá trị cho phép: `admin` hoặc `farmer`.*
+
+#### Phản hồi thành công (`200 OK`): Trả về thông tin user với vai trò mới.
 
 ---
 
-## 4. Admin Monitoring & System Reports API
+## 4. Module Admin Monitoring & System Reports (`/admin`)
 
-### [Admin] Thống kê tổng quan toàn nền tảng
+Tất cả các API trong module này yêu cầu quyền **`admin`**.
+
+### 4.1. [Admin] Thống kê tổng quan toàn nền tảng
 
 ```http
 GET /admin/overview
 ```
 
-Quyền: `admin`.
+- **Công dụng**: Cung cấp bức tranh tổng thể thời gian thực về quy mô hệ thống: số lượng người dùng (active/locked), số lượng trang trại, số lượng ao nuôi (active/maintenance), số lượng thiết bị phần cứng trực tuyến/ngoại tuyến, tỷ lệ online (%) và thống kê cảnh báo theo mức độ nghiêm trọng.
 
-Response:
+#### Phản hồi thành công (`200 OK`):
 ```json
 {
-  "serverTime": "2026-09-19T15:30:00.000Z",
+  "serverTime": "2026-10-10T08:30:00.000Z",
   "users": {
-    "total": 120,
-    "active": 115,
-    "locked": 5,
-    "farmers": 118,
+    "total": 50,
+    "active": 48,
+    "locked": 2,
+    "farmers": 48,
     "admins": 2
   },
   "farms": {
-    "total": 45,
-    "active": 42,
+    "total": 35,
+    "active": 32,
     "inactive": 3
   },
   "ponds": {
-    "total": 150,
-    "active": 138,
-    "maintenance": 8,
+    "total": 120,
+    "active": 110,
+    "maintenance": 6,
     "inactive": 4
   },
   "devices": {
-    "total": 210,
-    "online": 195,
+    "total": 180,
+    "online": 165,
     "offline": 15,
-    "onlineRatePercent": 92.9
+    "onlineRatePercent": 91.7
   },
   "alerts": {
-    "total": 60,
-    "open": 8,
-    "acknowledged": 12,
-    "resolved": 40,
+    "total": 45,
+    "open": 5,
+    "acknowledged": 10,
+    "resolved": 30,
     "bySeverity": {
-      "critical": 5,
-      "warning": 25,
-      "monitoring": 30
+      "critical": 3,
+      "warning": 17,
+      "monitoring": 25
     }
   }
 }
 ```
 
-### [Admin] Báo cáo vận hành toàn nền tảng
+---
+
+### 4.2. [Admin] Báo cáo vận hành toàn nền tảng
 
 ```http
 GET /admin/reports/operational
 ```
 
-Quyền: `admin`. Trả về báo cáo tổng quan, danh sách cảnh báo sự cố gần đây và danh sách các thiết bị ngoại tuyến (offline) cần kiểm tra bảo trì.
+- **Công dụng**: Xuất báo cáo vận hành hệ thống máy chủ, bao gồm số liệu tổng quan, danh sách 10 cảnh báo nguy cấp/bất thường gần nhất và danh sách các thiết bị phần cứng đang bị offline quá 5 phút để kỹ thuật viên có phương án kiểm tra bảo trì.
 
-### [Admin] Báo cáo hiệu quả chuyển đổi thức ăn (FCR) toàn hệ thống
+#### Phản hồi thành công (`200 OK`):
+```json
+{
+  "generatedAt": "2026-10-10T08:30:00.000Z",
+  "overview": { ... },
+  "recentAlerts": [
+    {
+      "id": "uuid",
+      "type": "CAMERA_FEEDING_ANOMALY",
+      "severity": 3,
+      "status": "open",
+      "message": "Phát hiện bất thường tại sàng ăn: FIS=0.15, thức ăn thừa 65%",
+      "pondName": "Ao số 1",
+      "deviceUid": "CAM-01-A1",
+      "triggeredAt": "2026-10-10T08:25:00.000Z"
+    }
+  ],
+  "offlineDevices": [
+    {
+      "id": "uuid",
+      "deviceUid": "DEV-FEEDER-VN-002",
+      "name": "Máy cho ăn Ao 2",
+      "type": "feeder",
+      "firmwareVersion": "v1.2.0",
+      "lastSeenAt": "2026-10-10T08:00:00.000Z"
+    }
+  ]
+}
+```
+
+---
+
+### 4.3. [Admin] Báo cáo hiệu quả chuyển đổi thức ăn (FCR) toàn hệ thống
 
 ```http
 GET /admin/reports/fcr
 ```
 
-Quyền: `admin`.
+- **Công dụng**: Đánh giá hiệu suất sử dụng thức ăn và hệ số chuyển đổi sinh khối FCR (Feed Conversion Ratio) trên tất cả các vụ nuôi đang diễn ra (`active`) hoặc đã kết thúc (`completed`) trong toàn bộ nền tảng. Xếp loại chất lượng FCR: `Xuất sắc (< 1.3)`, `Tốt (1.3 - 1.5)`, hoặc `Cần tối ưu (> 1.5)`.
 
-Response:
+#### Phản hồi thành công (`200 OK`):
 ```json
 {
-  "generatedAt": "2026-09-22T09:30:00.000Z",
+  "generatedAt": "2026-10-10T08:30:00.000Z",
   "summary": {
-    "totalSeasonsEvaluated": 12,
-    "totalFeedConsumedSystemKg": 18500.5,
-    "totalBiomassGainSystemKg": 15400.0,
-    "averageSystemFcr": 1.20,
+    "totalSeasonsEvaluated": 8,
+    "totalFeedConsumedSystemKg": 14200.5,
+    "totalBiomassGainSystemKg": 11833.75,
+    "averageSystemFcr": 1.2,
     "systemQualityRating": "Xuất sắc"
   },
   "seasons": [
@@ -376,8 +598,8 @@ Response:
       "cropSeasonId": "uuid",
       "seasonName": "Vụ Mùa Mưa 2026",
       "status": "active",
-      "farmName": "Trang trại Sóng Xanh",
-      "pondName": "Ao Nuôi Số 1",
+      "farmName": "Trang trại Bạc Liêu 1",
+      "pondName": "Ao nuôi số 1",
       "daysOfCulture": 45,
       "totalFeedConsumedKg": 1250.0,
       "estimatedCurrentBiomassKg": 1100.0,
@@ -391,188 +613,397 @@ Response:
 
 ---
 
-## 5. Farm API (Người nuôi tự quản lý)
+## 5. Module Trang trại (Farm Management) (`/farms`)
 
-### Lấy danh sách trang trại của Farmer
+Tất cả API quản lý trang trại yêu cầu quyền **`farmer`**. Hệ thống tự động phân tách dữ liệu đa người dùng: Farmer chỉ có quyền truy cập vào trang trại thuộc quyền sở hữu của chính mình (`owner_id = user.id`).
+
+### 5.1. Lấy danh sách trang trại của Farmer
 
 ```http
-GET /farms
+GET /farms?page=1&limit=20
 ```
 
-Quyền: `farmer`. Chỉ trả về các trang trại do chính người nuôi này sở hữu (`ownerId = user.id`).
+- **Query Parameters**:
+  - `page` (tùy chọn, mặc định: 1): Số trang.
+  - `limit` (tùy chọn, mặc định: 20): Số lượng trang trại mỗi trang.
 
-### Tạo trang trại mới
+#### Phản hồi thành công (`200 OK`):
+```json
+{
+  "data": [
+    {
+      "id": "7b04fbb3-938b-4c4f-9e8c-d2325c34e047",
+      "ownerId": "e674512e-360d-45f8-8bbd-7d079dbe39f1",
+      "name": "Trang trại Nuôi Tôm Sông Xanh",
+      "address": "Xã Vĩnh Hậu, Huyện Hòa Bình, Tỉnh Bạc Liêu",
+      "status": "active",
+      "createdAt": "2026-10-01T08:00:00.000Z",
+      "updatedAt": "2026-10-01T08:00:00.000Z"
+    }
+  ],
+  "total": 1,
+  "page": 1,
+  "limit": 20,
+  "totalPages": 1
+}
+```
+
+---
+
+### 5.2. Tạo trang trại mới
 
 ```http
 POST /farms
 ```
 
-Quyền: `farmer`. Tự động gán `ownerId` là người tạo.
+- **Body**:
+  - `name`: Tên trang trại (bắt buộc).
+  - `address`: Địa chỉ (tùy chọn).
+  - `status`: Trạng thái (`active` hoặc `inactive`, mặc định: `active`).
 
-Body:
 ```json
 {
-  "name": "Trang trại Tôm Bạc Liêu 1",
+  "name": "Trang trại Nuôi Tôm Sông Xanh",
+  "address": "Xã Vĩnh Hậu, Huyện Hòa Bình, Tỉnh Bạc Liêu",
+  "status": "active"
+}
+```
+
+#### Phản hồi thành công (`201 Created`): Trả về đối tượng trang trại vừa tạo với `ownerId = user.id`.
+
+---
+
+### 5.3. Xem chi tiết trang trại theo ID
+
+```http
+GET /farms/:id
+```
+
+- **Phản hồi**: Trả về thông tin chi tiết trang trại kèm danh sách các ao nuôi trực thuộc.
+
+---
+
+### 5.4. Cập nhật thông tin trang trại
+
+```http
+PATCH /farms/:id
+```
+
+- **Body**:
+```json
+{
+  "name": "Trang trại Nuôi Tôm Sông Xanh - Khu 1",
   "address": "Bạc Liêu, Việt Nam",
   "status": "active"
 }
 ```
 
-### Lấy chi tiết / Cập nhật / Xóa trang trại
+---
 
-- `GET /farms/:id`: Lấy chi tiết trang trại (chỉ chủ sở hữu).
-- `PATCH /farms/:id`: Cập nhật tên, địa chỉ, trạng thái.
-- `DELETE /farms/:id`: Xóa mềm trang trại (soft delete) và các ao thuộc trang trại.
+### 5.5. Xóa trang trại (Soft Delete)
+
+```http
+DELETE /farms/:id
+```
+
+- **Công dụng**: Thực hiện xóa mềm trang trại (đánh dấu `deleted_at`) và đồng thời tự động xóa mềm tất cả các ao nuôi trực thuộc để bảo toàn dữ liệu lịch sử vụ nuôi.
 
 ---
 
-## 6. Pond API (Người nuôi tự quản lý)
+## 6. Module Ao nuôi (Pond Management) (`/farms/:farmId/ponds`)
 
-### Lấy danh sách ao nuôi thuộc trang trại
+Quản lý các ao nuôi nằm trong trang trại. Yêu cầu quyền **`farmer`** (và phải là chủ sở hữu trang trại tương ứng).
+
+### 6.1. Danh sách ao nuôi thuộc trang trại
 
 ```http
-GET /farms/:farmId/ponds
+GET /farms/:farmId/ponds?page=1&limit=20
 ```
 
-Quyền: `farmer` (chủ sở hữu trang trại).
+#### Phản hồi thành công (`200 OK`):
+```json
+{
+  "data": [
+    {
+      "id": "3cb49a46-81cf-4a47-a365-1d6fa55e8d89",
+      "farmId": "7b04fbb3-938b-4c4f-9e8c-d2325c34e047",
+      "code": "AO-01",
+      "name": "Ao nuôi số 1 - Khu A",
+      "areaM2": 3000.0,
+      "status": "active",
+      "createdAt": "2026-10-01T09:00:00.000Z",
+      "updatedAt": "2026-10-01T09:00:00.000Z"
+    }
+  ],
+  "total": 1,
+  "page": 1,
+  "limit": 20,
+  "totalPages": 1
+}
+```
 
-### Tạo ao nuôi mới
+---
+
+### 6.2. Tạo ao nuôi mới trong trang trại
 
 ```http
 POST /farms/:farmId/ponds
 ```
 
-Quyền: `farmer` (không cần sự phê duyệt của Admin).
+- **Yêu cầu đầu vào**:
+  - `code`: Mã ao nuôi (duy nhất trong phạm vi cùng một trang trại).
+  - `name`: Tên ao nuôi.
+  - `areaM2`: Diện tích mặt nước ao ($m^2$, số dương).
+  - `status`: `active`, `inactive`, hoặc `maintenance` (mặc định: `active`).
 
-Body:
+#### Body:
 ```json
 {
-  "code": "POND-01",
+  "code": "AO-01",
   "name": "Ao nuôi số 1 - Khu A",
-  "areaM2": 3000,
+  "areaM2": 3000.0,
   "status": "active"
 }
 ```
-*Trạng thái: `active`, `inactive`, `maintenance`.*
 
-### Lấy chi tiết / Cập nhật / Xóa ao nuôi
-
-- `GET /farms/:farmId/ponds/:id`: Lấy thông tin ao nuôi.
-- `PATCH /farms/:farmId/ponds/:id`: Cập nhật diện tích ($m^2$), tên ao, mã ao, trạng thái.
-- `DELETE /farms/:farmId/ponds/:id`: Xóa ao nuôi.
+#### Phản hồi thành công (`201 Created`): Trả về đối tượng ao nuôi vừa tạo.
 
 ---
 
-## 7. Device & IoT Hardware Catalog API
-
-### [Admin] Khai báo thiết bị chuẩn vào danh mục hệ thống
+### 6.3. Chi tiết ao nuôi
 
 ```http
-POST /devices
+GET /farms/:farmId/ponds/:id
 ```
 
-Quyền: `admin`.
+- **Phản hồi**: Trả về thông tin chi tiết của ao nuôi cùng danh sách thiết bị IoT đang được gán vào ao này.
 
-Body:
+---
+
+### 6.4. Cập nhật thông tin ao nuôi
+
+```http
+PATCH /farms/:farmId/ponds/:id
+```
+
+#### Body:
 ```json
 {
-  "deviceUid": "DEV-FEEDER-VN-001",
-  "name": "Máy cho ăn chuẩn Model A1",
-  "type": "feeder",
-  "firmwareVersion": "v1.2.0",
-  "metadata": {
-    "manufacturer": "ShrimpMate IoT",
-    "batch": "2026-Q1"
-  }
+  "name": "Ao nuôi số 1 (Đã nâng cấp lót bạt)",
+  "areaM2": 3200.0,
+  "status": "active"
 }
 ```
-*`type`: `feeder`, `sensor_node`, `camera`, `edge_gateway`.*
-*Thiết bị tạo mới mặc định `pondId: null`, sẵn sàng để người nuôi đăng ký gán vào ao.*
 
-### [Admin] Quản trị danh mục phần cứng
+---
 
-- `GET /devices`: Admin xem toàn bộ thiết bị trong danh mục hệ thống và trạng thái kết nối.
-- `PATCH /devices/:id`: Admin cập nhật firmware version, tên, metadata, hoặc trạng thái.
-- `DELETE /devices/:id`: Admin xóa thiết bị khỏi danh mục hệ thống.
+### 6.5. Xóa ao nuôi (Soft Delete)
 
-### [Farmer] Xem danh sách thiết bị thuộc các ao của mình
+```http
+DELETE /farms/:farmId/ponds/:id
+```
+
+- **Công dụng**: Thực hiện xóa mềm ao nuôi (`deleted_at`), đồng thời tự động set `pond_id = NULL` đối với tất cả các thiết bị IoT đang gắn với ao này để hoàn trả thiết bị về kho chuẩn.
+
+---
+
+## 7. Module Thiết bị IoT & Catalog Phần cứng (`/devices`)
+
+Hệ thống quản lý thiết bị theo mô hình Catalog:
+- **Admin**: Khai báo thiết bị chuẩn vào kho hệ thống (`pond_id = null`), quản lý firmware và định danh phần cứng.
+- **Farmer**: Tìm `deviceUid` của thiết bị được lắp đặt tại ao để `claim` (gán) vào ao của mình, điều khiển hoạt động hoặc hủy gán (`unassign`).
+
+### 7.1. Danh sách thiết bị IoT
 
 ```http
 GET /devices
 ```
 
-Quyền: `farmer`. Hệ thống tự động lọc và chỉ hiển thị các thiết bị đã được gán vào các ao của Farmer.
+- **Quyền**: `admin`, `farmer`.
+- **Cơ chế lọc tự động**:
+  - `admin`: Trả về toàn bộ danh mục thiết bị trong hệ thống kèm trạng thái kết nối.
+  - `farmer`: Tự động chỉ trả về các thiết bị đã được gán vào các ao nuôi thuộc sở hữu của người nuôi đó.
 
-### [Farmer] Đăng ký gán thiết bị IoT vào ao nuôi
+#### Phản hồi thành công (`200 OK`):
+```json
+[
+  {
+    "id": "22fffa98-46eb-4606-93a0-faae9f70691e",
+    "pondId": "3cb49a46-81cf-4a47-a365-1d6fa55e8d89",
+    "deviceUid": "ESP32_FEEDER_01",
+    "name": "Máy cho ăn tự động A1",
+    "type": "feeder",
+    "status": "online",
+    "mode": "automatic",
+    "firmwareVersion": "1.2.0",
+    "lastSeenAt": "2026-10-10T08:35:00.000Z",
+    "metadata": {
+      "hopperCapacityKg": 50
+    }
+  }
+]
+```
+
+---
+
+### 7.2. [Admin] Khai báo thiết bị chuẩn vào danh mục
+
+```http
+POST /devices
+```
+
+- **Quyền**: `admin`.
+- **Body**:
+  - `deviceUid`: Mã định danh phần cứng duy nhất (Unique), ví dụ: `ESP32_SENSOR_01`.
+  - `name`: Tên thiết bị.
+  - `type`: Loại thiết bị (`feeder`, `sensor_node`, `camera`, `edge_gateway`).
+  - `firmwareVersion`: Phiên bản firmware ban đầu (mặc định: `1.0.0`).
+  - `metadata`: Đối tượng JSON chứa cấu hình phần cứng bổ sung.
+
+```json
+{
+  "deviceUid": "CAM-01-A1",
+  "name": "Camera giám sát sàng ăn Ao 1",
+  "type": "camera",
+  "firmwareVersion": "1.0.0",
+  "metadata": {
+    "resolution": "1920x1080",
+    "fps": 30
+  }
+}
+```
+
+#### Phản hồi thành công (`201 Created`): Thiết bị khởi tạo với `pondId: null`, trạng thái `offline`.
+
+---
+
+### 7.3. [Farmer] Đăng ký gán thiết bị vào ao nuôi (Claim Device)
 
 ```http
 POST /devices/claim
 ```
 
-Quyền: `farmer`.
+- **Quyền**: `farmer`.
+- **Công dụng**: Người nuôi nhập mã `deviceUid` in trên tem thiết bị phần cứng để liên kết thiết bị vào một ao nuôi cụ thể của mình.
+- **Điều kiện**: Thiết bị phải tồn tại trong Catalog hệ thống và chưa bị người khác gán vào ao của họ.
 
-Body:
+#### Body:
 ```json
 {
-  "deviceUid": "DEV-FEEDER-VN-001",
-  "pondId": "uuid-cua-ao-nuoi"
+  "deviceUid": "CAM-01-A1",
+  "pondId": "3cb49a46-81cf-4a47-a365-1d6fa55e8d89"
 }
 ```
-*Ao nuôi phải thuộc sở hữu của người nuôi. Thiết bị phải tồn tại trong danh mục phần cứng chuẩn và chưa bị gán vào ao của người khác.*
 
-### [Farmer] Hủy gán thiết bị khỏi ao nuôi
+#### Phản hồi thành công (`201 Created`): Trả về thiết bị với `pondId` đã được cập nhật.
+
+---
+
+### 7.4. [Farmer] Hủy gán thiết bị khỏi ao nuôi (Unassign Device)
 
 ```http
 POST /devices/:id/unassign
 ```
 
-Quyền: `farmer`. Đưa thiết bị về trạng thái chưa gán (`pondId: null`).
+- **Quyền**: `farmer`.
+- **Công dụng**: Gỡ thiết bị ra khỏi ao nuôi (`pondId = null`), trả thiết bị về kho chuẩn để có thể gán sang ao khác hoặc trả về kho bảo trì.
 
-### [Farmer] Điều khiển chế độ và máy cho ăn
+#### Phản hồi thành công (`200 OK`): Trả về thiết bị với `pondId: null`.
+
+---
+
+### 7.5. Xem chi tiết thiết bị
+
+```http
+GET /devices/:id
+```
+
+- **Quyền**: `admin`, `farmer` (phải sở hữu ao gắn với thiết bị này).
+
+---
+
+### 7.6. Cập nhật thiết bị
 
 ```http
 PATCH /devices/:id
 ```
 
-Quyền: `farmer` (với thiết bị trong ao của mình).
+- **Quyền**: `admin` hoặc `farmer`.
+- **Phân quyền trường dữ liệu**:
+  - `admin`: Được phép cập nhật `deviceUid`, `firmwareVersion`, `metadata`, `status`, `name`.
+  - `farmer`: Chỉ được cập nhật `name`, `mode` (`automatic`, `manual`, `emergency_stop`) và `metadata`. Cấm tự đổi `deviceUid` hoặc `firmwareVersion`.
 
-Body ví dụ chuyển chế độ:
+#### Body (Farmer đổi chế độ hoạt động):
 ```json
 {
   "mode": "automatic"
 }
 ```
-*`mode`: `automatic`, `manual`, `emergency_stop`.*
 
-### [Farmer] Kích hoạt Dừng khẩn cấp từ xa (Emergency Stop)
+---
+
+### 7.7. [Admin] Xóa thiết bị khỏi danh mục
+
+```http
+DELETE /devices/:id
+```
+
+- **Quyền**: `admin`. Xóa vĩnh viễn thiết bị khỏi cơ sở dữ liệu.
+
+---
+
+### 7.8. [Farmer] Kích hoạt Dừng khẩn cấp (Emergency Stop)
 
 ```http
 POST /devices/:id/emergency-stop
 ```
 
-Quyền: `farmer`. Chuyển ngay lập tức chế độ thiết bị sang `emergency_stop`.
+- **Quyền**: `farmer`.
+- **Công dụng**: Lập tức chuyển `mode` của thiết bị sang `emergency_stop`. Nếu là máy cho ăn (`feeder`), hệ thống sẽ ngừng ngay lập tức cữ ăn đang chạy và gửi lệnh ngắt khẩn cấp qua MQTT.
 
-### [IoT / Simulator] Gửi tín hiệu nhịp tim (Heartbeat)
+#### Phản hồi thành công (`200 OK`):
+```json
+{
+  "id": "22fffa98-46eb-4606-93a0-faae9f70691e",
+  "mode": "emergency_stop",
+  "status": "online"
+}
+```
+
+---
+
+### 7.9. Gửi tín hiệu nhịp tim thiết bị (Heartbeat)
 
 ```http
 POST /devices/:id/heartbeat
 ```
 
-Cập nhật thời điểm `lastSeenAt` và đánh dấu `status = 'online'`.
+- **Quyền**: `admin`, `farmer` (hoặc thiết bị IoT gọi qua REST/Gateway).
+- **Công dụng**: Cập nhật `lastSeenAt = CURRENT_TIMESTAMP` và đánh dấu `status = 'online'`.
 
 ---
 
-## 8. Crop Season & FCR Statistics API (Người nuôi)
+## 8. Module Vụ nuôi & Thống kê FCR (Crop Season)
 
-### Tạo vụ nuôi mới cho ao nuôi
+Quản lý vòng đời vụ nuôi tôm của từng ao. Yêu cầu quyền **`farmer`**.
+
+### 8.1. Danh sách vụ nuôi của ao
+
+```http
+GET /ponds/:pondId/crop-seasons
+```
+
+---
+
+### 8.2. Tạo vụ nuôi mới cho ao nuôi
 
 ```http
 POST /ponds/:pondId/crop-seasons
 ```
 
-Quyền: `farmer`.
+- **Ràng buộc an toàn**: Mỗi ao nuôi chỉ được phép có **tối đa 1 vụ nuôi ở trạng thái `active`** tại một thời điểm (được kiểm soát bởi DB Unique Partial Index).
 
-Body:
+#### Body:
 ```json
 {
   "name": "Vụ tôm thẻ chân trắng 2026 - Đợt 1",
@@ -580,149 +1011,273 @@ Body:
   "initialCount": 200000,
   "stockingDensity": 66.6,
   "initialAverageWeightG": 0.02,
-  "estimatedSurvivalRate": 85,
+  "estimatedSurvivalRate": 85.0,
   "status": "active"
 }
 ```
-*Mỗi ao chỉ được có tối đa 1 vụ nuôi ở trạng thái `active`.*
 
-### Xem danh sách / Chi tiết vụ nuôi
+#### Phản hồi thành công (`201 Created`): Trả về đối tượng vụ nuôi mới tạo.
 
-- `GET /ponds/:pondId/crop-seasons`: Danh sách vụ nuôi của ao.
-- `GET /crop-seasons/:id`: Chi tiết vụ nuôi.
-- `PATCH /crop-seasons/:id`: Cập nhật thông số vụ nuôi (hoặc đổi trạng thái sang `completed`).
-- `DELETE /crop-seasons/:id`: Xóa vụ nuôi.
+---
 
-### Thống kê vụ nuôi & Hệ số chuyển đổi thức ăn (FCR)
+### 8.3. Xem chi tiết vụ nuôi
+
+```http
+GET /crop-seasons/:id
+```
+
+---
+
+### 8.4. Thống kê chi tiết vụ nuôi & Hệ số FCR
 
 ```http
 GET /crop-seasons/:id/statistics
 ```
 
-Quyền: `farmer`.
+- **Công dụng**: Tính toán tự động các chỉ số vận hành quan trọng của vụ nuôi:
+  - Số ngày nuôi ($DOC = Days\ of\ Culture$).
+  - Số lượng tôm sống sót ước tính dựa trên tỷ lệ sống.
+  - Tổng khối lượng thức ăn đã tiêu thụ từ các cữ ăn hoàn thành ($kg$).
+  - Tổng số cữ cho ăn đã thực hiện.
+  - Ước tính sinh khối hiện tại ($kg$).
+  - Hệ số chuyển đổi thức ăn thực tế ($FCR = \frac{Tổng\ thức\ ăn}{Độ\ tăng\ sinh\ khối}$).
 
-Response:
+#### Phản hồi thành công (`200 OK`):
 ```json
 {
   "cropSeasonId": "uuid",
   "name": "Vụ tôm thẻ chân trắng 2026 - Đợt 1",
   "status": "active",
   "stockingDate": "2026-09-01",
-  "daysOfCulture": 18,
+  "daysOfCulture": 40,
   "initialCount": 200000,
   "estimatedSurvivingCount": 170000,
-  "survivalRatePercent": 85,
-  "totalFeedConsumedKg": 750.5,
-  "totalFeedingSessions": 54,
-  "estimatedCurrentBiomassKg": 768.4,
-  "fcr": 1.08
+  "survivalRatePercent": 85.0,
+  "totalFeedConsumedKg": 820.5,
+  "totalFeedingSessions": 120,
+  "estimatedCurrentBiomassKg": 765.0,
+  "fcr": 1.07
 }
 ```
 
 ---
 
-## 9. Feeding API (Lịch cho ăn & Nhật ký & Đánh giá An toàn)
+### 8.5. Cập nhật vụ nuôi
 
-### Lịch cho ăn tự động
+```http
+PATCH /crop-seasons/:id
+```
 
-- `GET /ponds/:pondId/feeding-schedules`: Danh sách lịch cho ăn.
-- `POST /ponds/:pondId/feeding-schedules`: Tạo lịch (khung giờ, định mức kg, tốc độ rải kg/phút, các ngày trong tuần).
-  ```json
-  {
-    "name": "Cữ sáng",
-    "timeOfDay": "07:30",
-    "feedAmountKg": 15.0,
-    "spreadRateKgPerMinute": 1.5,
-    "daysOfWeek": [1, 2, 3, 4, 5, 6, 0],
-    "isEnabled": true
-  }
-  ```
-- `PATCH /feeding-schedules/:id`: Tinh chỉnh cữ ăn.
-- `DELETE /feeding-schedules/:id`: Xóa lịch.
-
-### Nhật ký cho ăn (Feeding Records) & Kích hoạt qua Safety Rule Engine
-
-- `GET /ponds/:pondId/feeding-records`: Lịch sử các cữ cho ăn.
-- `POST /ponds/:pondId/feeding-records`: Tạo và kích hoạt cữ cho ăn mới.
-  - Tự động đánh giá qua **Safety Rule Engine** (kiểm tra DO, pH, Nhiệt độ, Khí độc NH3, trạng thái thiết bị).
-  - Nếu `BLOCKED`: Lưu record ở trạng thái `stopped`, ghi nhận `safetyDecision = 'blocked'`, tự động sinh Alert mức `CRITICAL` và **không phát lệnh MQTT**.
-  - Nếu `ADJUSTED`: Điều chỉnh khối lượng (`actualAmountKg = requestedAmountKg * factor`), lưu `safetyDecision = 'adjusted'` và phát lệnh MQTT tới máy cho ăn.
-  - Nếu `ALLOWED`: Cho phép xả 100% định mức, phát lệnh MQTT tới máy cho ăn và chuyển sang `running`.
-  ```json
-  {
-    "deviceId": "uuid",
-    "requestedAmountKg": 12.5,
-    "source": "manual"
-  }
-  ```
-- `PATCH /feeding-records/:id`: Cập nhật tiến trình (`running`, `completed`, `stopped`, `failed`), cập nhật `actualAmountKg` thực tế và ghi nhận `leftoverPercent`.
+- Cập nhật thông số thả giống, tỷ lệ sống, hoặc chuyển trạng thái sang `completed` khi thu hoạch.
 
 ---
 
-## 10. Water Quality Telemetry API (Chất lượng nước & Kiểm tra Ngưỡng)
+### 8.6. Xóa vụ nuôi
 
-### Lấy chỉ số môi trường nước mới nhất của ao
+```http
+DELETE /crop-seasons/:id
+```
+
+---
+
+## 9. Module Quản lý Cho ăn (Feeding Schedules & Records)
+
+Quản lý lịch cho ăn tự động và nhật ký các lần cho ăn thực tế. Yêu cầu quyền **`farmer`**.
+
+### 9.1. Danh sách lịch cho ăn của ao
+
+```http
+GET /ponds/:pondId/feeding-schedules
+```
+
+---
+
+### 9.2. Tạo lịch cho ăn tự động
+
+```http
+POST /ponds/:pondId/feeding-schedules
+```
+
+- **Body**:
+  - `name`: Tên cữ ăn (ví dụ: `Cữ sáng`).
+  - `timeOfDay`: Khung giờ cho ăn theo định dạng `HH:mm` (ví dụ: `07:30`).
+  - `feedAmountKg`: Khối lượng thức ăn định mức ($kg$, ví dụ: `15.0`).
+  - `spreadRateKgPerMinute`: Tốc độ rải thức ăn ($kg/phút$, ví dụ: `1.5`).
+  - `daysOfWeek`: Mảng số nguyên đại diện cho các ngày trong tuần (`0` là Chủ Nhật, `1` là Thứ Hai... `[1, 2, 3, 4, 5, 6, 0]`).
+  - `isEnabled`: Trạng thái bật/tắt (mặc định: `true`).
+
+```json
+{
+  "name": "Cữ sáng",
+  "timeOfDay": "07:30",
+  "feedAmountKg": 15.0,
+  "spreadRateKgPerMinute": 1.5,
+  "daysOfWeek": [1, 2, 3, 4, 5, 6, 0],
+  "isEnabled": true
+}
+```
+
+#### Phản hồi thành công (`201 Created`).
+
+---
+
+### 9.3. Cập nhật / Xóa lịch cho ăn
+
+- `PATCH /feeding-schedules/:id`: Cập nhật thông số lịch.
+- `DELETE /feeding-schedules/:id`: Xóa lịch cho ăn.
+
+---
+
+### 9.4. Lịch sử nhật ký các lần cho ăn
+
+```http
+GET /ponds/:pondId/feeding-records
+```
+
+---
+
+### 9.5. Kích hoạt cữ cho ăn mới (Tự động bảo vệ qua Safety Rule Engine)
+
+```http
+POST /ponds/:pondId/feeding-records
+```
+
+- **Quy trình hoạt động cốt lõi**:
+  1. Người nuôi hoặc hệ thống gửi yêu cầu cữ ăn mới (`requestedAmountKg`).
+  2. Hệ thống gọi tự động **SafetyRuleEngineService**: Lấy snapshot chỉ số môi trường nước mới nhất từ `telemetry_readings` và so sánh với danh sách các luật an toàn trong `safety_rules`.
+  3. **Nếu vi phạm luật cấm (decision = `blocked`)**:
+     - Bản ghi được tạo với trạng thái `stopped`.
+     - `safetyDecision = 'blocked'`, lưu lý do vào `safetyReason`.
+     - Tự động sinh `Alert` mức `CRITICAL`.
+     - **Tuyệt đối không phát lệnh MQTT tới máy cho ăn** để bảo vệ an toàn cho đàn tôm.
+  4. **Nếu điều chỉnh an toàn (decision = `adjusted`)**:
+     - Khối lượng thực tế được giảm theo hệ số an toàn.
+     - `safetyDecision = 'adjusted'`, bản ghi chuyển sang `running`.
+     - Phát lệnh qua MQTT tới thiết bị với khối lượng đã điều chỉnh.
+  5. **Nếu an toàn tuyệt đối (decision = `allowed`)**:
+     - `safetyDecision = 'allowed'`, trạng thái `running`.
+     - Phát lệnh qua MQTT tới máy cho ăn xả 100% định mức.
+
+#### Body:
+```json
+{
+  "deviceId": "22fffa98-46eb-4606-93a0-faae9f70691e",
+  "scheduleId": "uuid-lich-an-neu-co",
+  "requestedAmountKg": 15.0,
+  "source": "manual"
+}
+```
+*`source`: `schedule`, `manual`, `ai`.*
+
+#### Phản hồi thành công (`201 Created`):
+```json
+{
+  "id": "uuid-feeding-record",
+  "pondId": "uuid-ao",
+  "deviceId": "22fffa98-46eb-4606-93a0-faae9f70691e",
+  "startedAt": "2026-10-10T08:40:00.000Z",
+  "requestedAmountKg": 15.0,
+  "actualAmountKg": 15.0,
+  "source": "manual",
+  "status": "running",
+  "safetyDecision": "allowed",
+  "safetyReason": null
+}
+```
+
+---
+
+### 9.6. Cập nhật tiến trình cho ăn
+
+```http
+PATCH /feeding-records/:id
+```
+
+- **Công dụng**: Cập nhật trạng thái hoàn thành (`completed`), dừng (`stopped`), thất bại (`failed`), cập nhật lượng thức ăn thực tế đã rải (`actualAmountKg`), tỷ lệ thức ăn dư trên sàng (`leftoverPercent`) và cường độ bắt mồi (`appetiteLevel`).
+
+#### Body:
+```json
+{
+  "status": "completed",
+  "actualAmountKg": 14.8,
+  "leftoverPercent": 5.2,
+  "appetiteLevel": 3
+}
+```
+
+---
+
+## 10. Module Quan trắc Chất lượng Nước (Telemetry) (`/ponds/:pondId/telemetry`)
+
+Quyền: `admin`, `farmer`.
+
+### 10.1. Lấy chỉ số môi trường nước mới nhất của ao
 
 ```http
 GET /ponds/:pondId/telemetry/latest
 ```
 
-Quyền: `admin`, `farmer`.
+- **Công dụng**: Lấy bản ghi quan trắc gần nhất để hiển thị trực tiếp lên đồng hồ đo (Gauges) của Dashboard.
 
-Response:
+#### Phản hồi thành công (`200 OK`):
 ```json
 {
   "id": "uuid",
-  "pondId": "uuid",
-  "deviceId": "uuid",
-  "measuredAt": "2026-09-22T09:25:00.000Z",
-  "ph": 7.8,
-  "dissolvedOxygenMgL": 5.6,
+  "pondId": "uuid-ao",
+  "deviceId": "uuid-cam-bien",
+  "measuredAt": "2026-10-10T08:42:00.000Z",
+  "ph": 7.85,
+  "dissolvedOxygenMgL": 5.4,
   "temperatureC": 28.5,
   "salinityPpt": 15.2,
   "ammoniaMgL": 0.02,
-  "turbidityNtu": 12.4
+  "turbidityNtu": 12.0
 }
 ```
 
-### Lấy lịch sử đo môi trường nước (Vẽ đồ thị & Phân trang theo thời gian)
+---
+
+### 10.2. Lịch sử đo môi trường nước (Vẽ đồ thị & Phân trang)
 
 ```http
-GET /ponds/:pondId/telemetry/history?startDate=2026-09-01T00:00:00.000Z&endDate=2026-09-22T23:59:59.000Z&deviceId=uuid&page=1&limit=50
+GET /ponds/:pondId/telemetry/history?startDate=2026-10-01T00:00:00.000Z&endDate=2026-10-10T23:59:59.000Z&deviceId=uuid&page=1&limit=50
 ```
 
-Quyền: `admin`, `farmer`.
+- **Query Parameters**:
+  - `startDate` (ISO String): Lọc từ thời điểm.
+  - `endDate` (ISO String): Lọc đến thời điểm.
+  - `deviceId` (UUID): Lọc theo cảm biến cụ thể.
+  - `page` (number, mặc định: 1): Trang hiện tại.
+  - `limit` (number, mặc định: 50, tối đa: 500): Số bản ghi mỗi trang.
 
-Query Parameters:
-- `startDate` (ISO String): Lọc từ thời điểm.
-- `endDate` (ISO String): Lọc đến thời điểm.
-- `deviceId` (UUID): Lọc theo cảm biến đo.
-- `page` (number, default: 1): Trang hiện tại.
-- `limit` (number, default: 50, max: 500): Số lượng bản ghi mỗi trang.
-
-Response:
+#### Phản hồi thành công (`200 OK`):
 ```json
 {
   "data": [ ... ],
-  "total": 120,
+  "total": 240,
   "page": 1,
   "limit": 50,
-  "totalPages": 3
+  "totalPages": 5
 }
 ```
 
-### Ghi nhận chỉ số đo cảm biến (Cảm biến / REST Simulator)
+---
+
+### 10.3. Ghi nhận chỉ số đo cảm biến (REST Ingestion / Simulator)
 
 ```http
 POST /ponds/:pondId/telemetry
 ```
 
-Quyền: `admin`, `farmer`.
+- **Quy trình kiểm tra ngưỡng tự động**:
+  - Dữ liệu gửi lên sẽ lập tức được kiểm tra qua **TelemetryThresholdService**.
+  - Nếu chỉ số rơi vào khoảng nguy hiểm (ví dụ DO < 3.5 mg/L, pH < 7.0 hoặc pH > 9.0, Ammonia > 0.1 mg/L), hệ thống sẽ tự động kích hoạt một `Alert` mức `CRITICAL`.
+  - Áp dụng cơ chế **Debounce 15 phút** cho mỗi loại lỗi của từng ao nuôi để chống spam cảnh báo.
 
-Body:
+#### Body:
 ```json
 {
-  "deviceId": "uuid",
+  "deviceId": "uuid-cam-bien",
   "ph": 7.9,
   "dissolvedOxygenMgL": 3.2,
   "temperatureC": 28.7,
@@ -732,25 +1287,287 @@ Body:
 }
 ```
 
-*Hệ thống tự động chạy qua **TelemetryThresholdService**: Nếu chỉ số vượt ngưỡng an toàn (ví dụ DO = 3.2 mg/L < 3.5 mg/L), hệ thống sẽ tự động tạo `Alert` cảnh báo mức `CRITICAL` và áp dụng debounce 15 phút chống spam.*
+#### Phản hồi thành công (`201 Created`): Trả về đối tượng quan trắc đã lưu.
 
 ---
 
-## 11. AI Recommendations & Feeding Intensity (FIS) API
+## 11. Module Thị giác Máy tính & Cường độ Bắt mồi FIS (Camera Computer Vision) (`/camera`)
 
-### Lấy khuyến nghị AI mới nhất cho ao nuôi
+Hệ thống xử lý thị giác máy tính chạy **2 luồng AI song song**:
+1. **YOLO11n-seg**: Phân đoạn hình ảnh sàng ăn (Tray Segmentation) để tính tỷ lệ diện tích thức ăn còn lại ($R_t$) và đếm mật độ tôm tập trung quanh sàng ($D_t$).
+2. **MobileNetV3-Small**: Phân loại chuyển động và hành vi ăn tức thời ($C_t$) theo 4 mức độ.
+
+Chỉ số cường độ bắt mồi tổng hợp:
+$$FIS = w_1 \cdot \text{norm}(1 - R_t) + w_2 \cdot \text{norm}(v_t) + w_3 \cdot \text{norm}(D_t) + w_4 \cdot \text{norm}(C_t)$$
+
+Trong đó $v_t = \frac{\Delta R_t}{\Delta t}$ là tốc độ tiêu thụ thức ăn. 4 mức bắt mồi:
+- **0: None (Không ăn)** ($FIS < q_{25}$)
+- **1: Weak (Ăn yếu)** ($q_{25} \le FIS < q_{50}$)
+- **2: Normal (Bình thường)** ($q_{50} \le FIS < q_{75}$)
+- **3: Strong (Ăn mạnh)** ($FIS \ge q_{75}$)
+
+---
+
+### 11.1. Phân tích khung hình Camera bằng AI (Song song 2 luồng)
+
+```http
+POST /camera/analyze
+```
+
+- **Quyền**: Đã đăng nhập (`admin`, `farmer`).
+- **Công dụng**: Nhận ảnh khung hình (dạng chuỗi Base64 hoặc URL ảnh), chạy đồng thời YOLO11n-seg và MobileNetV3-Small, tính toán các chỉ số $R_t, v_t, D_t, C_t$, điểm FIS và mức độ thèm ăn.
+- **Tự động liên kết**:
+  - Tự động cập nhật `appetiteLevel` và `leftoverPercent` vào cữ ăn `feedingRecordId` (nếu có).
+  - Tự động cập nhật trạng thái Camera thành `online` và ghi nhận `lastSeenAt`.
+  - Tự động kích hoạt `Alert` mức `CRITICAL` nếu phát hiện thức ăn tồn đọng bất thường (> 50% sau thời gian dài) với độ trễ $\le 5$ giây.
+
+#### Body:
+```json
+{
+  "pondId": "3cb49a46-81cf-4a47-a365-1d6fa55e8d89",
+  "deviceId": "22fffa98-46eb-4606-93a0-faae9f70691e",
+  "feedingRecordId": "uuid-cu-an-neu-co",
+  "frameUrl": "https://storage.shrimpmate.vn/frames/pond1_tray_20261010.jpg",
+  "timeDeltaSeconds": 20,
+  "roi": {
+    "x": 250,
+    "y": 180,
+    "width": 600,
+    "height": 600,
+    "resolutionWidth": 1920,
+    "resolutionHeight": 1080
+  },
+  "simulatedMetrics": {
+    "remainingFeedAreaRt": 0.12,
+    "shrimpDensityDt": 18.5,
+    "behaviorClassificationCt": 2.8
+  }
+}
+```
+
+#### Phản hồi thành công (`201 Created`):
+```json
+{
+  "success": true,
+  "data": {
+    "id": "uuid-fis-log",
+    "pondId": "3cb49a46-81cf-4a47-a365-1d6fa55e8d89",
+    "deviceId": "22fffa98-46eb-4606-93a0-faae9f70691e",
+    "timestamp": "2026-10-10T08:45:00.000Z",
+    "remainingFeedAreaRt": 0.12,
+    "feedConsumptionVelocityVt": 0.015,
+    "shrimpDensityDt": 18.5,
+    "behaviorClassificationCt": 2.8,
+    "normalizedRt": 0.88,
+    "normalizedVt": 0.3,
+    "normalizedDt": 0.6167,
+    "normalizedCt": 0.9333,
+    "fisScore": 0.785,
+    "appetiteLevel": 3,
+    "confidence": 0.92,
+    "frameUrl": "https://storage.shrimpmate.vn/frames/pond1_tray_20261010.jpg"
+  },
+  "analysisSummary": {
+    "fisScore": 0.785,
+    "appetiteLevel": 3,
+    "appetiteLevelDescription": "Ăn mạnh (Mức 3)",
+    "feedLeftoverPercent": 12.0,
+    "shrimpDensity": 18.5,
+    "consumptionVelocity": 0.015,
+    "isAnomaly": false,
+    "anomalyReason": null
+  }
+}
+```
+
+---
+
+### 11.2. Thu nhận chỉ số tiền xử lý từ Camera AI Edge Gateway
+
+```http
+POST /camera/ingest-metrics
+```
+
+- **Quyền**: Public / Edge Gateway token.
+- **Công dụng**: Dành cho các thiết bị phần cứng tại biên (như Raspberry Pi / Jetson Nano) đã chạy mô hình YOLO/MobileNet cục bộ, gửi trực tiếp các chỉ số $R_t, D_t, C_t$ lên máy chủ qua HTTP REST hoặc MQTT.
+
+#### Body:
+```json
+{
+  "pondId": "3cb49a46-81cf-4a47-a365-1d6fa55e8d89",
+  "deviceUid": "CAM-01-A1",
+  "remainingFeedAreaRt": 0.25,
+  "shrimpDensityDt": 12.0,
+  "behaviorClassificationCt": 2.0,
+  "timeDeltaSeconds": 20,
+  "confidence": 0.89
+}
+```
+
+#### Phản hồi thành công (`201 Created`): Trả về bản ghi `CameraFisLog` đã được lưu trữ.
+
+---
+
+### 11.3. Lấy kết quả FIS mới nhất theo ao nuôi
+
+```http
+GET /camera/ponds/:pondId/latest-fis
+```
+
+- **Quyền**: `admin`, `farmer`.
+- **Công dụng**: Lấy trạng thái bắt mồi mới nhất của ao, kiểm tra độ tươi của dữ liệu (`ageSeconds`, đánh dấu `isStale = true` nếu quá 120 giây không có khung hình mới) và thông tin camera quan sát.
+
+#### Phản hồi thành công (`200 OK`):
+```json
+{
+  "hasData": true,
+  "pondId": "3cb49a46-81cf-4a47-a365-1d6fa55e8d89",
+  "status": {
+    "fisScore": 0.785,
+    "appetiteLevel": 3,
+    "appetiteLevelDescription": "Ăn mạnh (Mức 3)",
+    "remainingFeedPercent": 12.0,
+    "shrimpDensity": 18.5,
+    "consumptionVelocity": 0.015,
+    "timestamp": "2026-10-10T08:45:00.000Z",
+    "ageSeconds": 25,
+    "isStale": false
+  },
+  "camera": {
+    "id": "uuid-cam",
+    "name": "Camera quan sát Ao 1",
+    "status": "online",
+    "lastSeenAt": "2026-10-10T08:45:00.000Z"
+  }
+}
+```
+
+---
+
+### 11.4. Lấy lịch sử chuỗi thời gian FIS (Vẽ biểu đồ trực quan)
+
+```http
+GET /camera/ponds/:pondId/fis-history?from=2026-10-01T00:00:00.000Z&to=2026-10-10T23:59:59.000Z&appetiteLevel=3&page=1&limit=50
+```
+
+- **Query Parameters**:
+  - `from`, `to` (ISO Date String): Khoảng thời gian lọc.
+  - `deviceId` (UUID): Lọc theo camera.
+  - `feedingRecordId` (UUID): Lọc theo cữ ăn.
+  - `appetiteLevel` (`0`, `1`, `2`, `3`): Lọc theo mức thèm ăn.
+  - `page`, `limit`: Phân trang (mặc định: page 1, limit 50, tối đa 500).
+
+#### Phản hồi thành công (`200 OK`):
+```json
+{
+  "data": [ ... ],
+  "total": 150,
+  "page": 1,
+  "limit": 50,
+  "totalPages": 3,
+  "summary": {
+    "avgFisScore": 0.684,
+    "distribution": {
+      "none": 5,
+      "weak": 20,
+      "normal": 75,
+      "strong": 50
+    }
+  }
+}
+```
+
+---
+
+### 11.5. Danh sách camera thuộc ao nuôi
+
+```http
+GET /camera/ponds/:pondId/devices
+```
+
+- **Quyền**: `admin`, `farmer`. Trả về danh sách tất cả các thiết bị có `type = 'camera'` đang được gán vào ao nuôi này.
+
+---
+
+### 11.6. Cập nhật vùng quan sát cố định cho Camera (ROI)
+
+```http
+PATCH /camera/devices/:deviceId/roi
+```
+
+- **Quyền**: `admin`, `farmer`.
+- **Công dụng**: Thiết lập tọa độ hộp chữ nhật hoặc đa giác của sàng ăn trên khung hình camera, lưu vào `metadata.roi` của thiết bị để AI tự động cắt đúng vùng sàng ăn trong các lần phân tích sau.
+
+#### Body:
+```json
+{
+  "x": 200,
+  "y": 150,
+  "width": 650,
+  "height": 650,
+  "polygon": [
+    [200, 150],
+    [850, 150],
+    [850, 800],
+    [200, 800]
+  ],
+  "resolutionWidth": 1920,
+  "resolutionHeight": 1080
+}
+```
+
+#### Phản hồi thành công (`200 OK`): Trả về đối tượng thiết bị đã cập nhật ROI.
+
+---
+
+### 11.7. Tinh chỉnh trọng số và phân vị thuật toán FIS
+
+```http
+PATCH /camera/ponds/:pondId/weights
+```
+
+- **Quyền**: `admin`, `farmer`.
+- **Công dụng**: Điều chỉnh trọng số thành phần ($w_1, w_2, w_3, w_4$) và các ngưỡng phân vị ($q_{25}, q_{50}, q_{75}$) phù hợp với đặc thù nước đục/nước trong hoặc giống tôm của từng ao.
+
+#### Body:
+```json
+{
+  "weightRt": 0.35,
+  "weightVt": 0.25,
+  "weightDt": 0.20,
+  "weightCt": 0.20,
+  "quantile25": 0.25,
+  "quantile50": 0.50,
+  "quantile75": 0.75,
+  "samplingIntervalSeconds": 20
+}
+```
+
+#### Phản hồi thành công (`200 OK`):
+```json
+{
+  "message": "Đã cập nhật trọng số và phân vị FIS cho 1 camera trong ao",
+  "weights": { ... }
+}
+```
+
+---
+
+## 12. Module Đề xuất AI & Tối ưu cữ ăn (`/ponds/:pondId/ai`)
+
+Tích hợp mô hình AI tối ưu lượng thức ăn theo sinh khối và dữ liệu môi trường. Yêu cầu quyền **`farmer`**.
+
+### 12.1. Lấy khuyến nghị AI mới nhất cho ao nuôi
 
 ```http
 GET /ponds/:pondId/ai/recommendations/latest
 ```
 
-Quyền: `farmer`.
-
-Response:
+#### Phản hồi thành công (`200 OK`):
 ```json
 {
   "id": "uuid",
-  "pondId": "uuid",
+  "pondId": "uuid-ao",
   "modelName": "ShrimpMate-FeedOpt-v2",
   "modelVersion": "2.1.0",
   "predictedFeedAmountKg": 16.2,
@@ -760,107 +1577,120 @@ Response:
   "anomalyScore": 0.04,
   "confidence": 0.94,
   "safetyDecision": "allowed",
-  "explanation": "Tôm bắt mồi mạnh (FIS cao), DO và nhiệt độ nước trong ngưỡng tối ưu. Đề xuất tăng nhẹ lượng thức ăn 5%."
+  "safetyReason": null,
+  "explanation": "Tôm bắt mồi mạnh (FIS cao), DO=5.5 mg/L và nhiệt độ 28.5°C nằm trong ngưỡng tối ưu. Đề xuất tăng nhẹ lượng thức ăn 5%."
 }
 ```
 
-### Lịch sử các khuyến nghị AI
+---
+
+### 12.2. Lịch sử các khuyến nghị AI
 
 ```http
 GET /ponds/:pondId/ai/recommendations?limit=10
 ```
 
-Quyền: `farmer`.
+- **Query Parameters**: `limit` (mặc định: 10).
 
 ---
 
-## 12. Alerts & Incident Handling API
+## 13. Module Cảnh báo & Xử lý Sự cố (`/alerts`)
 
-### Lấy số lượng tổng kết cảnh báo (Summary Badge)
+Quyền: `admin`, `farmer` (Farmer chỉ thấy ao của mình, Admin thấy toàn hệ thống).
+
+### 13.1. Tổng kết số lượng cảnh báo (Summary Badge)
 
 ```http
-GET /alerts/summary?pondId=uuid
+GET /alerts/summary?pondId=uuid-tuy-chon
 ```
 
-Quyền: `admin`, `farmer`.
+- **Query Parameters**: `pondId` (tùy chọn, lọc theo ao).
 
-Response:
+#### Phản hồi thành công (`200 OK`):
 ```json
 {
-  "total": 15,
-  "open": 3,
-  "acknowledged": 2,
-  "resolved": 10,
+  "total": 12,
+  "open": 2,
+  "acknowledged": 3,
+  "resolved": 7,
   "bySeverity": {
     "critical": 1,
     "warning": 4,
-    "monitoring": 10
+    "monitoring": 7
   }
 }
 ```
 
-### Lấy danh sách cảnh báo của toàn bộ trang trại
+---
+
+### 13.2. Lấy danh sách toàn bộ cảnh báo
 
 ```http
-GET /alerts?status=open&severity=3&page=1&limit=20
+GET /alerts?status=open&severity=3&pondId=uuid&page=1&limit=20
 ```
 
-Quyền: `admin`, `farmer`. (Farmer chỉ thấy ao của mình; Admin thấy toàn hệ thống).
+- **Query Parameters**:
+  - `status`: `open`, `acknowledged`, `resolved`.
+  - `severity`: `1` (monitoring), `2` (warning), `3` (critical).
+  - `pondId`, `deviceId`, `type`: Lọc theo tiêu chí tương ứng.
+  - `page`, `limit`: Phân trang.
 
-Query Parameters:
-- `status`: `open`, `acknowledged`, `resolved`.
-- `severity`: `1` (monitoring), `2` (warning), `3` (critical).
-- `pondId`: Lọc theo ao.
-- `deviceId`: Lọc theo thiết bị.
-- `type`: Lọc theo loại cảnh báo.
-- `page`, `limit`: Phân trang.
+---
 
-### Lấy danh sách cảnh báo theo từng ao
+### 13.3. Lấy danh sách cảnh báo theo từng ao cụ thể
 
 ```http
 GET /ponds/:pondId/alerts?status=open
 ```
 
-Quyền: `admin`, `farmer`.
+---
 
-### Xác nhận đã tiếp nhận cảnh báo (Acknowledge)
+### 13.4. Xác nhận đã tiếp nhận sự cố (Acknowledge)
 
 ```http
 PATCH /alerts/:id/acknowledge
 ```
 
-Quyền: `admin`, `farmer`. Chuyển trạng thái sang `acknowledged` và ghi nhận thời gian `acknowledgedAt`.
+- **Công dụng**: Người nuôi bấm nút xác nhận đã biết có sự cố đang xảy ra. Cập nhật `status = 'acknowledged'` và lưu thời điểm `acknowledgedAt`.
 
-### Xác nhận đã giải quyết xong sự cố (Resolve)
+---
+
+### 13.5. Xác nhận đã khắc phục sự cố xong (Resolve)
 
 ```http
 PATCH /alerts/:id/resolve
 ```
 
-Quyền: `admin`, `farmer`. Chuyển trạng thái sang `resolved` và ghi nhận thời gian `resolvedAt`.
+- **Công dụng**: Người nuôi xác nhận đã xử lý xong sự cố ngoài ao (ví dụ: đã bật quạt nước nâng DO, đã thay nước...). Cập nhật `status = 'resolved'` và lưu thời điểm `resolvedAt`.
 
 ---
 
-## 13. Safety Rule Engine API
+## 14. Module Quy tắc An toàn Nước (Safety Rule Engine) (`/safety-rules`)
 
-### [Admin & Farmer] Xem danh mục quy tắc an toàn
+Cung cấp khả năng cấu hình các luật nghiệp vụ an toàn để hệ thống tự động kiểm soát việc xả thức ăn.
+
+### 14.1. Xem danh mục quy tắc an toàn
 
 ```http
 GET /safety-rules
 ```
 
-### [Admin] Tạo quy tắc an toàn mới
+- **Quyền**: `admin`, `farmer`. Trả về tất cả các luật an toàn đang được kích hoạt trong hệ thống.
+
+---
+
+### 14.2. [Admin] Tạo quy tắc an toàn mới
 
 ```http
 POST /safety-rules
 ```
 
-Quyền: `admin`.
+- **Quyền**: `admin`.
 
-Body:
+#### Body:
 ```json
 {
-  "code": "DO_CRITICAL_CUSTOM",
+  "code": "DO_CRITICAL_BLOCKED",
   "name": "Chặn cho ăn khi DO dưới 3.5 mg/L",
   "priority": 1,
   "isEnabled": true,
@@ -871,59 +1701,72 @@ Body:
   },
   "action": {
     "decision": "blocked",
-    "reason": "Oxy hòa tan quá thấp, cấm xả thức ăn."
-  }
-}
-```
-
-### [Admin & Farmer] Thử nghiệm đánh giá an toàn trước khi cho ăn
-
-```http
-POST /ponds/:pondId/safety-rules/evaluate
-```
-
-Quyền: `admin`, `farmer`. Cho phép Web/Mobile app preview điều kiện an toàn và lý do trước khi bấm xác nhận cho ăn.
-
-Body:
-```json
-{
-  "deviceId": "uuid",
-  "requestedAmountKg": 15.0
-}
-```
-
-Response:
-```json
-{
-  "decision": "blocked",
-  "allowedAmountKg": 0,
-  "requestedAmountKg": 15.0,
-  "reasons": [
-    "Nồng độ oxy hòa tan (DO) quá thấp (< 3.5 mg/L). Cấm cho ăn để tránh tôm bị ngạt và dư thừa thức ăn gây ô nhiễm đáy ao."
-  ],
-  "appliedRules": [
-    "DO_BELOW_CRITICAL"
-  ],
-  "telemetrySnapshot": {
-    "id": "uuid",
-    "dissolvedOxygenMgL": 3.2,
-    "ph": 7.8,
-    "temperatureC": 29.0
+    "reason": "Nồng độ oxy hòa tan (DO) quá thấp (< 3.5 mg/L). Cấm cho ăn để tránh tôm bị ngạt và ô nhiễm đáy ao."
   }
 }
 ```
 
 ---
 
-## 14. MQTT & IoT Communication Protocol
+### 14.3. [Admin] Chi tiết, Cập nhật, Xóa quy tắc an toàn
 
-### Kiểm tra trạng thái kết nối MQTT Broker
+- `GET /safety-rules/:id`: Xem chi tiết quy tắc.
+- `PATCH /safety-rules/:id` [Admin]: Cập nhật điều kiện, ngưỡng, mức ưu tiên hoặc bật/tắt (`isEnabled`).
+- `DELETE /safety-rules/:id` [Admin]: Xóa quy tắc.
+
+---
+
+### 14.4. Thử nghiệm đánh giá an toàn trước khi cho ăn (Preview Safety Evaluation)
+
+```http
+POST /ponds/:pondId/safety-rules/evaluate
+```
+
+- **Quyền**: `admin`, `farmer`.
+- **Công dụng**: Cho phép ứng dụng Web / Mobile app kiểm tra trước kết quả an toàn dựa trên số đo cảm biến mới nhất của ao mà chưa cần tạo bản ghi thực tế. Giúp hiển thị cảnh báo cho người nuôi biết trước khi họ quyết định nhấn nút xả thức ăn.
+
+#### Body:
+```json
+{
+  "deviceId": "22fffa98-46eb-4606-93a0-faae9f70691e",
+  "requestedAmountKg": 15.0
+}
+```
+
+#### Phản hồi thành công (`200 OK` - Trường hợp bị chặn):
+```json
+{
+  "decision": "blocked",
+  "allowedAmountKg": 0,
+  "requestedAmountKg": 15.0,
+  "reasons": [
+    "Nồng độ oxy hòa tan (DO) quá thấp (< 3.5 mg/L). Cấm cho ăn để tránh tôm bị ngạt và ô nhiễm đáy ao."
+  ],
+  "appliedRules": [
+    "DO_CRITICAL_BLOCKED"
+  ],
+  "telemetrySnapshot": {
+    "id": "uuid",
+    "dissolvedOxygenMgL": 3.2,
+    "ph": 7.8,
+    "temperatureC": 28.5
+  }
+}
+```
+
+---
+
+## 15. Module Giao tiếp MQTT & IoT Protocol (`/mqtt`)
+
+### 15.1. Kiểm tra trạng thái kết nối MQTT Broker
 
 ```http
 GET /mqtt/status
 ```
 
-Response:
+- **Quyền**: Public.
+
+#### Phản hồi thành công (`200 OK`):
 ```json
 {
   "connected": true,
@@ -931,13 +1774,18 @@ Response:
 }
 ```
 
-### [Admin] Gửi lệnh kiểm thử Feeder qua MQTT
+---
+
+### 15.2. [Admin] Gửi lệnh kiểm thử Feeder qua MQTT
 
 ```http
 POST /mqtt/devices/:deviceUid/feeder-test
 ```
 
-Body:
+- **Quyền**: `admin`.
+- **Công dụng**: Phát lệnh kiểm tra phần cứng trực tiếp tới topic MQTT của máy cho ăn.
+
+#### Body:
 ```json
 {
   "command": "FEED",
@@ -947,62 +1795,89 @@ Body:
 }
 ```
 
-### Quy chuẩn Topic MQTT & Payloads:
-
-1. **Thu nhận Telemetry**: `shrimpmate/telemetry/{deviceUid}` hoặc `shrimpmate/ponds/{pondId}/devices/{deviceUid}/telemetry`
-   ```json
-   {
-     "deviceUid": "ESP32_SENSOR_01",
-     "ph": 7.9,
-     "dissolvedOxygenMgL": 5.8,
-     "temperatureC": 29.2,
-     "salinityPpt": 16.0,
-     "ammoniaMgL": 0.02,
-     "turbidityNtu": 25.0,
-     "measuredAt": "2026-09-22T09:00:00.000Z"
-   }
-   ```
-2. **Lệnh cho ăn (Feeder Command)**: `shrimpmate/devices/{deviceUid}/feeder/command`
-   ```json
-   {
-     "command": "FEED",
-     "recordId": "uuid",
-     "feedAmountKg": 10.0,
-     "spreadRateKgPerMinute": 1.5,
-     "timestamp": "2026-09-22T09:00:00.000Z"
-   }
-   ```
-3. **Phản hồi từ Feeder**: `shrimpmate/devices/{deviceUid}/feeder/status`
-   ```json
-   {
-     "deviceUid": "ESP32_FEEDER_01",
-     "recordId": "uuid",
-     "status": "completed",
-     "actualAmountKg": 10.0,
-     "timestamp": "2026-09-22T09:05:00.000Z"
-   }
-   ```
-4. **Heartbeat thiết bị**: `shrimpmate/devices/{deviceUid}/heartbeat`
-   ```json
-   {
-     "deviceUid": "ESP32_FEEDER_01",
-     "status": "online",
-     "firmwareVersion": "1.2.0",
-     "timestamp": "2026-09-22T09:00:00.000Z"
-   }
-   ```
-
-*Chạy script mô phỏng ESP32: `node scripts/mqtt-simulator.js [feeder | telemetry | abnormal]`.*
+#### Phản hồi thành công (`200 OK`):
+```json
+{
+  "success": true,
+  "deviceUid": "ESP32_FEEDER_01",
+  "message": "Đã gửi lệnh feeder test tới thiết bị ESP32_FEEDER_01"
+}
+```
 
 ---
 
-## 15. Dữ liệu Seed mẫu
+### 15.3. Quy chuẩn Topic MQTT & Payloads
 
-Hệ thống tự động khởi tạo dữ liệu mẫu khi khởi động:
+Hệ thống định tuyến dữ liệu IoT qua các Topic chuẩn:
 
-| Role | Email | Số điện thoại | Mật khẩu | Mô tả |
+#### 1. Thu nhận chỉ số môi trường nước (Telemetry Ingestion)
+- **Topic**: `shrimpmate/telemetry/{deviceUid}` hoặc `shrimpmate/ponds/{pondId}/devices/{deviceUid}/telemetry`
+- **Payload**:
+  ```json
+  {
+    "deviceUid": "ESP32_SENSOR_01",
+    "ph": 7.85,
+    "dissolvedOxygenMgL": 5.4,
+    "temperatureC": 28.5,
+    "salinityPpt": 15.2,
+    "ammoniaMgL": 0.02,
+    "turbidityNtu": 12.0,
+    "measuredAt": "2026-10-10T08:42:00.000Z"
+  }
+  ```
+
+#### 2. Lệnh điều khiển máy cho ăn (Feeder Command)
+- **Topic**: `shrimpmate/devices/{deviceUid}/feeder/command`
+- **Payload**:
+  ```json
+  {
+    "command": "FEED",
+    "recordId": "uuid-feeding-record",
+    "feedAmountKg": 15.0,
+    "spreadRateKgPerMinute": 1.5,
+    "timestamp": "2026-10-10T08:40:00.000Z"
+  }
+  ```
+
+#### 3. Phản hồi trạng thái từ máy cho ăn (Feeder Status)
+- **Topic**: `shrimpmate/devices/{deviceUid}/feeder/status`
+- **Payload**:
+  ```json
+  {
+    "deviceUid": "ESP32_FEEDER_01",
+    "recordId": "uuid-feeding-record",
+    "status": "completed",
+    "actualAmountKg": 14.8,
+    "timestamp": "2026-10-10T08:50:00.000Z"
+  }
+  ```
+
+#### 4. Tín hiệu nhịp tim phần cứng (Device Heartbeat)
+- **Topic**: `shrimpmate/devices/{deviceUid}/heartbeat`
+- **Payload**:
+  ```json
+  {
+    "deviceUid": "ESP32_FEEDER_01",
+    "status": "online",
+    "firmwareVersion": "1.2.0",
+    "timestamp": "2026-10-10T08:45:00.000Z"
+  }
+  ```
+
+*Kịch bản kiểm thử ESP32 mô phỏng bằng terminal:*
+```powershell
+node scripts/mqtt-simulator.js feeder
+node scripts/mqtt-simulator.js telemetry
+node scripts/mqtt-simulator.js abnormal
+```
+
+---
+
+## 16. Tài khoản Seed Mẫu Sẵn Có
+
+Hệ thống tự động khởi tạo các tài khoản chuẩn khi chạy seed:
+
+| Vai trò (Role) | Email | Số điện thoại | Mật khẩu | Phạm vi quyền hạn |
 | --- | --- | --- | --- | --- |
-| `admin` | `admin@shrimpmate.local` | `0901000001` | `Admin@123456` | Quản trị viên hệ thống, quản lý catalog thiết bị, luật an toàn và giám sát toàn diện |
-| `farmer` | `farmer@shrimpmate.local` | `0901000002` | `Farmer@123456` | Người nuôi tôm, sở hữu các Farm và Pond mẫu |
-
-*Có thể tùy chỉnh tài khoản mẫu thông qua biến môi trường `SEED_ADMIN_*` và `SEED_FARMER_*`.*
+| `admin` | `admin@shrimpmate.local` | `0901000001` | `Admin@123456` | Quản trị viên hệ thống: Quản lý catalog phần cứng, khóa/phân quyền tài khoản, cấu hình luật an toàn, báo cáo tổng quan và FCR toàn hệ thống |
+| `farmer` | `farmer@shrimpmate.local` | `0901000002` | `Farmer@123456` | Người nuôi tôm: Sở hữu và tự chủ các Farm và Pond mẫu, gán thiết bị, tạo lịch ăn, phân tích AI camera FIS và tiếp nhận cảnh báo |
