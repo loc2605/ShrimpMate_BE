@@ -115,4 +115,11 @@ export class AuthController {
   adminCheck() {
     return { message: 'Bạn có quyền Admin' };
   }
+
+  @Get('farmer-check')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.FARMER)
+  farmerCheck() {
+    return { message: 'Bạn có quyền Người nuôi (Farmer)' };
+  }
 }

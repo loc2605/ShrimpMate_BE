@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { CameraService } from './camera.service';
 import { CameraAiEngineService } from './camera-ai-engine.service';
@@ -52,6 +53,10 @@ describe('CameraService', () => {
       providers: [
         CameraService,
         CameraAiEngineService,
+        {
+          provide: ConfigService,
+          useValue: { get: jest.fn() },
+        },
         {
           provide: getRepositoryToken(CameraFisLog),
           useValue: fisLogRepo,

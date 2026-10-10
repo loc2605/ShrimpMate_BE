@@ -393,7 +393,7 @@ GET /auth/admin-check
 ```
 
 - **Quyền**: `admin`.
-- **Công dụng**: Kiểm tra nhanh xem token hiện tại có quyền Quản trị viên hay không, thường dùng cho Auth Guard phía Frontend.
+- **Công dụng**: Kiểm tra nhanh xem token hiện tại có quyền Quản trị viên hay không, thường dùng cho Auth Guard phía Frontend Admin Web Dashboard.
 
 #### Phản hồi thành công (`200 OK`):
 ```json
@@ -407,7 +407,28 @@ GET /auth/admin-check
 
 ---
 
-### 3.12. [Admin] Xem danh sách tất cả tài khoản trong hệ thống
+### 3.12. [Farmer] Kiểm tra quyền Người nuôi nhanh
+
+```http
+GET /auth/farmer-check
+```
+
+- **Quyền**: `farmer`.
+- **Công dụng**: Kiểm tra nhanh xem token hiện tại có quyền Người nuôi hay không, dùng cho Auth Guard phía Farmer Mobile App và Farmer Web để chặn nếu tài khoản Admin đăng nhập nhầm.
+
+#### Phản hồi thành công (`200 OK`):
+```json
+{
+  "message": "Bạn có quyền Người nuôi (Farmer)"
+}
+```
+
+#### Mã lỗi:
+- `403 Forbidden`: Người dùng không mang role `farmer` sẽ bị từ chối truy cập.
+
+---
+
+### 3.13. [Admin] Xem danh sách tất cả tài khoản trong hệ thống
 
 ```http
 GET /auth/users

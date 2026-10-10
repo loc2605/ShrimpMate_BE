@@ -15,7 +15,7 @@ export class CropSeasonController {
   constructor(private readonly cropSeasonService: CropSeasonService) {}
 
   @Get('ponds/:pondId/crop-seasons')
-  @Roles(UserRole.FARMER)
+  @Roles(UserRole.ADMIN, UserRole.FARMER)
   findAllByPond(@Param('pondId') pondId: string, @CurrentUser() user: User) {
     return this.cropSeasonService.findAllByPond(pondId, user);
   }
@@ -27,13 +27,13 @@ export class CropSeasonController {
   }
 
   @Get('crop-seasons/:id')
-  @Roles(UserRole.FARMER)
+  @Roles(UserRole.ADMIN, UserRole.FARMER)
   findOne(@Param('id') id: string, @CurrentUser() user: User) {
     return this.cropSeasonService.findOne(id, user);
   }
 
   @Get('crop-seasons/:id/statistics')
-  @Roles(UserRole.FARMER)
+  @Roles(UserRole.ADMIN, UserRole.FARMER)
   getStatistics(@Param('id') id: string, @CurrentUser() user: User) {
     return this.cropSeasonService.getStatistics(id, user);
   }

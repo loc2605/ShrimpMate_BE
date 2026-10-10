@@ -28,7 +28,7 @@ export class FarmPondController {
   constructor(private readonly farmPondService: FarmPondService) {}
 
   @Get()
-  @Roles(UserRole.FARMER)
+  @Roles(UserRole.ADMIN, UserRole.FARMER)
   findAllFarms(@Query() pagination: PaginationDto, @CurrentUser() user: User) {
     return this.farmPondService.findAllFarms(pagination, user);
   }
@@ -40,7 +40,7 @@ export class FarmPondController {
   }
 
   @Get(':id')
-  @Roles(UserRole.FARMER)
+  @Roles(UserRole.ADMIN, UserRole.FARMER)
   findFarmById(@Param('id') id: string, @CurrentUser() user: User) {
     return this.farmPondService.findFarmById(id, user);
   }
@@ -58,7 +58,7 @@ export class FarmPondController {
   }
 
   @Get(':farmId/ponds')
-  @Roles(UserRole.FARMER)
+  @Roles(UserRole.ADMIN, UserRole.FARMER)
   findAllPondsByFarm(@Param('farmId') farmId: string, @Query() pagination: PaginationDto, @CurrentUser() user: User) {
     return this.farmPondService.findAllPondsByFarm(farmId, pagination, user);
   }
@@ -70,7 +70,7 @@ export class FarmPondController {
   }
 
   @Get(':farmId/ponds/:id')
-  @Roles(UserRole.FARMER)
+  @Roles(UserRole.ADMIN, UserRole.FARMER)
   findPondById(@Param('id') id: string, @CurrentUser() user: User) {
     return this.farmPondService.findPondById(id, user);
   }
