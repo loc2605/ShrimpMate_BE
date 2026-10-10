@@ -12,6 +12,7 @@ export * from './safety-rule.entity';
 export * from './telemetry-reading.entity';
 export * from './user.entity';
 export * from './user-pond-assignment.entity';
+export * from './farmer-assignment.entity';
 export * from './password-reset-otp.entity';
 
 import { Alert } from './alert.entity';
@@ -27,11 +28,13 @@ import { SafetyRule } from './safety-rule.entity';
 import { TelemetryReading } from './telemetry-reading.entity';
 import { User } from './user.entity';
 import { UserPondAssignment } from './user-pond-assignment.entity';
+import { FarmerAssignment } from './farmer-assignment.entity';
 import { PasswordResetOtp } from './password-reset-otp.entity';
 
 export const entities = [
 	User,
 	UserPondAssignment,
+	FarmerAssignment,
 	PasswordResetOtp,
 	Farm,
 	Pond,

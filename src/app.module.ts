@@ -19,6 +19,7 @@ import { CropSeasonModule } from './modules/crop-season/crop-season.module';
 import { FeedingModule } from './modules/feeding/feeding.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { CameraModule } from './modules/camera/camera.module';
+import { FarmersModule } from './modules/farmers/farmers.module';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -52,6 +53,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     DatabaseModule,
     AuthModule,
     AdminModule,
+    FarmersModule,
     FarmPondModule,
     CropSeasonModule,
     FeedingModule,

@@ -1,4 +1,4 @@
-import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 import { UserRole } from './enums';
 
 @Entity('users')
@@ -23,6 +23,13 @@ export class User {
 
   @Column({ type: 'enum', enum: UserRole, default: UserRole.FARMER })
   role!: UserRole;
+
+  @Column({ name: 'manager_id', type: 'uuid', nullable: true })
+  managerId!: string | null;
+
+  @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'manager_id' })
+  manager!: User | null;
 
   @Column({ default: true })
   isActive!: boolean;

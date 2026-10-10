@@ -50,7 +50,7 @@ export class AuthService {
       phoneNumber,
       passwordHash,
       fullName: registerDto.fullName.trim(),
-      role: UserRole.FARMER,
+      role: UserRole.MANAGER,
       isActive: true,
     });
 

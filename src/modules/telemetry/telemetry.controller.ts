@@ -15,13 +15,13 @@ export class TelemetryController {
   constructor(private readonly telemetryService: TelemetryService) {}
 
   @Get('latest')
-  @Roles(UserRole.ADMIN, UserRole.FARMER)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.FARMER)
   getLatest(@Param('pondId') pondId: string, @CurrentUser() user: User) {
     return this.telemetryService.getLatest(pondId, user);
   }
 
   @Get('history')
-  @Roles(UserRole.ADMIN, UserRole.FARMER)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.FARMER)
   getHistory(
     @Param('pondId') pondId: string,
     @Query() queryDto: QueryTelemetryDto,
@@ -31,7 +31,7 @@ export class TelemetryController {
   }
 
   @Post()
-  @Roles(UserRole.ADMIN, UserRole.FARMER)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.FARMER)
   recordTelemetry(
     @Param('pondId') pondId: string,
     @Body() dto: RecordTelemetryDto,

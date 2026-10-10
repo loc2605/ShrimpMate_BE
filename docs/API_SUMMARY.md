@@ -1,6 +1,6 @@
 # Bảng Tóm Tắt Toàn Bộ API - ShrimpMate Backend
 
-Tài liệu tra cứu nhanh (Quick Reference) toàn bộ các endpoint, phương thức, phân quyền và yêu cầu kỹ thuật của hệ thống **ShrimpMate Backend**.
+Tài liệu tra cứu nhanh (Quick Reference) toàn bộ các endpoint, phương thức, phân quyền và yêu cầu kỹ thuật của hệ thống **ShrimpMate Backend** theo mô hình **3 Roles** (`Admin`, `Manager`, `Farmer`).
 
 ---
 
@@ -11,9 +11,10 @@ Tài liệu tra cứu nhanh (Quick Reference) toàn bộ các endpoint, phương
   ```http
   Authorization: Bearer <access_token>
   ```
-- **Phân quyền (Roles)**:
-  - `admin`: Quản trị viên hệ thống (quản lý người dùng, catalog phần cứng, luật an toàn, báo cáo tổng quan & FCR toàn nền tảng).
-  - `farmer`: Người nuôi tôm (tự chủ trang trại, ao nuôi, vụ nuôi, gán thiết bị, tạo lịch ăn, giám sát môi trường, camera AI FIS, cảnh báo).
+- **Phân quyền (3 Roles)**:
+  - `admin`: Quản trị viên hệ thống (Web Dashboard: quản lý người dùng, catalog phần cứng, luật an toàn, báo cáo tổng quan & FCR toàn nền tảng).
+  - `manager`: Quản lý sở hữu cơ sở nuôi (Web App: quản lý Farmer, phân công ao, trang trại, ao nuôi, vụ nuôi, gán thiết bị, tạo lịch ăn, camera AI, báo cáo).
+  - `farmer`: Người nuôi trực tiếp vận hành bờ ao (Mobile App: giám sát tức thời, cho ăn nhanh, dừng khẩn cấp, nhận cảnh báo FCM trên các ao được phân công).
   - `Public`: Không yêu cầu token.
 
 ---
@@ -23,10 +24,10 @@ Tài liệu tra cứu nhanh (Quick Reference) toàn bộ các endpoint, phương
 | STT | Module | Endpoint | Method | Phân quyền | Công dụng chính & Yêu cầu |
 | :-: | --- | --- | :---: | :---: | --- |
 | **1** | **Health Check** | `/` | `GET` | Public | Kiểm tra trạng thái hoạt động của máy chủ backend (`200 OK`) |
-| **2** | **Auth** | `/auth/register` | `POST` | Public | Đăng ký tài khoản người nuôi (`farmer`), chuẩn hóa SĐT Việt Nam, email & phone duy nhất |
+| **2** | **Auth** | `/auth/register` | `POST` | Public | Quản lý (`manager`) tự đăng ký tài khoản mới trên Web App, chuẩn hóa SĐT Việt Nam |
 | **3** | | `/auth/login` | `POST` | Public | Đăng nhập bằng Email hoặc SĐT + Password, trả về `accessToken` & `refreshToken` |
 | **4** | | `/auth/refresh-token` | `POST` | Public | Cấp lại `accessToken` mới từ `refreshToken` hợp lệ |
-| **5** | | `/auth/forgot-password` | `POST` | Public | Gửi yêu cầu mã OTP 6 chữ số khôi phục mật khẩu (hiệu lực 5 phút) |
+| **5** | | `/auth/forgot-password` | `POST` | Public | Gửi yêu cầu mã OTP 6 chữ số khôi phục mật khẩu (hiệu lực 5 phút qua Email/SMS) |
 | **6** | | `/auth/resend-otp` | `POST` | Public | Hủy OTP cũ và gửi lại mã OTP mới |
 | **7** | | `/auth/verify-reset-otp` | `POST` | Public | Xác thực tính hợp lệ của OTP trước khi người dùng nhập mật khẩu mới |
 | **8** | | `/auth/reset-password` | `POST` | Public | Đặt lại mật khẩu mới bằng mã OTP, tự động hủy các refresh token cũ |
@@ -34,89 +35,86 @@ Tài liệu tra cứu nhanh (Quick Reference) toàn bộ các endpoint, phương
 | **10** | | `/auth/profile` | `PATCH` | Authenticated | Người dùng tự cập nhật họ tên (`fullName`) và số điện thoại |
 | **11** | | `/auth/change-password` | `PATCH` | Authenticated | Đổi mật khẩu tài khoản (yêu cầu mật khẩu hiện tại) |
 | **12** | | `/auth/admin-check` | `GET` | `admin` | Kiểm tra nhanh token có vai trò Admin hay không |
-| **13** | | `/auth/farmer-check` | `GET` | `farmer` | Kiểm tra nhanh token có vai trò Farmer hay không |
-| **14** | | `/auth/users` | `GET` | `admin` | Xem danh sách tất cả tài khoản người dùng trong hệ thống |
-| **15** | | `/auth/users/:id/status` | `PATCH` | `admin` | Khóa (`isActive: false`) hoặc mở khóa tài khoản (chặn Admin tự khóa) |
-| **16** | | `/auth/users/:id/role` | `PATCH` | `admin` | Phân quyền tài khoản giữa `admin` và `farmer` (chặn Admin tự hạ quyền) |
-| **17** | **Admin** | `/admin/overview` | `GET` | `admin` | Thống kê tổng quan: user, trang trại, ao nuôi, thiết bị online/offline, cảnh báo |
-| **18** | | `/admin/reports/operational` | `GET` | `admin` | Báo cáo vận hành: số liệu tổng quan + 10 cảnh báo mới nhất + thiết bị offline > 5 phút |
-| **19** | | `/admin/reports/fcr` | `GET` | `admin` | Báo cáo FCR toàn hệ thống: FCR từng vụ, FCR trung bình toàn hệ thống & xếp loại chất lượng |
-| **20** | **Farms** | `/farms` | `GET` | `admin`, `farmer` | Danh sách trang trại (Farmer xem farm của mình; Admin xem toàn bộ để giám sát) |
-| **21** | | `/farms` | `POST` | `farmer` | Tạo trang trại mới (tự động gán `owner_id = user.id`) |
-| **22** | | `/farms/:id` | `GET` | `admin`, `farmer` | Xem chi tiết thông tin trang trại kèm danh sách ao nuôi |
-| **23** | | `/farms/:id` | `PATCH` | `farmer` | Cập nhật tên, địa chỉ, trạng thái trang trại |
-| **24** | | `/farms/:id` | `DELETE` | `farmer` | Xóa mềm trang trại (`deleted_at`) và toàn bộ ao trực thuộc |
-| **25** | **Ponds** | `/farms/:farmId/ponds` | `GET` | `admin`, `farmer` | Danh sách ao nuôi trong trang trại (phân trang: `page`, `limit`) |
-| **26** | | `/farms/:farmId/ponds` | `POST` | `farmer` | Tạo ao nuôi mới trong trang trại (mã ao `code` duy nhất trong farm) |
-| **27** | | `/farms/:farmId/ponds/:id` | `GET` | `admin`, `farmer` | Chi tiết ao nuôi kèm danh sách thiết bị IoT đã gán |
-| **28** | | `/farms/:farmId/ponds/:id` | `PATCH` | `farmer` | Cập nhật diện tích ($m^2$), mã ao, tên ao, trạng thái |
-| **29** | | `/farms/:farmId/ponds/:id` | `DELETE` | `farmer` | Xóa mềm ao nuôi, tự động hoàn trả thiết bị về kho (`pond_id = NULL`) |
-| **30** | **Devices** | `/devices` | `GET` | `admin`, `farmer` | Admin xem toàn bộ Catalog; Farmer chỉ xem thiết bị trong các ao của mình |
-| **31** | | `/devices` | `POST` | `admin` | Khai báo thiết bị chuẩn mới vào Catalog (`pond_id = null`, status: offline) |
-| **32** | | `/devices/claim` | `POST` | `farmer` | Đăng ký gán thiết bị theo mã phần cứng `deviceUid` vào ao nuôi |
-| **33** | | `/devices/:id/unassign` | `POST` | `farmer` | Hủy gán thiết bị khỏi ao nuôi, đưa về trạng thái tự do (`pond_id = null`) |
-| **34** | | `/devices/:id` | `GET` | `admin`, `farmer` | Xem chi tiết thông tin và trạng thái thiết bị |
-| **35** | | `/devices/:id` | `PATCH` | `admin`, `farmer` | Admin sửa firmware/UID/metadata; Farmer sửa `mode` (`automatic`/`manual`/`emergency_stop`) |
-| **36** | | `/devices/:id` | `DELETE` | `admin` | Xóa vĩnh viễn thiết bị khỏi danh mục phần cứng hệ thống |
-| **37** | | `/devices/:id/emergency-stop`| `POST` | `farmer` | Kích hoạt lệnh Dừng khẩn cấp máy cho ăn tức thời từ xa |
-| **38** | | `/devices/:id/heartbeat` | `POST` | `admin`, `farmer` | Ghi nhận tín hiệu nhịp tim, cập nhật `lastSeenAt` và đánh dấu `status = 'online'` |
-| **39** | **Crop Seasons** | `/ponds/:pondId/crop-seasons` | `GET` | `admin`, `farmer` | Danh sách các vụ nuôi của ao |
-| **40** | | `/ponds/:pondId/crop-seasons` | `POST` | `farmer` | Tạo vụ nuôi mới cho ao (ràng buộc tối đa 1 vụ `active` mỗi ao) |
-| **41** | | `/crop-seasons/:id` | `GET` | `admin`, `farmer` | Xem chi tiết vụ nuôi |
-| **42** | | `/crop-seasons/:id/statistics`| `GET` | `admin`, `farmer` | Thống kê FCR vụ nuôi: ngày nuôi DOC, lượng thức ăn, sinh khối, FCR thực tế |
-| **43** | | `/crop-seasons/:id` | `PATCH` | `farmer` | Cập nhật thông số thả giống hoặc chuyển trạng thái `completed` |
-| **44** | | `/crop-seasons/:id` | `DELETE` | `farmer` | Xóa vụ nuôi |
-| **45** | **Feeding** | `/ponds/:pondId/feeding-schedules` | `GET` | `farmer` | Danh sách lịch cho ăn tự động của ao |
-| **46** | | `/ponds/:pondId/feeding-schedules` | `POST` | `farmer` | Tạo lịch cho ăn tự động (khung giờ `HH:mm`, kg thức ăn, ngày trong tuần `[0..6]`) |
-| **47** | | `/feeding-schedules/:id` | `PATCH` | `farmer` | Tinh chỉnh lịch cho ăn (giờ, kg, tốc độ rải) |
-| **48** | | `/feeding-schedules/:id` | `DELETE` | `farmer` | Xóa lịch cho ăn |
-| **49** | | `/ponds/:pondId/feeding-records` | `GET` | `farmer` | Xem lịch sử nhật ký các lần cho ăn |
-| **50** | | `/ponds/:pondId/feeding-records` | `POST` | `farmer` | Kích hoạt cữ ăn mới qua **Safety Rule Engine** (`ALLOWED`, `ADJUSTED`, `BLOCKED`) |
-| **51** | | `/feeding-records/:id` | `PATCH` | `farmer` | Cập nhật tiến trình cho ăn (`completed`, `stopped`), lượng thức ăn thực tế, tỷ lệ dư |
-| **52** | **Telemetry** | `/ponds/:pondId/telemetry/latest` | `GET` | `admin`, `farmer` | Lấy chỉ số nước mới nhất của ao (pH, DO, nhiệt độ, độ mặn, NH₃, độ đục) |
-| **53** | | `/ponds/:pondId/telemetry/history`| `GET` | `admin`, `farmer` | Lịch sử quan trắc phân trang (lọc `startDate`, `endDate`, `deviceId`, `page`, `limit`) |
-| **54** | | `/ponds/:pondId/telemetry` | `POST` | `admin`, `farmer` | Ghi nhận dữ liệu cảm biến, tự động kiểm tra ngưỡng cảnh báo (debounce 15 phút) |
-| **55** | **Camera AI & FIS** | `/camera/analyze` | `POST` | `admin`, `farmer` | Phân tích khung hình qua 2 luồng AI (YOLO11n-seg + MobileNetV3), tính FIS & 4 mức bắt mồi |
-| **56** | | `/camera/ingest-metrics` | `POST` | Public / Edge | Thu nhận chỉ số $R_t, D_t, C_t$ từ Edge Gateway gửi lên |
-| **57** | | `/camera/ponds/:pondId/latest-fis`| `GET` | `admin`, `farmer` | Lấy chỉ số FIS mới nhất của ao, kiểm tra độ trễ stale (> 120s) |
-| **58** | | `/camera/ponds/:pondId/fis-history`| `GET` | `admin`, `farmer` | Lịch sử chuỗi thời gian FIS vẽ biểu đồ, tính FIS trung bình & phân phối 4 mức bắt mồi |
-| **59** | | `/camera/ponds/:pondId/devices` | `GET` | `admin`, `farmer` | Danh sách các thiết bị camera đang hoạt động trong ao |
-| **60** | | `/camera/devices/:deviceId/roi` | `PATCH` | `admin`, `farmer` | Cấu hình vùng quan sát ROI cố định của sàng ăn cho camera |
-| **61** | | `/camera/ponds/:pondId/weights` | `PATCH` | `admin`, `farmer` | Tinh chỉnh bộ trọng số $w_1 - w_4$ và ngưỡng phân vị $q_{25}, q_{50}, q_{75}$ của thuật toán FIS |
-| **62** | **AI Integration** | `/ponds/:pondId/ai/recommendations/latest` | `GET` | `farmer` | Lấy đề xuất lượng thức ăn tối ưu mới nhất từ mô hình AI |
-| **63** | | `/ponds/:pondId/ai/recommendations` | `GET` | `farmer` | Lịch sử các đề xuất AI tối ưu cữ ăn theo tham số `limit` |
-| **64** | **Alerts** | `/alerts/summary` | `GET` | `admin`, `farmer` | Thống kê số lượng cảnh báo (open, acknowledged, resolved, critical, warning) |
-| **65** | | `/alerts` | `GET` | `admin`, `farmer` | Danh sách toàn bộ cảnh báo (lọc theo trạng thái, mức độ, ao, thiết bị, loại) |
-| **66** | | `/ponds/:pondId/alerts` | `GET` | `admin`, `farmer` | Danh sách cảnh báo riêng cho từng ao nuôi |
-| **67** | | `/alerts/:id/acknowledge` | `PATCH` | `admin`, `farmer` | Tiếp nhận xử lý sự cố cảnh báo (`acknowledged`) |
-| **68** | | `/alerts/:id/resolve` | `PATCH` | `admin`, `farmer` | Xác nhận sự cố đã khắc phục xong (`resolved`) |
-| **69** | **Safety Rules** | `/safety-rules` | `GET` | `admin`, `farmer` | Xem danh mục các quy tắc an toàn chất lượng nước |
-| **70** | | `/safety-rules` | `POST` | `admin` | Tạo quy tắc kiểm tra an toàn mới (ngưỡng DO, pH, nhiệt độ...) |
-| **71** | | `/safety-rules/:id` | `GET` | `admin`, `farmer` | Xem chi tiết quy tắc an toàn |
-| **72** | | `/safety-rules/:id` | `PATCH` | `admin` | Cập nhật điều kiện, hành động hoặc bật/tắt quy tắc an toàn |
-| **73** | | `/safety-rules/:id` | `DELETE` | `admin` | Xóa quy tắc an toàn khỏi hệ thống |
-| **74** | | `/ponds/:pondId/safety-rules/evaluate` | `POST` | `admin`, `farmer` | Thử nghiệm đánh giá an toàn trước khi bấm xả thức ăn thực tế |
-| **75** | **MQTT Protocol** | `/mqtt/status` | `GET` | Public | Kiểm tra trạng thái kết nối giữa Backend và MQTT Broker |
-| **76** | | `/mqtt/devices/:deviceUid/feeder-test` | `POST` | `admin` | Gửi lệnh test máy cho ăn trực tiếp qua MQTT |
-| **--** | | *MQTT Topics* | `Pub/Sub` | IoT / Server | Telemetry: `shrimpmate/telemetry/{deviceUid}`<br>Lệnh ăn: `shrimpmate/devices/{deviceUid}/feeder/command`<br>Status: `shrimpmate/devices/{deviceUid}/feeder/status`<br>Heartbeat: `shrimpmate/devices/{deviceUid}/heartbeat` |
+| **13** | | `/auth/manager-check` | `GET` | `manager` | Kiểm tra nhanh token có vai trò Quản lý (Manager) hay không |
+| **14** | | `/auth/farmer-check` | `GET` | `farmer` | Kiểm tra nhanh token có vai trò Người nuôi (Farmer) hay không |
+| **15** | | `/auth/users` | `GET` | `admin` | Xem danh sách tất cả tài khoản người dùng trong hệ thống |
+| **16** | | `/auth/users/:id/status` | `PATCH` | `admin` | Khóa (`isActive: false`) hoặc mở khóa tài khoản (chặn Admin tự khóa) |
+| **17** | | `/auth/users/:id/role` | `PATCH` | `admin` | Phân quyền tài khoản giữa `admin`, `manager`, `farmer` (chặn Admin tự hạ quyền) |
+| **18** | **Farmers (UC020)** | `/farmers` | `POST` | `manager`, `admin` | Manager tạo tài khoản Farmer mới, hệ thống tự sinh mật khẩu ngẫu nhiên |
+| **19** | | `/farmers` | `GET` | `manager`, `admin` | Danh sách Farmer thuộc quyền quản lý của Manager (Admin xem tất cả) |
+| **20** | | `/farmers/:id` | `GET` | `manager`, `admin` | Chi tiết Farmer kèm danh sách ao/trang trại được phân công |
+| **21** | | `/farmers/:id` | `PATCH` | `manager`, `admin` | Cập nhật thông tin họ tên, số điện thoại, email của Farmer |
+| **22** | | `/farmers/:id/status` | `PATCH` | `manager`, `admin` | Khóa hoặc mở khóa tài khoản của Farmer |
+| **23** | **Assignments (UC021)** | `/farmers/:id/assignments` | `POST` | `manager`, `admin` | Phân công một hoặc nhiều ao nuôi (hoặc toàn bộ trang trại) cho Farmer |
+| **24** | | `/farmers/:id/assignments` | `GET` | `manager`, `admin`, `farmer` | Xem danh sách phân công của Farmer |
+| **25** | | `/farmers/:id/assignments/:assignmentId` | `DELETE` | `manager`, `admin` | Thu hồi một bản ghi phân công ao cụ thể của Farmer |
+| **26** | | `/farmers/:id/assignments` | `DELETE` | `manager`, `admin` | Thu hồi toàn bộ phân công của Farmer |
+| **27** | **Admin Reports** | `/admin/overview` | `GET` | `admin` | Thống kê tổng quan: user, trang trại, ao nuôi, thiết bị online/offline, cảnh báo |
+| **28** | | `/admin/reports/operational` | `GET` | `admin` | Báo cáo vận hành: số liệu tổng quan + 10 cảnh báo mới nhất + thiết bị offline > 5 phút |
+| **29** | | `/admin/reports/fcr` | `GET` | `admin` | Báo cáo FCR toàn hệ thống: FCR từng vụ, FCR trung bình & xếp loại chất lượng |
+| **30** | **Farms (UC005)** | `/farms` | `GET` | `admin`, `manager`, `farmer` | Danh sách trang trại (Manager xem trại mình sở hữu, Farmer xem trại được phân công) |
+| **31** | | `/farms` | `POST` | `manager` | Khởi tạo trang trại mới (tự động gán `owner_id = manager.id`) |
+| **32** | | `/farms/:id` | `GET` | `admin`, `manager`, `farmer` | Xem chi tiết thông tin trang trại kèm danh sách ao nuôi |
+| **33** | | `/farms/:id` | `PATCH` | `manager` | Cập nhật tên, địa chỉ, trạng thái trang trại thuộc quyền sở hữu |
+| **34** | | `/farms/:id` | `DELETE` | `manager` | Xóa mềm trang trại (`deleted_at`) và toàn bộ ao trực thuộc |
+| **35** | **Ponds (UC006)** | `/farms/:farmId/ponds` | `GET` | `admin`, `manager`, `farmer` | Danh sách ao nuôi (Farmer chỉ xem các ao được phân công phụ trách) |
+| **36** | | `/farms/:farmId/ponds` | `POST` | `manager` | Tạo ao nuôi mới trong trang trại (mã ao `code` duy nhất trong farm) |
+| **37** | | `/farms/:farmId/ponds/:id` | `GET` | `admin`, `manager`, `farmer` | Chi tiết ao nuôi kèm danh sách thiết bị IoT đã gán |
+| **38** | | `/farms/:farmId/ponds/:id` | `PATCH` | `manager` | Cập nhật diện tích ($m^2$), mã ao, tên ao, trạng thái |
+| **39** | | `/farms/:farmId/ponds/:id` | `DELETE` | `manager` | Xóa mềm ao nuôi, tự động hoàn trả thiết bị về kho (`pond_id = NULL`) |
+| **40** | **Devices (UC008, 009)** | `/devices` | `GET` | `admin`, `manager`, `farmer` | Admin xem Catalog; Manager/Farmer xem thiết bị thuộc ao của mình |
+| **41** | | `/devices` | `POST` | `admin` | Khai báo thiết bị chuẩn mới vào Catalog (`pond_id = null`, status: offline) |
+| **42** | | `/devices/claim` | `POST` | `manager` | Manager đăng ký gán thiết bị theo mã `deviceUid` vào ao nuôi |
+| **43** | | `/devices/:id/unassign` | `POST` | `manager` | Manager hủy gán thiết bị khỏi ao nuôi, đưa về trạng thái tự do trong kho |
+| **44** | | `/devices/:id` | `GET` | `admin`, `manager`, `farmer` | Xem chi tiết thông tin và trạng thái thiết bị |
+| **45** | | `/devices/:id` | `PATCH` | `admin`, `manager` | Admin sửa firmware/UID/metadata; Manager sửa mode |
+| **46** | | `/devices/:id` | `DELETE` | `admin` | Xóa vĩnh viễn thiết bị khỏi danh mục phần cứng hệ thống |
+| **47** | | `/devices/:id/emergency-stop` | `POST` | `admin`, `manager`, `farmer` | Dừng khẩn cấp máy cho ăn tức thì qua MQTT (khóa feeder, status: `emergency_stop`) |
+| **48** | | `/devices/:id/heartbeat` | `POST` | `admin`, `manager`, `farmer` | Cập nhật tín hiệu sống heartbeat (`last_seen_at = now()`, status: `online`) |
+| **49** | **Crop Seasons (UC007)** | `/ponds/:pondId/crop-seasons` | `GET` | `admin`, `manager`, `farmer` | Danh sách các vụ nuôi của ao nuôi (lịch sử và vụ đang chạy) |
+| **50** | | `/ponds/:pondId/crop-seasons` | `POST` | `manager` | Tạo vụ nuôi mới (mỗi ao chỉ có tối đa 1 vụ `active` tại một thời điểm) |
+| **51** | | `/crop-seasons/:id` | `GET` | `admin`, `manager`, `farmer` | Xem thông tin chi tiết vụ nuôi |
+| **52** | | `/crop-seasons/:id` | `PATCH` | `manager` | Cập nhật thông số vụ nuôi (tỷ lệ sống, mật độ, đóng vụ `completed`) |
+| **53** | | `/crop-seasons/:id` | `DELETE` | `manager` | Hủy vụ nuôi (`cancelled`) |
+| **54** | | `/crop-seasons/:id/statistics` | `GET` | `admin`, `manager`, `farmer` | Thống kê vụ nuôi: DOC, lượng thức ăn, sinh khối ước tính, hệ số FCR |
+| **55** | **Feeding (UC011, 012)** | `/ponds/:pondId/feeding-schedules` | `GET` | `admin`, `manager`, `farmer` | Danh sách lịch cho ăn tự động trong tuần của ao |
+| **56** | | `/ponds/:pondId/feeding-schedules` | `POST` | `manager` | Tạo lịch cho ăn tự động theo khung giờ trong tuần |
+| **57** | | `/feeding-schedules/:id` | `PATCH` | `manager` | Cập nhật khung giờ, định mức kg thức ăn, bật/tắt (`isEnabled`) |
+| **58** | | `/feeding-schedules/:id` | `DELETE` | `manager` | Xóa lịch cho ăn tự động |
+| **59** | | `/ponds/:pondId/feeding-records` | `GET` | `admin`, `manager`, `farmer` | Lịch sử các cữ cho ăn (thành công, bị chặn an toàn, đang chạy) |
+| **60** | | `/ponds/:pondId/feeding-records` | `POST` | `admin`, `manager`, `farmer` | Cho ăn nhanh (Quick Feed) / Ghi nhận cữ ăn (kiểm duyệt qua Safety Rule Engine) |
+| **61** | | `/feeding-records/:id` | `PATCH` | `admin`, `manager`, `farmer` | Cập nhật kết quả cữ ăn sau khi thiết bị cho ăn xong (`actualAmountKg`) |
+| **62** | **Telemetry (UC013, 017)**| `/ponds/:pondId/telemetry/latest` | `GET` | `admin`, `manager`, `farmer` | Chỉ số nước mới nhất (pH, DO, nhiệt độ, độ mặn, NH₃, độ đục) |
+| **63** | | `/ponds/:pondId/telemetry/history` | `GET` | `admin`, `manager`, `farmer` | Lịch sử chuỗi thời gian 24h/7d phục vụ vẽ đồ thị giám sát |
+| **64** | | `/ponds/:pondId/telemetry` | `POST` | `admin`, `manager`, `farmer` | Thu nhận đo đạc cảm biến, tự động kiểm tra ngưỡng vi phạm & debounce alert |
+| **65** | **Camera & FIS (UC019)** | `/camera/analyze` | `POST` | `admin`, `manager`, `farmer` | Phân tích ảnh sàng ăn song song qua YOLO11n-seg & MobileNetV3 để tính FIS |
+| **66** | | `/camera/ingest-metrics` | `POST` | Public | Thu nhận chỉ số tiền xử lý ($R_t, D_t, C_t$) từ Camera AI Edge Gateway |
+| **67** | | `/camera/ponds/:pondId/latest-fis` | `GET` | `admin`, `manager`, `farmer` | Chỉ số thèm ăn FIS mới nhất của ao (0: Không ăn, 1: Yếu, 2: Bình thường, 3: Mạnh) |
+| **68** | | `/camera/ponds/:pondId/fis-history`| `GET` | `admin`, `manager`, `farmer` | Lịch sử biến thiên điểm FIS theo thời gian kèm đồ thị |
+| **69** | | `/camera/ponds/:pondId/devices` | `GET` | `admin`, `manager`, `farmer` | Danh sách thiết bị camera lắp đặt tại ao nuôi |
+| **70** | | `/camera/devices/:deviceId/roi` | `PATCH` | `manager`, `admin` | Cập nhật vùng quan sát ROI cố định cho camera sàng ăn |
+| **71** | | `/camera/ponds/:pondId/weights` | `PATCH` | `manager`, `admin` | Tinh chỉnh trọng số $w_1 - w_4$ và ngưỡng phân vị $q_{25}, q_{50}, q_{75}$ của thuật toán FIS |
+| **72** | **Alerts (UC015)** | `/alerts/summary` | `GET` | `admin`, `manager`, `farmer` | Thống kê số lượng cảnh báo theo mức độ (`critical`, `warning`, `info`) |
+| **73** | | `/alerts` | `GET` | `admin`, `manager`, `farmer` | Danh sách sự cố toàn bộ ao thuộc quyền truy cập |
+| **74** | | `/ponds/:pondId/alerts` | `GET` | `admin`, `manager`, `farmer` | Danh sách sự cố theo từng ao nuôi cụ thể |
+| **75** | | `/alerts/:id/acknowledge` | `PATCH` | `admin`, `manager`, `farmer` | Tiếp nhận cảnh báo (`status: acknowledged`) |
+| **76** | | `/alerts/:id/resolve` | `PATCH` | `admin`, `manager`, `farmer` | Đánh dấu sự cố đã được khắc phục xong (`status: resolved`) |
+| **77** | **Safety Rules (UC018)** | `/safety-rules` | `GET` | `admin`, `manager`, `farmer` | Xem danh sách các quy tắc an toàn môi trường đang kích hoạt |
+| **78** | | `/safety-rules` | `POST` | `admin` | Admin tạo quy tắc an toàn mới áp dụng toàn hệ thống |
+| **79** | | `/safety-rules/:id` | `PATCH` | `admin` | Admin cập nhật ngưỡng kiểm duyệt, độ ưu tiên, bật/tắt quy tắc |
+| **80** | | `/safety-rules/:id` | `DELETE` | `admin` | Admin xóa quy tắc an toàn |
+| **81** | | `/safety-rules/evaluate` | `POST` | `admin`, `manager`, `farmer` | Kiểm tra thử nghiệm tính an toàn của một bộ chỉ số nước |
+| **82** | **AI Integration (UC014)** | `/ai-integration/ponds/:pondId/recommendations` | `GET` | `admin`, `manager`, `farmer` | Lấy khuyến nghị lượng thức ăn tối ưu từ AI |
+| **83** | | `/ai-integration/ponds/:pondId/forecast-biomass` | `GET` | `admin`, `manager`, `farmer` | Dự báo sinh khối tôm và sản lượng thu hoạch dự kiến |
+| **84** | **MQTT Diagnostics** | `/mqtt/status` | `GET` | `admin` | Kiểm tra trạng thái kết nối tới MQTT Broker và danh sách topic đăng ký |
+| **85** | | `/mqtt/devices/:deviceUid/feeder-test` | `POST` | `admin` | Phát gói tin test máy cho ăn trực tiếp qua MQTT tới thiết bị phần cứng |
 
 ---
 
-## 3. Mã Trạng Thái HTTP Chuẩn (Status Codes)
+## 3. Tài Khoản Test Mẫu Khởi Tạo Sẵn (Seeded Accounts)
 
-- `200 OK`: Request thành công, trả về dữ liệu.
-- `201 Created`: Tạo mới tài nguyên thành công.
-- `400 Bad Request`: Dữ liệu đầu vào sai định dạng hoặc vi phạm validate class-validator.
-- `401 Unauthorized`: Chưa đăng nhập, sai thông tin đăng nhập, hoặc token không hợp lệ/hết hạn.
-- `403 Forbidden`: Người dùng không có quyền truy cập tài nguyên (ví dụ: Farmer gọi API của Admin, hoặc Farmer truy cập ao của người khác).
-- `404 Not Found`: Không tìm thấy tài nguyên theo ID yêu cầu.
-- `409 Conflict`: Xung đột dữ liệu (ví dụ: trùng email, trùng số điện thoại, trùng mã thiết bị `device_uid`).
-
----
-
-## 4. Tài Khoản Thử Nghiệm Mẫu (Pre-seeded Accounts)
-
-| Role | Email | Số điện thoại | Mật khẩu | Phạm vi quyền hạn |
-| --- | --- | --- | --- | --- |
-| `admin` | `admin@shrimpmate.local` | `0901000001` | `Admin@123456` | Quản trị viên: Quản lý người dùng, catalog phần cứng, luật an toàn, báo cáo FCR toàn hệ thống |
-| `farmer` | `farmer@shrimpmate.local` | `0901000002` | `Farmer@123456` | Người nuôi tôm: Sở hữu trang trại, ao nuôi, gán thiết bị, tạo lịch ăn, phân tích AI camera FIS |
+| Vai trò | Định danh (`identifier`) | Mật khẩu | Ứng dụng sử dụng | Phạm vi quyền hạn |
+| :--- | :--- | :--- | :--- | :--- |
+| **Quản trị viên** (`admin`) | `admin@shrimpmate.local`<br>`0901000001` | `Admin@123456` | **Admin Web Dashboard** | Quản lý toàn bộ Manager & Farmer, Catalog thiết bị, Safety Rules, Báo cáo toàn hệ thống |
+| **Quản lý** (`manager`) | `manager@shrimpmate.local`<br>`0901000002` | `Manager@123456` | **Manager Web App** | Sở hữu trang trại, tạo Farmer, phân công ao, lập lịch ăn, vụ nuôi, FCR, cấu hình AI |
+| **Người nuôi** (`farmer`) | `farmer@shrimpmate.local`<br>`0901000003` | `Farmer@123456` | **Farmer Mobile App** | Vận hành ngoài bờ ao, xem ao được phân công, đo tức thời, Cho ăn nhanh, Dừng khẩn cấp, nhận cảnh báo FCM |

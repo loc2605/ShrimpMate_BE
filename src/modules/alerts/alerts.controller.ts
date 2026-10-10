@@ -14,7 +14,7 @@ export class AlertsController {
   constructor(private readonly alertsService: AlertsService) {}
 
   @Get('alerts/summary')
-  @Roles(UserRole.ADMIN, UserRole.FARMER)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.FARMER)
   getAlertsSummary(
     @CurrentUser() user: User,
     @Query('pondId') pondId?: string,
@@ -23,7 +23,7 @@ export class AlertsController {
   }
 
   @Get('alerts')
-  @Roles(UserRole.ADMIN, UserRole.FARMER)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.FARMER)
   getAllAlerts(
     @CurrentUser() user: User,
     @Query() queryDto: QueryAlertDto,
@@ -32,7 +32,7 @@ export class AlertsController {
   }
 
   @Get('ponds/:pondId/alerts')
-  @Roles(UserRole.ADMIN, UserRole.FARMER)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.FARMER)
   getPondAlerts(
     @Param('pondId') pondId: string,
     @Query() queryDto: QueryAlertDto,
@@ -42,13 +42,13 @@ export class AlertsController {
   }
 
   @Patch('alerts/:id/acknowledge')
-  @Roles(UserRole.ADMIN, UserRole.FARMER)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.FARMER)
   acknowledgeAlert(@Param('id') id: string, @CurrentUser() user: User) {
     return this.alertsService.acknowledgeAlert(id, user);
   }
 
   @Patch('alerts/:id/resolve')
-  @Roles(UserRole.ADMIN, UserRole.FARMER)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.FARMER)
   resolveAlert(@Param('id') id: string, @CurrentUser() user: User) {
     return this.alertsService.resolveAlert(id, user);
   }

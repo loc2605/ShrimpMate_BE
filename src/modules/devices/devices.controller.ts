@@ -25,7 +25,7 @@ export class DevicesController {
   constructor(private readonly devicesService: DevicesService) {}
 
   @Get()
-  @Roles(UserRole.ADMIN, UserRole.FARMER)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.FARMER)
   findAll(@CurrentUser() user: User) {
     return this.devicesService.findAllDevices(user);
   }
@@ -37,25 +37,25 @@ export class DevicesController {
   }
 
   @Post('claim')
-  @Roles(UserRole.FARMER)
+  @Roles(UserRole.MANAGER)
   claimDevice(@Body() claimDto: ClaimDeviceDto, @CurrentUser() user: User) {
     return this.devicesService.claimDevice(claimDto, user);
   }
 
   @Post(':id/unassign')
-  @Roles(UserRole.FARMER)
+  @Roles(UserRole.MANAGER)
   unassignDevice(@Param('id') id: string, @CurrentUser() user: User) {
     return this.devicesService.unassignDevice(id, user);
   }
 
   @Get(':id')
-  @Roles(UserRole.ADMIN, UserRole.FARMER)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.FARMER)
   findOne(@Param('id') id: string, @CurrentUser() user: User) {
     return this.devicesService.findDeviceById(id, user);
   }
 
   @Patch(':id')
-  @Roles(UserRole.ADMIN, UserRole.FARMER)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   update(@Param('id') id: string, @Body() updateDeviceDto: UpdateDeviceDto, @CurrentUser() user: User) {
     return this.devicesService.updateDevice(id, updateDeviceDto, user);
   }
@@ -67,13 +67,13 @@ export class DevicesController {
   }
 
   @Post(':id/emergency-stop')
-  @Roles(UserRole.FARMER)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.FARMER)
   emergencyStop(@Param('id') id: string, @CurrentUser() user: User) {
     return this.devicesService.emergencyStop(id, user);
   }
 
   @Post(':id/heartbeat')
-  @Roles(UserRole.ADMIN, UserRole.FARMER)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.FARMER)
   heartbeat(@Param('id') id: string, @CurrentUser() user: User) {
     return this.devicesService.heartbeat(id, user);
   }

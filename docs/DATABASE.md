@@ -1,13 +1,14 @@
 # ShrimpMate Database Schema
 
-Tài liệu mô tả kiến trúc cơ sở dữ liệu hiện tại dựa trên các entity, migration và mô hình phân quyền **2 Roles** (`admin` & `farmer`) của hệ thống ShrimpMate.
+Tài liệu mô tả kiến trúc cơ sở dữ liệu hiện tại dựa trên các entity, migration và mô hình phân quyền **3 Roles** (`admin`, `manager`, `farmer`) của hệ thống ShrimpMate.
 
 ---
 
 ## 1. Danh sách bảng
 
-- `users`: Tài khoản người dùng (Admin & Farmer)
-- `farms`: Trang trại nuôi tôm (gắn với Farmer sở hữu qua `owner_id`)
+- `users`: Tài khoản người dùng (Admin, Manager, Farmer)
+- `farmer_assignments`: Phân công Người nuôi phụ trách trang trại hoặc ao nuôi (`farmer_id`, `farm_id`, `pond_id`)
+- `farms`: Trang trại nuôi tôm (gắn với Manager sở hữu qua `owner_id`)
 - `ponds`: Ao nuôi tôm (thuộc Farm)
 - `crop_seasons`: Vụ nuôi của từng ao
 - `devices`: Danh mục thiết bị phần cứng IoT chuẩn & thiết bị đã gán ao
@@ -19,8 +20,6 @@ Tài liệu mô tả kiến trúc cơ sở dữ liệu hiện tại dựa trên 
 - `alerts`: Cảnh báo nguy hiểm / sự cố thiết bị
 - `password_reset_otps`: Mã OTP khôi phục mật khẩu
 - `camera_fis_logs`: Nhật ký phân tích thị giác máy tính (Computer Vision) từ camera sàng ăn, bao gồm các chỉ số $R_t, v_t, D_t, C_t$, điểm FIS và 4 mức bắt mồi (0: không ăn, 1: ăn yếu, 2: ăn bình thường, 3: ăn mạnh)
-
-*(Bảng `user_pond_assignments` là bảng trung gian cũ từ mô hình 3 roles, hiện đã được thay thế bằng quan hệ trực tiếp `users` -> `farms` -> `ponds`)*.
 
 ---
 
@@ -38,14 +37,35 @@ Lưu tài khoản đăng nhập hệ thống.
 | `password_hash` | VARCHAR(255) | Mật khẩu đã mã hóa (bcrypt) |
 | `refresh_token_hash` | VARCHAR(255) | Có thể rỗng, hash refresh token hiện tại |
 | `full_name` | VARCHAR(150) | Họ và tên |
-| `role` | ENUM | `admin`, `farmer` (mặc định: `farmer`) |
-| `isActive` | BOOLEAN | Mặc định `true` (Admin có thể khóa/mở khóa) |
+| `role` | ENUM | `admin`, `manager`, `farmer` (mặc định: `farmer`) |
+| `manager_id` | UUID | FK -> `users.id`, ID của Manager quản lý (chỉ áp dụng cho Farmer) |
+| `isActive` | BOOLEAN | Mặc định `true` (Admin hoặc Manager có thể khóa/mở khóa) |
 | `created_at` | TIMESTAMPTZ | Thời gian tạo |
 | `updated_at` | TIMESTAMPTZ | Thời gian cập nhật |
 
 **Mô hình phân quyền:**
 - `admin`: Quản trị viên nền tảng, duy trì máy chủ, quản lý danh mục phần cứng IoT chuẩn, kiểm soát trạng thái tài khoản và theo dõi báo cáo toàn hệ thống.
-- `farmer`: Người nuôi tự chủ toàn quyền cơ sở nuôi của mình, sở hữu trang trại qua `farms.owner_id`. Toàn bộ ao nuôi (`ponds`) thuộc Farm mặc nhiên thuộc quyền sở hữu độc quyền của Farmer đó.
+- `manager`: Quản lý sở hữu trang trại (`farms.owner_id`), tự đăng ký tài khoản, tạo tài khoản Farmer, phân công ao nuôi cho Farmer, cấu hình lịch cho ăn, vụ nuôi và xem báo cáo.
+- `farmer`: Người nuôi trực tiếp vận hành bờ ao qua Mobile App, do Manager tạo và phân công ao nuôi (`farmer_assignments`). Farmer chỉ thao tác trên các ao được phân công.
+
+---
+
+### `farmer_assignments`
+
+Lưu việc Quản lý phân công Người nuôi phụ trách trang trại hoặc ao nuôi, làm cơ sở giới hạn phạm vi truy cập của Người nuôi.
+
+| Cột | Kiểu | Ràng buộc / Mô tả |
+|---|---|---|
+| `id` | UUID | PK |
+| `farmer_id` | UUID | FK -> `users.id`, Bắt buộc (onDelete: CASCADE) |
+| `farm_id` | UUID | FK -> `farms.id`, Bắt buộc (onDelete: CASCADE) |
+| `pond_id` | UUID | FK -> `ponds.id`, Có thể rỗng (onDelete: CASCADE). Nếu `NULL`, nghĩa là Farmer được phân công toàn bộ trang trại |
+| `created_at` | TIMESTAMPTZ | Thời gian phân công |
+
+Index:
+- `IDX_farmer_assignments_farmer` trên `farmer_id`
+- `IDX_farmer_assignments_farm` trên `farm_id`
+- `IDX_farmer_assignments_pond` trên `pond_id`
 
 ---
 
@@ -56,7 +76,7 @@ Lưu thông tin trang trại nuôi tôm.
 | Cột | Kiểu | Ràng buộc / Mô tả |
 |---|---|---|
 | `id` | UUID | PK |
-| `owner_id` | UUID | FK -> `users.id`, ID của Farmer sở hữu trang trại |
+| `owner_id` | UUID | FK -> `users.id`, ID của Quản lý (Manager) sở hữu trang trại |
 | `name` | VARCHAR(150) | Tên trang trại, bắt buộc |
 | `address` | TEXT | Địa chỉ, có thể rỗng |
 | `status` | ENUM | `active`, `inactive` |
@@ -542,7 +562,19 @@ erDiagram
         timestamptz updated_at
     }
 
-    USERS ||--o{ FARMS : "owns (farmer)"
+    FARMER_ASSIGNMENTS {
+        uuid id PK
+        uuid farmer_id FK
+        uuid farm_id FK
+        uuid pond_id FK
+        timestamptz created_at
+    }
+
+    USERS ||--o{ USERS : "manages (manager -> farmer)"
+    USERS ||--o{ FARMS : "owns (manager)"
+    USERS ||--o{ FARMER_ASSIGNMENTS : "assigned_to (farmer)"
+    FARMS ||--o{ FARMER_ASSIGNMENTS : "scopes"
+    PONDS ||--o{ FARMER_ASSIGNMENTS : "delegates"
     USERS ||--o{ PASSWORD_RESET_OTPS : "requests"
     FARMS ||--o{ PONDS : "contains"
     PONDS ||--o{ CROP_SEASONS : "has"

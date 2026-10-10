@@ -36,26 +36,36 @@ npx cloudflared tunnel --url http://localhost:3000
 
 ---
 
-### Mô hình Phân quyền: 2 Roles chính
+### Mô hình Phân quyền: 3 Roles chính
 
-1. **Quản trị viên (Admin - `admin`)**:
+1. **Quản trị viên (Admin - `admin` - Web Dashboard)**:
    - Quản trị viên cấp cao của nền tảng, duy trì sự ổn định và an toàn hệ thống máy chủ.
-   - **Quản lý tài khoản**: Theo dõi danh sách tài khoản (`GET /auth/users`), thực hiện khóa/mở khóa tài khoản vi phạm (`PATCH /auth/users/:id/status`) và phân vai trò (`PATCH /auth/users/:id/role`).
-   - **Quản lý danh mục thiết bị IoT chuẩn (Hardware Catalog)**: Khai báo thiết bị chuẩn vào danh mục (`POST /devices`), cấu hình phiên bản firmware chuẩn và kiểm soát định danh phần cứng duy nhất (`device_uid`).
+   - **Quản lý tài khoản toàn hệ thống**: Theo dõi danh sách tài khoản Manager và Farmer (`GET /auth/users`), khóa/mở khóa tài khoản vi phạm (`PATCH /auth/users/:id/status`) và phân vai trò (`PATCH /auth/users/:id/role`).
+   - **Quản lý danh mục thiết bị IoT chuẩn (Hardware Catalog)**: Khai báo thiết bị chuẩn vào kho danh mục (`POST /devices`), cấu hình phiên bản firmware chuẩn và kiểm soát định danh phần cứng duy nhất (`deviceUid`).
    - **Quản lý quy tắc an toàn chuẩn**: Thiết lập các quy tắc an toàn môi trường nước áp dụng cho toàn hệ thống (`POST /safety-rules`, `PATCH /safety-rules/:id`, `DELETE /safety-rules/:id`).
    - **Giám sát toàn diện & Báo cáo cấp hệ thống**: Xem thống kê tổng quan toàn nền tảng (`GET /admin/overview`), báo cáo vận hành & thiết bị ngoại tuyến (`GET /admin/reports/operational`), và báo cáo FCR toàn hệ thống (`GET /admin/reports/fcr`).
    - **Kiểm thử phần cứng MQTT**: Phát lệnh test điều khiển máy cho ăn trực tiếp tới thiết bị (`POST /mqtt/devices/:deviceUid/feeder-test`).
-   - **Không can thiệp vào quy trình nội bộ của hộ nuôi**: Không tự ý tạo/sửa ao, lịch ăn hay can thiệp vào cơ sở dữ liệu riêng của người nuôi.
 
-2. **Người nuôi (Farmer - `farmer`)**:
-   - Chủ thể tự chủ toàn quyền đối với cơ sở nuôi của mình trên cả Web Dashboard lẫn Mobile App:
-   - **Tự chủ tài khoản**: Đăng ký, đăng nhập bằng Email hoặc Số điện thoại, cập nhật hồ sơ (`PATCH /auth/profile`), đổi mật khẩu (`PATCH /auth/change-password`) và khôi phục mật khẩu bằng OTP 6 chữ số.
-   - **Tự quản lý trang trại và ao nuôi**: Tự khởi tạo và quản lý trang trại (`/farms`), tự do tạo, chỉnh sửa thông số diện tích ($m^2$), mã ao và cấu hình trạng thái từng ao nuôi (`/farms/:farmId/ponds`) mà không cần Admin phê duyệt.
-   - **Quản lý vụ nuôi và tính toán FCR**: Thiết lập vụ nuôi mới (`/ponds/:pondId/crop-seasons`), quản lý mật độ, ngày thả giống và theo dõi hệ số chuyển đổi thức ăn FCR (`GET /crop-seasons/:id/statistics`).
-   - **Gán thiết bị và điều khiển từ xa**: Tìm mã `device_uid` phần cứng đã lắp đặt để gán (`claim`) vào ao nuôi (`POST /devices/claim`), gỡ thiết bị khi cần (`POST /devices/:id/unassign`), điều khiển chế độ và kích hoạt lệnh Dừng khẩn cấp (`POST /devices/:id/emergency-stop`).
-   - **Quản lý lịch cho ăn & Nhật ký**: Thiết lập cữ ăn tự động (`/feeding-schedules`), kích hoạt lần cho ăn mới (`POST /ponds/:pondId/feeding-records`) được bảo vệ tự động bởi Safety Rule Engine.
-   - **Giám sát môi trường & Khai thác AI / Camera Computer Vision**: Theo dõi chất lượng nước pH, DO, nhiệt độ, độ mặn, NH₃, độ đục (`/telemetry`); phân tích khung hình camera qua AI 2 luồng song song (YOLO11n-seg + MobileNetV3-Small) để nhận diện cường độ bắt mồi FIS và phát hiện thức ăn thừa (`/camera`).
-   - **Tiếp nhận cảnh báo**: Nhận thông báo tức thời, tiếp nhận (`PATCH /alerts/:id/acknowledge`) và giải quyết sự cố (`PATCH /alerts/:id/resolve`).
+2. **Quản lý (Manager - `manager` - Web App)**:
+   - Chủ thể sở hữu và điều hành hoạt động cơ sở nuôi tôm trên Web App tại văn phòng/nhà:
+   - **Tự chủ tài khoản**: Tự đăng ký tài khoản Quản lý (`POST /auth/register`), đăng nhập, cập nhật hồ sơ, đổi mật khẩu và đặt lại mật khẩu qua OTP.
+   - **Quản lý Người nuôi (UC020)**: Trực tiếp tạo tài khoản cho Farmer với mật khẩu ngẫu nhiên do hệ thống sinh ra (`POST /farmers`), cập nhật thông tin và khóa/mở khóa tài khoản Farmer.
+   - **Phân công ao nuôi (UC021)**: Phân công một hoặc nhiều ao nuôi (hoặc toàn bộ trang trại) cho Farmer phụ trách (`POST /farmers/:id/assignments`).
+   - **Quản lý trang trại và ao nuôi (UC005, UC006)**: Khởi tạo trang trại (`/farms`, `owner_id = manager.id`), khai báo danh mục ao nuôi (`/farms/:farmId/ponds`), diện tích ($m^2$), mã ao và trạng thái hoạt động.
+   - **Quản lý vụ nuôi và tính toán FCR (UC007, UC016)**: Thiết lập vụ nuôi mới (`/ponds/:pondId/crop-seasons`), quản lý mật độ, ngày thả giống và theo dõi hệ số chuyển đổi thức ăn FCR (`GET /crop-seasons/:id/statistics`).
+   - **Gán thiết bị và điều khiển (UC009, UC012)**: Tìm mã `deviceUid` phần cứng để gán (`claim`) vào ao nuôi (`POST /devices/claim`), gỡ thiết bị khi cần (`POST /devices/:id/unassign`), bật/tắt máy cho ăn và chuyển chế độ tự động/thủ công.
+   - **Cấu hình lịch cho ăn tự động (UC011)**: Thiết lập cữ ăn tự động theo tuần (`/feeding-schedules`).
+   - **Giám sát môi trường & Khai thác AI (UC013, UC014)**: Xem đồ thị chuỗi thời gian 24h/7d chi tiết (`/telemetry`); cấu hình ROI và tinh chỉnh trọng số FIS ($w_1 - w_4$) của camera AI (`/camera`).
+   - **Tiếp nhận & xử lý cảnh báo (UC015)**: Theo dõi, tiếp nhận (`PATCH /alerts/:id/acknowledge`) và giải quyết sự cố (`PATCH /alerts/:id/resolve`).
+
+3. **Người nuôi (Farmer - `farmer` - Mobile App)**:
+   - Người trực tiếp vận hành tại bờ ao nuôi qua Mobile App (React Native):
+   - **Không tự đăng ký**: Tài khoản do Manager tạo; đăng nhập bằng mật khẩu do Manager bàn giao và đổi mật khẩu ở lần đăng nhập đầu tiên.
+   - **Xem cơ sở nuôi được phân công**: Xem danh sách trang trại và các ao nuôi mà mình được Manager phân công phụ trách.
+   - **Giám sát tức thời (UC013)**: Xem thẻ tóm tắt màu cảnh báo nhanh (Xanh / Vàng / Đỏ) cho 6 thông số: DO, pH, Nhiệt độ, Độ mặn, NH₃, Độ đục.
+   - **Xem khuyến nghị AI tóm tắt (UC014)**: Xem lượng thức ăn khuyến nghị và cường độ thèm ăn của tôm (FIS).
+   - **Điều khiển thiết bị nhanh (UC012)**: Cho ăn nhanh (Quick Feed) và Dừng khẩn cấp (1-Tap Emergency Stop) tức thì ngoài bờ ao.
+   - **Tiếp nhận cảnh báo đẩy (UC015)**: Nhận thông báo đẩy (Push Notification qua FCM) trên màn hình khóa điện thoại; xác nhận đã xử lý sự cố.
 
 ---
 
@@ -81,13 +91,14 @@ GET /
 
 ## 3. Module Authentication & User Management (`/auth`)
 
-### 3.1. Đăng ký tài khoản (Người nuôi - Farmer)
+### 3.1. Đăng ký tài khoản (Quản lý - Manager)
 
 ```http
 POST /auth/register
 ```
 
 - **Quyền**: Public.
+- **Công dụng**: Quản lý (Manager) tự đăng ký tài khoản mới trên Web App. Tài khoản tạo thành công sẽ có vai trò mặc định là `manager`. Farmer không tự đăng ký qua endpoint này mà do Manager tạo trực tiếp qua `POST /farmers`.
 - **Công dụng**: Người nuôi tự đăng ký tài khoản mới trên hệ thống. Tài khoản mới mặc định nhận role `farmer` và `isActive: true`.
 - **Yêu cầu đầu vào**:
   - `email`: Định dạng email hợp lệ, duy nhất trong hệ thống.
@@ -393,7 +404,7 @@ GET /auth/admin-check
 ```
 
 - **Quyền**: `admin`.
-- **Công dụng**: Kiểm tra nhanh xem token hiện tại có quyền Quản trị viên hay không, thường dùng cho Auth Guard phía Frontend Admin Web Dashboard.
+- **Công dụng**: Kiểm tra nhanh xem token hiện tại có quyền Quản trị viên hay không, dùng cho Auth Guard phía Frontend Admin Web Dashboard.
 
 #### Phản hồi thành công (`200 OK`):
 ```json
@@ -402,19 +413,34 @@ GET /auth/admin-check
 }
 ```
 
-#### Mã lỗi:
-- `403 Forbidden`: Người dùng mang role `farmer` sẽ bị từ chối truy cập.
+---
+
+### 3.12. [Manager] Kiểm tra quyền Quản lý nhanh
+
+```http
+GET /auth/manager-check
+```
+
+- **Quyền**: `manager`.
+- **Công dụng**: Kiểm tra nhanh xem token hiện tại có quyền Quản lý hay không, dùng cho Auth Guard phía Manager Web App.
+
+#### Phản hồi thành công (`200 OK`):
+```json
+{
+  "message": "Bạn có quyền Quản lý (Manager)"
+}
+```
 
 ---
 
-### 3.12. [Farmer] Kiểm tra quyền Người nuôi nhanh
+### 3.13. [Farmer] Kiểm tra quyền Người nuôi nhanh
 
 ```http
 GET /auth/farmer-check
 ```
 
 - **Quyền**: `farmer`.
-- **Công dụng**: Kiểm tra nhanh xem token hiện tại có quyền Người nuôi hay không, dùng cho Auth Guard phía Farmer Mobile App và Farmer Web để chặn nếu tài khoản Admin đăng nhập nhầm.
+- **Công dụng**: Kiểm tra nhanh xem token hiện tại có quyền Người nuôi hay không, dùng cho Auth Guard phía Farmer Mobile App.
 
 #### Phản hồi thành công (`200 OK`):
 ```json
@@ -423,12 +449,9 @@ GET /auth/farmer-check
 }
 ```
 
-#### Mã lỗi:
-- `403 Forbidden`: Người dùng không mang role `farmer` sẽ bị từ chối truy cập.
-
 ---
 
-### 3.13. [Admin] Xem danh sách tất cả tài khoản trong hệ thống
+### 3.14. [Admin] Xem danh sách tất cả tài khoản trong hệ thống
 
 ```http
 GET /auth/users
@@ -499,7 +522,203 @@ PATCH /auth/users/:id/role
 
 ---
 
-## 4. Module Admin Monitoring & System Reports (`/admin`)
+## 4. Module Quản lý Người nuôi & Phân công ao nuôi (`/farmers`) (UC020, UC021)
+
+Module phục vụ **Quản lý (Manager)** điều hành danh sách Người nuôi (Farmer) trực thuộc và phân công ao nuôi/trang trại cho họ phụ trách. Quản trị viên (Admin) cũng có quyền xem và can thiệp khi cần thiết.
+
+### 4.1. [Manager] Tạo tài khoản Người nuôi mới (UC020)
+
+```http
+POST /farmers
+```
+
+- **Quyền**: `manager`, `admin`.
+- **Công dụng**: Manager trực tiếp tạo tài khoản cho Farmer với mật khẩu ban đầu do hệ thống tự sinh ngẫu nhiên. Mật khẩu này được trả về 1 lần duy nhất trong response để Manager giao cho Farmer; Farmer dùng để đăng nhập trên Mobile App và đổi mật khẩu ở lần đầu.
+- **Yêu cầu đầu vào**:
+  - `fullName`: Họ và tên Người nuôi (bắt buộc).
+  - `phoneNumber`: Số điện thoại Người nuôi (bắt buộc, chuẩn hóa VN).
+  - `email`: Email (tùy chọn; nếu không điền hệ thống tự gán dạng `farmer_<sđt>@shrimpmate.local`).
+
+#### Body:
+```json
+{
+  "fullName": "Trần Văn Nuôi",
+  "phoneNumber": "0903123456",
+  "email": "nuoi.tran@example.com"
+}
+```
+
+#### Phản hồi thành công (`201 Created`):
+```json
+{
+  "message": "Tạo tài khoản Farmer thành công",
+  "farmer": {
+    "id": "c1a2b3c4-1111-4444-8888-999999999999",
+    "email": "nuoi.tran@example.com",
+    "phoneNumber": "0903123456",
+    "fullName": "Trần Văn Nuôi",
+    "role": "farmer",
+    "managerId": "m1a2b3c4-2222-4444-8888-999999999999",
+    "isActive": true,
+    "createdAt": "2026-10-10T08:00:00.000Z",
+    "updatedAt": "2026-10-10T08:00:00.000Z"
+  },
+  "initialPassword": "Fm#a8B2x9"
+}
+```
+
+---
+
+### 4.2. [Manager] Xem danh sách Người nuôi thuộc quyền quản lý
+
+```http
+GET /farmers
+```
+
+- **Quyền**: `manager`, `admin`.
+- **Công dụng**: Manager xem danh sách các Farmer do mình quản lý (`manager_id = manager.id`), kèm số lượng ao/trại đã phân công (`assignmentCount`). Admin có quyền xem tất cả Farmer trên nền tảng.
+
+#### Phản hồi thành công (`200 OK`):
+```json
+[
+  {
+    "id": "c1a2b3c4-1111-4444-8888-999999999999",
+    "email": "nuoi.tran@example.com",
+    "phoneNumber": "0903123456",
+    "fullName": "Trần Văn Nuôi",
+    "role": "farmer",
+    "managerId": "m1a2b3c4-2222-4444-8888-999999999999",
+    "isActive": true,
+    "createdAt": "2026-10-10T08:00:00.000Z",
+    "updatedAt": "2026-10-10T08:00:00.000Z",
+    "assignmentCount": 2
+  }
+]
+```
+
+---
+
+### 4.3. [Manager] Xem chi tiết Người nuôi và các ao được phân công
+
+```http
+GET /farmers/:id
+```
+
+- **Quyền**: `manager`, `admin`.
+- **Công dụng**: Xem thông tin chi tiết của 1 Farmer kèm danh sách toàn bộ các phân công (`assignments`) trang trại và ao nuôi.
+
+---
+
+### 4.4. [Manager] Cập nhật thông tin Người nuôi
+
+```http
+PATCH /farmers/:id
+```
+
+- **Quyền**: `manager`, `admin`.
+- **Body**:
+```json
+{
+  "fullName": "Trần Văn Nuôi Mới",
+  "phoneNumber": "0903888999"
+}
+```
+
+---
+
+### 4.5. [Manager] Khóa hoặc mở khóa tài khoản Người nuôi
+
+```http
+PATCH /farmers/:id/status
+```
+
+- **Quyền**: `manager`, `admin`.
+- **Body**:
+```json
+{
+  "isActive": false
+}
+```
+
+---
+
+### 4.6. [Manager] Phân công trang trại hoặc ao nuôi cho Người nuôi (UC021)
+
+```http
+POST /farmers/:id/assignments
+```
+
+- **Quyền**: `manager`, `admin`.
+- **Công dụng**: Manager phân công một hoặc nhiều ao nuôi cụ thể (hoặc toàn bộ trang trại) cho Farmer phụ trách.
+- **Body phân công các ao cụ thể**:
+```json
+{
+  "farmId": "f1a2b3c4-1111-4444-8888-999999999999",
+  "pondIds": [
+    "p1a2b3c4-1111-4444-8888-999999999999",
+    "p2a2b3c4-2222-4444-8888-999999999999"
+  ]
+}
+```
+- **Body phân công toàn bộ trang trại** (`pondIds` để trống):
+```json
+{
+  "farmId": "f1a2b3c4-1111-4444-8888-999999999999"
+}
+```
+
+#### Phản hồi thành công (`201 Created`):
+```json
+{
+  "message": "Đã phân công 2 ao nuôi cho Farmer Trần Văn Nuôi",
+  "assignments": [
+    {
+      "id": "a1b2c3d4-1111-2222-3333-444444444444",
+      "farmerId": "c1a2b3c4-1111-4444-8888-999999999999",
+      "farmId": "f1a2b3c4-1111-4444-8888-999999999999",
+      "pondId": "p1a2b3c4-1111-4444-8888-999999999999",
+      "createdAt": "2026-10-10T08:00:00.000Z"
+    }
+  ]
+}
+```
+
+---
+
+### 4.7. Xem danh sách phân công của một Người nuôi
+
+```http
+GET /farmers/:id/assignments
+```
+
+- **Quyền**: `manager`, `admin`, hoặc chính `farmer` đó.
+- **Công dụng**: Xem danh sách các trang trại và ao nuôi mà Farmer được phân công.
+
+---
+
+### 4.8. [Manager] Thu hồi một phân công cụ thể
+
+```http
+DELETE /farmers/:id/assignments/:assignmentId
+```
+
+- **Quyền**: `manager`, `admin`.
+- **Công dụng**: Thu hồi quyền phụ trách 1 ao/trại cụ thể của Farmer.
+
+---
+
+### 4.9. [Manager] Thu hồi toàn bộ phân công của Người nuôi
+
+```http
+DELETE /farmers/:id/assignments
+```
+
+- **Quyền**: `manager`, `admin`.
+- **Công dụng**: Thu hồi tất cả các phân công ao và trại của Farmer.
+
+---
+
+## 5. Module Admin Monitoring & System Reports (`/admin`)
 
 Tất cả các API trong module này yêu cầu quyền **`admin`**.
 

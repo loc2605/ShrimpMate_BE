@@ -12,8 +12,15 @@ const defaultUsers = [
     role: UserRole.ADMIN,
   },
   {
+    email: process.env.SEED_MANAGER_EMAIL ?? 'manager@shrimpmate.local',
+    phoneNumber: process.env.SEED_MANAGER_PHONE ?? '0901000002',
+    password: process.env.SEED_MANAGER_PASSWORD ?? 'Manager@123456',
+    fullName: 'ShrimpMate Manager',
+    role: UserRole.MANAGER,
+  },
+  {
     email: process.env.SEED_FARMER_EMAIL ?? 'farmer@shrimpmate.local',
-    phoneNumber: process.env.SEED_FARMER_PHONE ?? '0901000002',
+    phoneNumber: process.env.SEED_FARMER_PHONE ?? '0901000003',
     password: process.env.SEED_FARMER_PASSWORD ?? 'Farmer@123456',
     fullName: 'ShrimpMate Farmer',
     role: UserRole.FARMER,
@@ -22,7 +29,7 @@ const defaultUsers = [
 
 if (process.env.NODE_ENV === 'production') {
   const hasDefaultPassword = defaultUsers.some((user) =>
-    ['Admin@123456', 'Farmer@123456'].includes(user.password),
+    ['Admin@123456', 'Manager@123456', 'Farmer@123456'].includes(user.password),
   );
   if (hasDefaultPassword) {
     console.warn('WARNING: production is using a default seed password. Set SEED_*_PASSWORD before deployment.');
@@ -35,24 +42,20 @@ export async function seedUserData(dataSource: DataSource) {
 
   for (const seedUser of defaultUsers) {
     const email = seedUser.email.trim().toLowerCase();
-    const existingUser = await userRepository.findOne({
+    let existingUser = await userRepository.findOne({
       where: [{ email }, { phoneNumber: seedUser.phoneNumber }],
     });
 
     if (existingUser) {
       let updated = false;
-      if (existingUser.email !== email && ['manager@shrimpmate.local', 'operator@shrimpmate.local'].includes(existingUser.email)) {
-        existingUser.email = email;
-        existingUser.fullName = seedUser.fullName;
+      const passwordMatches = await bcrypt.compare(seedUser.password, existingUser.passwordHash);
+      if (!passwordMatches) {
         existingUser.passwordHash = await bcrypt.hash(seedUser.password, 12);
         updated = true;
       }
-      if (['admin@shrimpmate.local', 'farmer@shrimpmate.local'].includes(existingUser.email)) {
-        const passwordMatches = await bcrypt.compare(seedUser.password, existingUser.passwordHash);
-        if (!passwordMatches) {
-          existingUser.passwordHash = await bcrypt.hash(seedUser.password, 12);
-          updated = true;
-        }
+      if (existingUser.email !== email) {
+        existingUser.email = email;
+        updated = true;
       }
       if (!existingUser.phoneNumber && seedUser.phoneNumber) {
         existingUser.phoneNumber = seedUser.phoneNumber;
@@ -63,24 +66,32 @@ export async function seedUserData(dataSource: DataSource) {
         updated = true;
       }
       if (updated) {
-        await userRepository.save(existingUser);
+        existingUser = await userRepository.save(existingUser);
       }
+      users.push(existingUser);
       continue;
     }
 
     const passwordHash = await bcrypt.hash(seedUser.password, 12);
-    users.push(
-      await userRepository.save(
-        userRepository.create({
-          email,
-          phoneNumber: seedUser.phoneNumber,
-          passwordHash,
-          fullName: seedUser.fullName,
-          role: seedUser.role,
-          isActive: true,
-        }),
-      ),
+    const created = await userRepository.save(
+      userRepository.create({
+        email,
+        phoneNumber: seedUser.phoneNumber,
+        passwordHash,
+        fullName: seedUser.fullName,
+        role: seedUser.role,
+        isActive: true,
+      }),
     );
+    users.push(created);
+  }
+
+  // Gán managerId cho farmer nếu chưa có
+  const managerUser = await userRepository.findOne({ where: { role: UserRole.MANAGER } });
+  const farmerUser = await userRepository.findOne({ where: { role: UserRole.FARMER } });
+  if (managerUser && farmerUser && !farmerUser.managerId) {
+    farmerUser.managerId = managerUser.id;
+    await userRepository.save(farmerUser);
   }
 
   return { users };

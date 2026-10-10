@@ -15,6 +15,7 @@ import { CreatePondDto } from './dto/create-pond.dto';
 import { PaginationDto } from './dto/pagination.dto';
 import { UpdatePondDto } from './dto/update-pond.dto';
 import { User } from '../../database/entities/user.entity';
+import { FarmerAssignment } from '../../database/entities/farmer-assignment.entity';
 import { PondAccessService } from '../../common/guards/pond-access.service';
 
 @Injectable()
@@ -24,6 +25,8 @@ export class FarmPondService {
     private readonly farmRepository: Repository<Farm>,
     @InjectRepository(Pond)
     private readonly pondRepository: Repository<Pond>,
+    @InjectRepository(FarmerAssignment)
+    private readonly assignmentRepository: Repository<FarmerAssignment>,
     private readonly pondAccessService: PondAccessService,
   ) {}
 
@@ -47,8 +50,14 @@ export class FarmPondService {
       .take(limit);
 
     if (user) {
-      if (user.role === UserRole.FARMER) {
+      if (user.role === UserRole.MANAGER) {
         farmQuery.andWhere('farm.owner_id = :ownerId', { ownerId: user.id });
+      } else if (user.role === UserRole.FARMER) {
+        farmQuery
+          .innerJoin('farmer_assignments', 'fa', 'fa.farm_id = farm.id AND fa.farmer_id = :farmerId', {
+            farmerId: user.id,
+          })
+          .distinct(true);
       }
     }
 
@@ -61,8 +70,18 @@ export class FarmPondService {
     if (!farm) {
       throw new NotFoundException(`Không tìm thấy trang trại với id ${id}`);
     }
-    if (user && user.role === UserRole.FARMER && farm.ownerId !== user.id) {
-      throw new ForbiddenException('Bạn không có quyền truy cập Farm này');
+    if (user) {
+      if (user.role === UserRole.MANAGER && farm.ownerId !== user.id) {
+        throw new ForbiddenException('Bạn không phải chủ sở hữu trang trại này');
+      }
+      if (user.role === UserRole.FARMER) {
+        const hasAssignment = await this.assignmentRepository.findOne({
+          where: { farmerId: user.id, farmId: farm.id },
+        });
+        if (!hasAssignment) {
+          throw new ForbiddenException('Bạn không được phân công phụ trách trang trại này');
+        }
+      }
     }
     return farm;
   }
@@ -115,9 +134,17 @@ export class FarmPondService {
     const query = this.pondRepository
       .createQueryBuilder('pond')
       .where('pond.farm_id = :farmId', { farmId })
-      .orderBy('pond.code', 'ASC')
-      .skip((page - 1) * limit)
-      .take(limit);
+      .orderBy('pond.code', 'ASC');
+
+    if (user && user.role === UserRole.FARMER) {
+      const assignedPondIds = await this.pondAccessService.findAssignedPondIds(user);
+      if (!assignedPondIds || assignedPondIds.length === 0) {
+        return { data: [], meta: { page, limit, total: 0, pageCount: 0 } };
+      }
+      query.andWhere('pond.id IN (:...assignedPondIds)', { assignedPondIds });
+    }
+
+    query.skip((page - 1) * limit).take(limit);
 
     const [data, total] = await query.getManyAndCount();
     return { data, meta: { page, limit, total, pageCount: Math.ceil(total / limit) } };

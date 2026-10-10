@@ -53,6 +53,26 @@ export async function seedDeviceData(dataSource: DataSource) {
       firmwareVersion: '3.2.1',
       metadata: { location: 'pond_1_tray' },
     },
+    {
+      pondId: null,
+      deviceUid: 'DEV-FEEDER-002',
+      name: 'Máy cho ăn tự động 02',
+      type: DeviceType.FEEDER,
+      status: DeviceStatus.ONLINE,
+      mode: DeviceMode.AUTOMATIC,
+      firmwareVersion: '1.0.0',
+      metadata: { zone: 'south', batteryLevel: 95 },
+    },
+    {
+      pondId: null,
+      deviceUid: 'DEV-SENSOR-002',
+      name: 'Sensor giám sát nước 02',
+      type: DeviceType.SENSOR_NODE,
+      status: DeviceStatus.ONLINE,
+      mode: DeviceMode.AUTOMATIC,
+      firmwareVersion: '1.0.0',
+      metadata: { parameter: 'ph_do', batteryLevel: 80 },
+    },
   ]);
 
   return { devices };

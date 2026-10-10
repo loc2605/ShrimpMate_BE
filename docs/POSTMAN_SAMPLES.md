@@ -53,11 +53,11 @@ Moi lan ban bam Send o request Login, Postman se tu dong luu token vao bien `{{a
 
 He thong da co san 3 tai khoan voi 3 phan quyen khac nhau:
 
-| Role | Email | So dien thoai | Mat khau |
-| --- | --- | --- | --- |
-| `admin` | `admin@shrimpmate.local` | `0901000001` | `Admin@123456` |
-| `manager` | `manager@shrimpmate.local` | `0901000002` | `Manager@123456` |
-| `operator` | `operator@shrimpmate.local` | `0901000003` | `Operator@123456` |
+| Role | Email | So dien thoai | Mat khau | Ung dung su dung |
+| --- | --- | --- | --- | --- |
+| `admin` | `admin@shrimpmate.local` | `0901000001` | `Admin@123456` | Web Dashboard |
+| `manager` | `manager@shrimpmate.local` | `0901000002` | `Manager@123456` | Web App |
+| `farmer` | `farmer@shrimpmate.local` | `0901000003` | `Farmer@123456` | Mobile App |
 
 ---
 
@@ -73,17 +73,18 @@ He thong da co san 3 tai khoan voi 3 phan quyen khac nhau:
 
 ## 4. Module Authentication & User (`/auth`)
 
-### 4.1. [POST] Dang ky tai khoan moi (Mac dinh role `operator`)
+### 4.1. [POST] Dang ky tai khoan Manager moi (Tu dang ky)
 - **URL**: `{{baseUrl}}/auth/register`
 - **Method**: `POST`
 - **Auth**: Khong can
+- **Ghi chu**: Nguoi dung tu dang ky se mac dinh nhan vai tro `manager` (Farmer khong tu dang ky).
 - **Body (raw JSON)**:
 ```json
 {
-  "email": "nhanvien01@example.com",
+  "email": "manager_moi@example.com",
   "phoneNumber": "0912345678",
   "password": "Password@123",
-  "fullName": "Nguyen Van A"
+  "fullName": "Le Van Manager"
 }
 ```
 
@@ -579,19 +580,199 @@ He thong da co san 3 tai khoan voi 3 phan quyen khac nhau:
 
 ---
 
-## 10. Luong Test Chuan (Recommended Testing Flow)
+## 10. Module Quan Ly Farmer & Phan Cong Ao Nuoi (`/farmers`)
 
-De test toan dien tat ca cac module tu dau den cuoi, ban nen thuc hien theo trinh tu sau:
+### 10.1. [POST] Manager tao tai khoan Farmer moi (UC020)
+- **URL**: `{{baseUrl}}/farmers`
+- **Method**: `POST`
+- **Auth**: Bearer Token (`{{accessToken}}` cua Manager)
+- **Role**: `manager`
+- **Body (raw JSON)**:
+```json
+{
+  "fullName": "Nguyen Van Farmer",
+  "phoneNumber": "0988776655",
+  "email": "farmer_moi@shrimpmate.local"
+}
+```
+- **Response**: Tra ve thong tin Farmer kem theo `temporaryPassword` (mat khau ngau nhien do he thong sinh ra nhu `Fm#k9xP!2a`, chi hien thi 1 lan).
+
+### 10.2. [GET] Manager xem danh sach Farmer thuoc quyen quan ly
+- **URL**: `{{baseUrl}}/farmers`
+- **Method**: `GET`
+- **Auth**: Bearer Token (`{{accessToken}}` cua Manager)
+- **Role**: `manager`
+
+### 10.3. [GET] Manager xem chi tiet 1 Farmer kem cac ao duoc phan cong
+- **URL**: `{{baseUrl}}/farmers/{{farmerId}}`
+- **Method**: `GET`
+- **Auth**: Bearer Token (`{{accessToken}}` cua Manager)
+- **Role**: `manager`
+
+### 10.4. [PATCH] Manager khoa / mo khoa tai khoan Farmer
+- **URL**: `{{baseUrl}}/farmers/{{farmerId}}/status`
+- **Method**: `PATCH`
+- **Auth**: Bearer Token (`{{accessToken}}` cua Manager)
+- **Role**: `manager`
+- **Body (raw JSON)**:
+```json
+{
+  "isActive": false
+}
+```
+
+### 10.5. [POST] Manager phan cong ao nuoi / trang trai cho Farmer (UC021)
+- **URL**: `{{baseUrl}}/farmers/assignments`
+- **Method**: `POST`
+- **Auth**: Bearer Token (`{{accessToken}}` cua Manager)
+- **Role**: `manager`
+- **Body (raw JSON)**:
+```json
+{
+  "farmerId": "{{farmerId}}",
+  "farmId": "{{farmId}}",
+  "pondId": "{{pondId}}"
+}
+```
+*(Luu y: Bo qua `pondId` neu muon phan cong Farmer quan ly toan bo cac ao trong Farm)*
+
+### 10.6. [GET] Manager xem danh sach tat ca phan cong
+- **URL**: `{{baseUrl}}/farmers/assignments/list`
+- **Method**: `GET`
+- **Auth**: Bearer Token (`{{accessToken}}` cua Manager)
+- **Role**: `manager`
+
+### 10.7. [DELETE] Manager thu hoi phan cong ao
+- **URL**: `{{baseUrl}}/farmers/assignments/{{assignmentId}}`
+- **Method**: `DELETE`
+- **Auth**: Bearer Token (`{{accessToken}}` cua Manager)
+- **Role**: `manager`
+
+---
+
+## 11. Kich Ban Kiem Thu Toan Dien 3 Role (End-to-End Test Workflow)
+
+Kich ban nay kiem thu tron ven luong nghiep vu 3 role tu khoi tao den van hanh:
 
 ```mermaid
-graph TD
-    A["1. POST /auth/login (Admin) -> Luu accessToken"] --> B["2. GET /farms -> Chon 1 farmId"]
-    B --> C["3. GET /farms/:farmId/ponds -> Chon 1 pondId"]
-    C --> D["4. GET /devices -> Chon 1 deviceId"]
-    C --> E["5. POST /ponds/:pondId/crop-seasons -> Tao vu nuoi"]
-    E --> F["6. PATCH /crop-seasons/:id -> Chuyen status thanh 'active'"]
-    F --> G["7. POST /ponds/:pondId/feeding-schedules -> Tao lich an"]
-    G --> H["8. POST /ponds/:pondId/feeding-records -> Tao luot an"]
-    H --> I["9. PATCH /feeding-records/:id -> Hoan tat cu an ('completed')"]
-    D --> J["10. POST /devices/:id/emergency-stop -> Test nut dung khan cap"]
+sequenceDiagram
+    autonumber
+    actor Admin as Admin (Web Dash)
+    actor Manager as Manager (Web App)
+    actor Farmer as Farmer (Mobile App)
+    participant BE as ShrimpMate Backend
+
+    Note over Admin, BE: GIAI DOAN 1: ADMIN KIEM TRA NEN TANG
+    Admin->>BE: POST /auth/login (Admin)
+    Admin->>BE: GET /admin/overview
+    Admin->>BE: GET /devices (Kiem tra Hardware Catalog)
+
+    Note over Manager, BE: GIAI DOAN 2: MANAGER DANG KY & THIET LAP TRANG TRAI
+    Manager->>BE: POST /auth/register (Tao tai khoan Manager)
+    Manager->>BE: POST /auth/login (Lay Manager Token)
+    Manager->>BE: POST /farms (Tao Trang trai moi)
+    Manager->>BE: POST /farms/:farmId/ponds (Tao Ao nuoi moi)
+
+    Note over Manager, BE: GIAI DOAN 3: MANAGER TAO FARMER & PHAN CONG AO (UC020, UC021)
+    Manager->>BE: POST /farmers (Tao Farmer -> BE sinh pass ngau nhien)
+    Manager->>BE: POST /farmers/assignments (Phan cong Ao cho Farmer)
+
+    Note over Manager, BE: GIAI DOAN 4: MANAGER CAU HINH VAN HANH
+    Manager->>BE: POST /devices/claim (Gan thiet bi DEV-FEEDER-001 vao ao)
+    Manager->>BE: POST /ponds/:pondId/crop-seasons (Tao vu nuoi)
+    Manager->>BE: PATCH /crop-seasons/:id (Kich hoat status 'active')
+    Manager->>BE: POST /ponds/:pondId/feeding-schedules (Cai dat lich cho an)
+
+    Note over Farmer, BE: GIAI DOAN 5: FARMER VAN HANH NGOAI BO AO (MOBILE APP)
+    Farmer->>BE: POST /auth/login (Dang nhap bang mat khau tam duoc cap)
+    Farmer->>BE: GET /ponds (Chi thay ao duoc Manager phan cong)
+    Farmer->>BE: GET /ponds/:pondId/telemetry/latest (Xem gauges nuoc tuc thoi)
+    Farmer->>BE: POST /devices/:feederId/quick-feed (Cho an nhanh 1-tap)
+    Farmer->>BE: POST /devices/:feederId/emergency-stop (Dung khan cap 1-tap)
+    Farmer->>BE: PATCH /alerts/:alertId/resolve (Xac nhan da xu ly su co)
+
+    Note over Admin, BE: GIAI DOAN 6: ADMIN QUAN LY & KHOA TAI KHOAN
+    Admin->>BE: GET /auth/users (Xem danh sach tat ca Manager & Farmer)
+    Admin->>BE: PATCH /auth/users/:farmerId/status (Khoa/Mo khoa tai khoan)
 ```
+
+### Chi tiet cac buoc thuc hien:
+
+#### Giai doan 1: Admin kiem tra he thong
+1. **Dang nhap Admin**: `POST {{baseUrl}}/auth/login` voi body `{"identifier": "admin@shrimpmate.local", "password": "Admin@123456"}`. Luu `accessToken`.
+2. **Xem tong quan**: `GET {{baseUrl}}/admin/overview`.
+3. **Kiem tra Catalog thiet bi IoT**: `GET {{baseUrl}}/devices`. Luu ID cua thiet bi `DEV-FEEDER-001` vao `{{deviceId}}`.
+
+#### Giai doan 2: Manager dang ky & tao Farm/Ao
+4. **Dang ky Manager**: `POST {{baseUrl}}/auth/register` voi body `{"email": "boss@shrimpmate.local", "phoneNumber": "0981112233", "password": "Password@123", "fullName": "Nguyen Farm Boss"}`.
+5. **Dang nhap Manager**: `POST {{baseUrl}}/auth/login` voi body `{"identifier": "boss@shrimpmate.local", "password": "Password@123"}`. Cap nhat `accessToken` bang token cua Manager.
+6. **Tao Farm**: `POST {{baseUrl}}/farms` voi body:
+```json
+{
+  "name": "Trang Trai Soc Trang 01",
+  "address": "My Xuyen, Soc Trang",
+  "status": "active"
+}
+```
+*(Luu `id` tra ve vao `{{farmId}}`).*
+
+7. **Tao Ao**: `POST {{baseUrl}}/farms/{{farmId}}/ponds` voi body:
+```json
+{
+  "code": "POND-01",
+  "name": "Ao So 1",
+  "areaM2": 1500,
+  "status": "active"
+}
+```
+*(Luu `id` tra ve vao `{{pondId}}`).*
+
+#### Giai doan 3: Manager tao Farmer & phan cong ao
+8. **Tao Farmer**: `POST {{baseUrl}}/farmers` voi body `{"fullName": "Anh Ba Nuoi Tom", "phoneNumber": "0977889900", "email": "anhba@shrimpmate.local"}`.
+   - Ghi nhan `temporaryPassword` trong response (vi du: `Fm#x9P!2a`) va `id` cua Farmer vao `{{farmerId}}`.
+9. **Phan cong Ao cho Farmer**: `POST {{baseUrl}}/farmers/assignments` voi body `{"farmerId": "{{farmerId}}", "farmId": "{{farmId}}", "pondId": "{{pondId}}"}`.
+
+#### Giai doan 4: Manager cau hinh thiet bi, vu nuoi & lich an
+10. **Gan thiet bi vao Ao**: `POST {{baseUrl}}/devices/claim` voi body `{"deviceUid": "DEV-FEEDER-002", "pondId": "{{pondId}}"}`.
+11. **Tao vu nuoi**: `POST {{baseUrl}}/ponds/{{pondId}}/crop-seasons` voi body:
+```json
+{
+  "name": "Vu Mua Mua 2026",
+  "stockingDate": "2026-10-10",
+  "initialCount": 80000,
+  "stockingDensity": 50.0,
+  "initialAverageWeightG": 0.8,
+  "estimatedSurvivalRate": 85.0,
+  "status": "planned"
+}
+```
+*(Luu `id` tra ve vao `{{cropSeasonId}}`).*
+
+12. **Kich hoat vu nuoi**: `PATCH {{baseUrl}}/crop-seasons/{{cropSeasonId}}` voi body `{"status": "active"}`.
+13. **Tao lich an tuan**: `POST {{baseUrl}}/ponds/{{pondId}}/feeding-schedules` voi body:
+```json
+{
+  "name": "Cu cho an sang",
+  "feedAmountKg": 10.0,
+  "timeOfDay": "07:30",
+  "daysOfWeek": [1, 2, 3, 4, 5, 6, 0],
+  "isEnabled": true
+}
+```
+
+#### Giai doan 5: Farmer van hanh ngoai bo ao (Mobile App)
+14. **Dang nhap Farmer**: `POST {{baseUrl}}/auth/login` voi identifier `0977889900` va password la `temporaryPassword` vua duoc cap. Luu token vao bien `{{farmerAccessToken}}`.
+15. **Kiem tra ao duoc phan cong**: `GET {{baseUrl}}/ponds` (Authorization: Bearer `{{farmerAccessToken}}`).
+    - *Ket qua mong doi*: Farmer chi thay dung "Ao So 1" vua duoc phan cong.
+16. **Kiem tra chan bao mat**: Thu goi `GET {{baseUrl}}/ponds/<id-ao-cua-manager-khac>` (ao khong duoc phan cong).
+    - *Ket qua mong doi*: Backend tra ve `403 Forbidden` (`Bạn không có quyền truy cập ao nuôi này`).
+17. **Xem thong so moi truong tuc thoi**: `GET {{baseUrl}}/ponds/{{pondId}}/telemetry/latest`.
+18. **Dung khan cap 1-tap**: `POST {{baseUrl}}/devices/{{deviceId}}/emergency-stop` voi body `{"reason": "Phat hien chim nuoc ngoai ao"}`.
+19. **Cho an nhanh 1-tap**: `POST {{baseUrl}}/devices/{{deviceId}}/quick-feed` voi body `{"feedAmountKg": 2.5, "dispenseDurationSec": 30}`.
+20. **Xu ly canh bao**: `PATCH {{baseUrl}}/alerts/{{alertId}}/resolve` voi body `{"actionTaken": "Da bat quat nuoc bo sung oxy"}`.
+
+#### Giai doan 6: Admin giam sat & can thiep
+21. **Dang nhap lai Admin**: `POST {{baseUrl}}/auth/login` bang tai khoan admin.
+22. **Xem toan bo nguoi dung**: `GET {{baseUrl}}/auth/users`.
+23. **Khoa tai khoan bat thuong**: `PATCH {{baseUrl}}/auth/users/{{farmerId}}/status` voi body `{"isActive": false}`.
+

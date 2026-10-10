@@ -21,8 +21,8 @@
 - **Safety Rule Engine**: Validates environmental criteria before any feeding operation executes. Automatically blocks feeder activation (`decision: blocked`) and prevents MQTT dispatch if conditions are unsafe (e.g. DO < 3.5 mg/L).
 - **Dual Computer Vision FIS Pipeline**: Analyzes feeding tray frames using YOLO11n-seg (residual feed & shrimp density) and MobileNetV3 (feeding behavior classification) to calculate the **Feeding Intensity Score (FIS)** across 4 appetite levels (`0: None`, `1: Weak`, `2: Normal`, `3: Strong`).
 - **Crop Season & FCR Analytics**: Automatically tracks Days of Culture (DOC), surviving population, feed consumed, biomass gain, and Feed Conversion Ratio (FCR).
-- **Hardware Catalog & Claiming**: Admins manage standardized IoT hardware (`deviceUid`); farmers securely claim devices to their ponds.
-- **Role-Based Ecosystem**: Strict separation of concerns between `admin` (system governance) and `farmer` (farm & pond operations).
+- **Hardware Catalog & Claiming**: Admins manage standardized IoT hardware (`deviceUid`); managers securely claim devices to their ponds.
+- **Role-Based Ecosystem**: Strict separation of concerns between `admin` (platform governance & hardware catalog), `manager` (farm, pond & farmer operations via Web App), and `farmer` (pond-side field monitoring & quick emergency controls via Mobile App).
 
 ---
 
@@ -31,20 +31,21 @@
 ```text
                   [ Authentication: POST /auth/login ]
                                    |
-                    +--------------+--------------+
-                    |                             |
-             role === 'admin'              role === 'farmer'
-                    |                             |
-                    v                             v
-          [ ADMIN WEB DASHBOARD ]     +-----------+-----------+
-          - Hardware Catalog CRUD     |                       |
-          - Platform Overview & FCR   v                       v
-          - User Account Management [ FARMER MOBILE APP ]  [ FARMER WEB PORTAL ]
-          - System Safety Rules     - Real-Time Gauges     - Farm & Pond CRUD
-          - Read-Only Farm Audit    - 1-Tap Emergency Stop - Weekly Feeding Schedules
-          - Feeder Diagnostic Tests - Manual Quick-Feed    - Deep-Dive FCR Analytics
-                                    - Push Notifications   - Camera ROI & Weights Setup
-                                    - Incident Resolution  - 24h / 7d Time-Series Charts
+                   +---------------+---------------+
+                   |               |               |
+            role === 'admin' role === 'manager' role === 'farmer'
+                   |               |               |
+                   v               v               v
+         [ ADMIN WEB DASH ] [ MANAGER WEB APP ] [ FARMER MOBILE APP ]
+         (Ban quản trị)     (Văn phòng / nhà)   (Ngoài bờ ao)
+         - User Acct Mgmt   - Self-registration - Assigned Ponds Only
+         - Lock/Unlock Users- Create/Manage Fm  - Real-Time Gauges
+         - Hardware Catalog - Assign Farms/Ponds- AI Feed Summary
+         - Safety Rules CRUD- Farm & Pond CRUD  - 1-Tap Emergency Stop
+         - Global Audit & FCR- Crop Seasons/FCR - 1-Tap Quick-Feed
+         - System Oversight - Weekly Schedules  - Push Alerts (FCM)
+                            - Time-Series Charts- Incident Resolution
+                            - Camera ROI & FIS
 ```
 
 ---
@@ -78,9 +79,9 @@
      +------------+   +-----------+   +--------------+
                             |
            +----------------+----------------+
-           |                                 |
-           v                                 v
-   [ Admin Web Dashboard ]        [ Farmer Web & Mobile ]
+           |                |                |
+           v                v                v
+   [ Admin Dashboard ] [ Manager Web App ] [ Farmer Mobile App ]
 ```
 
 ---
@@ -121,6 +122,7 @@ src/
     ├── crop-season/    # Season lifecycle, stocking density, and FCR statistics
     ├── devices/        # Hardware catalog, claim/unassign, and emergency stop
     ├── farm-pond/      # Farm & pond CRUD with soft deletion
+    ├── farmers/        # Manager's farmer management and pond assignments (UC020, UC021)
     ├── feeding/        # Weekly schedules and safety-checked feeding records
     ├── safety-rule/    # Water threshold rule engine & pre-execution evaluations
     └── telemetry/      # Sensor metric ingestion, threshold alerts, and history
@@ -215,10 +217,11 @@ npm run build
 
 ## 8. Default Pre-Seeded Accounts
 
-| Role | Username / Identifier | Password | Access Scope |
-| --- | --- | --- | --- |
-| `admin` | `admin@shrimpmate.local` / `0901000001` | `Admin@123456` | Full platform governance, catalog, safety rules, FCR reports |
-| `farmer` | `farmer@shrimpmate.local` / `0901000002` | `Farmer@123456` | Farm & pond owner, feeding schedules, camera AI, telemetry |
+| Role | Client Application | Username / Identifier | Password | Access Scope |
+| --- | --- | --- | --- | --- |
+| `admin` | **Web Dashboard** | `admin@shrimpmate.local` / `0901000001` | `Admin@123456` | Full platform governance, catalog, safety rules, FCR reports |
+| `manager` | **Web App** | `manager@shrimpmate.local` / `0901000002` | `Manager@123456` | Farm & pond owner, farmer supervisor, schedules, AI configs, analytics |
+| `farmer` | **Mobile App** | `farmer@shrimpmate.local` / `0901000003` | `Farmer@123456` | Assigned pond operator, pond telemetry, quick feed, emergency stop, alerts |
 
 ---
 
@@ -227,7 +230,8 @@ npm run build
 Detailed specifications and integration guides are maintained in the [`docs/`](./docs) directory:
 
 - **[API Specification (`docs/API.md`)](./docs/API.md)**: Exhaustive documentation of all endpoints, request bodies, query parameters, response structures, and HTTP error codes.
-- **[API Summary Reference (`docs/API_SUMMARY.md`)](./docs/API_SUMMARY.md)**: Master numbered quick-reference table covering all 76 endpoints and MQTT topics.
-- **[Database Architecture (`docs/DATABASE.md`)](./docs/DATABASE.md)**: Complete database schema, table specifications, indices, cascading rules, and Mermaid ERD diagram.
-- **[Roles & Permissions Specification (`docs/ROLES_AND_PERMISSIONS.md`)](./docs/ROLES_AND_PERMISSIONS.md)**: RBAC permission matrix comparing Admin Web, Farmer Web, and Farmer Mobile App scopes.
+- **[API Summary Reference (`docs/API_SUMMARY.md`)](./docs/API_SUMMARY.md)**: Master numbered quick-reference table covering all 85 endpoints and MQTT topics across Admin, Manager, and Farmer.
+- **[Database Architecture (`docs/DATABASE.md`)](./docs/DATABASE.md)**: Complete database schema, table specifications, `farmer_assignments`, `users.manager_id`, indices, cascading rules, and Mermaid ERD diagram.
+- **[Roles & Permissions Specification (`docs/ROLES_AND_PERMISSIONS.md`)](./docs/ROLES_AND_PERMISSIONS.md)**: RBAC permission matrix comparing Admin Web Dashboard, Manager Web App, and Farmer Mobile App scopes (UC001–UC021).
 - **[Postman Test Collections (`docs/POSTMAN_SAMPLES.md`)](./docs/POSTMAN_SAMPLES.md)**: Ready-to-use Postman test scenarios, flow diagrams, and raw payload bodies.
+- **[Postman End-to-End Test Flows (`docs/POSTMAN_TEST_FLOWS.md`)](./docs/POSTMAN_TEST_FLOWS.md)**: 5 core business testing flows covering 100% features across Admin, Manager, and Farmer.

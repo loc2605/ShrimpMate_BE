@@ -2,12 +2,22 @@ import { DataSource } from 'typeorm';
 import { Farm } from '../entities/farm.entity';
 import { Pond } from '../entities/pond.entity';
 import { User } from '../entities/user.entity';
+import { FarmerAssignment } from '../entities/farmer-assignment.entity';
 import { FarmStatus, PondStatus, UserRole } from '../entities/enums';
 
 export async function seedFarmPondData(dataSource: DataSource) {
   const farmRepository = dataSource.getRepository(Farm);
   const pondRepository = dataSource.getRepository(Pond);
   const userRepository = dataSource.getRepository(User);
+  const assignmentRepository = dataSource.getRepository(FarmerAssignment);
+
+  const managerUser =
+    (await userRepository.findOne({
+      where: { email: process.env.SEED_MANAGER_EMAIL ?? 'manager@shrimpmate.local' },
+    })) ??
+    (await userRepository.findOne({
+      where: { role: UserRole.MANAGER },
+    }));
 
   const farmerUser =
     (await userRepository.findOne({
@@ -19,15 +29,33 @@ export async function seedFarmPondData(dataSource: DataSource) {
 
   const count = await farmRepository.count();
   if (count > 0) {
-    if (farmerUser) {
+    if (managerUser) {
       await farmRepository
         .createQueryBuilder()
         .update(Farm)
-        .set({ ownerId: farmerUser.id })
+        .set({ ownerId: managerUser.id })
         .where('owner_id IS NULL OR name IN (:...seedFarmNames)', {
           seedFarmNames: ['Trang trại Sóng Xanh', 'Ao Nước Trong', 'Vườn Tôm Minh Phú', 'Trang trai Tom Hung Phat'],
         })
         .execute();
+    }
+
+    // Đảm bảo Farmer có phân công mẫu
+    if (farmerUser) {
+      const existingAssignment = await assignmentRepository.findOne({ where: { farmerId: farmerUser.id } });
+      if (!existingAssignment) {
+        const firstFarm = await farmRepository.findOne({ where: { name: 'Trang trại Sóng Xanh' } });
+        if (firstFarm) {
+          const firstPond = await pondRepository.findOne({ where: { farmId: firstFarm.id } });
+          await assignmentRepository.save(
+            assignmentRepository.create({
+              farmerId: farmerUser.id,
+              farmId: firstFarm.id,
+              pondId: firstPond?.id ?? null,
+            }),
+          );
+        }
+      }
     }
     return;
   }
@@ -37,23 +65,23 @@ export async function seedFarmPondData(dataSource: DataSource) {
       name: 'Trang trại Sóng Xanh',
       address: 'Bạc Liêu, Việt Nam',
       status: FarmStatus.ACTIVE,
-      ownerId: farmerUser?.id ?? null,
+      ownerId: managerUser?.id ?? null,
     },
     {
       name: 'Ao Nước Trong',
       address: 'Cà Mau, Việt Nam',
       status: FarmStatus.ACTIVE,
-      ownerId: farmerUser?.id ?? null,
+      ownerId: managerUser?.id ?? null,
     },
     {
-      name: 'Vườn Tôm Minh Phú',  
+      name: 'Vườn Tôm Minh Phú',
       address: 'Sóc Trăng, Việt Nam',
       status: FarmStatus.INACTIVE,
       ownerId: null,
     },
   ]);
 
-  await pondRepository.save([
+  const ponds = await pondRepository.save([
     {
       farmId: farms[0].id,
       code: 'POND-01',
@@ -83,6 +111,17 @@ export async function seedFarmPondData(dataSource: DataSource) {
       status: PondStatus.ACTIVE,
     },
   ]);
+
+  // Phân công mẫu cho farmerUser vào Ao 1
+  if (farmerUser && farms[0] && ponds[0]) {
+    await assignmentRepository.save(
+      assignmentRepository.create({
+        farmerId: farmerUser.id,
+        farmId: farms[0].id,
+        pondId: ponds[0].id,
+      }),
+    );
+  }
 
   return { farms, ponds: 4 };
 }

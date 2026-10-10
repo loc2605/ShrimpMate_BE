@@ -116,6 +116,13 @@ export class AuthController {
     return { message: 'Bạn có quyền Admin' };
   }
 
+  @Get('manager-check')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.MANAGER)
+  managerCheck() {
+    return { message: 'Bạn có quyền Quản lý (Manager)' };
+  }
+
   @Get('farmer-check')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.FARMER)

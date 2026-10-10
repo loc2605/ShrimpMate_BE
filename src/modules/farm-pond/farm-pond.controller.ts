@@ -28,61 +28,61 @@ export class FarmPondController {
   constructor(private readonly farmPondService: FarmPondService) {}
 
   @Get()
-  @Roles(UserRole.ADMIN, UserRole.FARMER)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.FARMER)
   findAllFarms(@Query() pagination: PaginationDto, @CurrentUser() user: User) {
     return this.farmPondService.findAllFarms(pagination, user);
   }
 
   @Post()
-  @Roles(UserRole.FARMER)
+  @Roles(UserRole.MANAGER)
   createFarm(@Body() createFarmDto: CreateFarmDto, @CurrentUser() user: User) {
     return this.farmPondService.createFarm(createFarmDto, user);
   }
 
   @Get(':id')
-  @Roles(UserRole.ADMIN, UserRole.FARMER)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.FARMER)
   findFarmById(@Param('id') id: string, @CurrentUser() user: User) {
     return this.farmPondService.findFarmById(id, user);
   }
 
   @Patch(':id')
-  @Roles(UserRole.FARMER)
+  @Roles(UserRole.MANAGER)
   updateFarm(@Param('id') id: string, @Body() updateFarmDto: UpdateFarmDto, @CurrentUser() user: User) {
     return this.farmPondService.updateFarm(id, updateFarmDto, user);
   }
 
   @Delete(':id')
-  @Roles(UserRole.FARMER)
+  @Roles(UserRole.MANAGER)
   removeFarm(@Param('id') id: string, @CurrentUser() user: User) {
     return this.farmPondService.removeFarm(id, user);
   }
 
   @Get(':farmId/ponds')
-  @Roles(UserRole.ADMIN, UserRole.FARMER)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.FARMER)
   findAllPondsByFarm(@Param('farmId') farmId: string, @Query() pagination: PaginationDto, @CurrentUser() user: User) {
     return this.farmPondService.findAllPondsByFarm(farmId, pagination, user);
   }
 
   @Post(':farmId/ponds')
-  @Roles(UserRole.FARMER)
+  @Roles(UserRole.MANAGER)
   createPond(@Param('farmId') farmId: string, @Body() createPondDto: CreatePondDto, @CurrentUser() user: User) {
     return this.farmPondService.createPond(farmId, createPondDto, user);
   }
 
   @Get(':farmId/ponds/:id')
-  @Roles(UserRole.ADMIN, UserRole.FARMER)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.FARMER)
   findPondById(@Param('id') id: string, @CurrentUser() user: User) {
     return this.farmPondService.findPondById(id, user);
   }
 
   @Patch(':farmId/ponds/:id')
-  @Roles(UserRole.FARMER)
+  @Roles(UserRole.MANAGER)
   updatePond(@Param('id') id: string, @Body() updatePondDto: UpdatePondDto, @CurrentUser() user: User) {
     return this.farmPondService.updatePond(id, updatePondDto, user);
   }
 
   @Delete(':farmId/ponds/:id')
-  @Roles(UserRole.FARMER)
+  @Roles(UserRole.MANAGER)
   deletePond(@Param('id') id: string, @CurrentUser() user: User) {
     return this.farmPondService.removePond(id, user);
   }
