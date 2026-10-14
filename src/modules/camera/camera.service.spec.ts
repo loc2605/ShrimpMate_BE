@@ -55,7 +55,12 @@ describe('CameraService', () => {
         CameraAiEngineService,
         {
           provide: ConfigService,
-          useValue: { get: jest.fn() },
+          useValue: {
+            get: jest.fn().mockImplementation((key: string) => {
+              if (key === 'ai.engineUrl') return 'http://localhost:8000';
+              return null;
+            }),
+          },
         },
         {
           provide: getRepositoryToken(CameraFisLog),
@@ -86,16 +91,14 @@ describe('CameraService', () => {
           provide: AlertsService,
           useValue: alertsService,
         },
-        {
-          provide: 'ConfigService',
-          useValue: {
-            get: jest.fn().mockReturnValue(null),
-          },
-        },
       ],
     }).compile();
 
     service = module.get<CameraService>(CameraService);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   it('should analyze frame, calculate FIS, save log and update camera status to ONLINE', async () => {
@@ -109,15 +112,33 @@ describe('CameraService', () => {
     };
     deviceRepo.findOne.mockResolvedValue(mockCamera);
 
+    global.fetch = jest.fn().mockImplementation((url: string) => {
+      if (url.includes('yolo-seg')) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              remainingFeedAreaRt: 0.2,
+              shrimpDensityDt: 15,
+              shrimpMaskConfidence: 0.95,
+            }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            behaviorClassificationCt: 2,
+            confidence: 0.9,
+          }),
+      });
+    });
+
     const result = await service.analyzeFrame(
       {
         pondId: 'pond-1',
         deviceId: 'cam-1',
-        simulatedMetrics: {
-          remainingFeedAreaRt: 0.2,
-          shrimpDensityDt: 15,
-          behaviorClassificationCt: 2,
-        },
+        frameUrl: 'https://storage.shrimpmate.vn/frames/cam-1.jpg',
       },
       mockUser,
     );
@@ -142,15 +163,33 @@ describe('CameraService', () => {
     };
     deviceRepo.findOne.mockResolvedValue(mockCamera);
 
+    global.fetch = jest.fn().mockImplementation((url: string) => {
+      if (url.includes('yolo-seg')) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              remainingFeedAreaRt: 0.9, // 90% food remaining
+              shrimpDensityDt: 0.2, // 0 shrimps
+              shrimpMaskConfidence: 0.95,
+            }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            behaviorClassificationCt: 0,
+            confidence: 0.9,
+          }),
+      });
+    });
+
     await service.analyzeFrame(
       {
         pondId: 'pond-1',
         deviceId: 'cam-1',
-        simulatedMetrics: {
-          remainingFeedAreaRt: 0.9, // 90% food remaining
-          shrimpDensityDt: 0.2, // 0 shrimps
-          behaviorClassificationCt: 0,
-        },
+        frameUrl: 'https://storage.shrimpmate.vn/frames/cam-1-anomaly.jpg',
       },
       mockUser,
     );

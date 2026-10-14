@@ -1,19 +1,22 @@
 import {
+  BadGatewayException,
   BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { QueryFailedError, Repository } from 'typeorm';
 import { Device } from '../../database/entities/device.entity';
 import { Pond } from '../../database/entities/pond.entity';
-import { DeviceMode, DeviceStatus, UserRole } from '../../database/entities/enums';
+import { DeviceMode, DeviceStatus, DeviceType, UserRole } from '../../database/entities/enums';
 import { CreateDeviceDto } from './dto/create-device.dto';
 import { UpdateDeviceDto } from './dto/update-device.dto';
 import { ClaimDeviceDto } from './dto/claim-device.dto';
 import { User } from '../../database/entities/user.entity';
 import { PondAccessService } from '../../common/guards/pond-access.service';
+import { MqttService } from '../../mqtt/mqtt.service';
 
 @Injectable()
 export class DevicesService {
@@ -23,6 +26,7 @@ export class DevicesService {
     @InjectRepository(Pond)
     private readonly pondRepository: Repository<Pond>,
     private readonly pondAccessService: PondAccessService,
+    private readonly mqttService: MqttService,
   ) { }
 
   async createDevice(createDeviceDto: CreateDeviceDto, _user?: User) {
@@ -182,7 +186,29 @@ export class DevicesService {
   async emergencyStop(id: string, user?: User) {
     const device = await this.findDeviceById(id, user);
     device.mode = DeviceMode.EMERGENCY_STOP;
-    return this.deviceRepository.save(device);
+    const saved = await this.deviceRepository.save(device);
+
+    if (device.type === DeviceType.FEEDER && device.deviceUid) {
+      if (!this.mqttService.getIsConnected()) {
+        throw new ServiceUnavailableException(
+          `Đã chuyển chế độ dừng khẩn cấp trong CSDL, nhưng chưa thể gửi lệnh STOP tới thiết bị (${device.deviceUid}) do MQTT Broker đang mất kết nối. Vui lòng ngắt nguồn điện thủ công!`,
+        );
+      }
+
+      const sent = await this.mqttService.publishFeederCommand(device.deviceUid, {
+        command: 'STOP',
+        feedAmountKg: 0,
+        timestamp: new Date().toISOString(),
+      });
+
+      if (!sent) {
+        throw new BadGatewayException(
+          `Đã chuyển chế độ dừng khẩn cấp trong CSDL, nhưng không thể truyền lệnh STOP tới thiết bị (${device.deviceUid}) qua MQTT. Vui lòng ngắt nguồn điện thủ công!`,
+        );
+      }
+    }
+
+    return saved;
   }
 
   async heartbeat(id: string, _user?: User) {

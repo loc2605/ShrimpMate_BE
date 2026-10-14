@@ -1,4 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  BadGatewayException,
+  BadRequestException,
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppetiteLevel } from '../../database/entities/enums';
 
@@ -89,8 +95,8 @@ export class CameraAiEngineService {
   constructor(private readonly configService: ConfigService) {}
 
   /**
-   * Chạy song song 2 luồng AI (YOLO11n-seg & MobileNetV3-Small) trên cùng 1 khung hình
-   * Giảm độ trễ so với chạy tuần tự
+   * Chạy song song 2 luồng AI (YOLO11n-seg & MobileNetV3-Small) trên cùng 1 khung hình thật
+   * Kết nối trực tiếp tới AI Engine service, không dùng dữ liệu giả lập
    */
   async processFrameParallel(
     frameData?: string,
@@ -99,22 +105,23 @@ export class CameraAiEngineService {
     previousRt?: number | null,
     timeDeltaSeconds = 20,
     weightsOverride?: Partial<VisionModelWeights>,
-    simulatedMetrics?: {
-      remainingFeedAreaRt?: number;
-      shrimpDensityDt?: number;
-      behaviorClassificationCt?: number;
-    },
   ): Promise<ProcessedFisResult> {
+    if (!frameData && !frameUrl) {
+      throw new BadRequestException(
+        'Vui lòng cung cấp dữ liệu hình ảnh (frameData base64 hoặc frameUrl) thực tế để phân tích.',
+      );
+    }
+
     const startTime = Date.now();
 
     // 1. Chạy song song 2 luồng phân tích bằng Promise.all
     const [yoloResult, mobileNetResult] = await Promise.all([
-      this.runYoloSegInference(frameData, frameUrl, roi, simulatedMetrics),
-      this.runMobileNetInference(frameData, frameUrl, roi, simulatedMetrics),
+      this.runYoloSegInference(frameData, frameUrl, roi),
+      this.runMobileNetInference(frameData, frameUrl, roi),
     ]);
 
     const inferenceDurationMs = Date.now() - startTime;
-    this.logger.debug(`Hoàn tất suy luận AI song song (Dual-stream) trong ${inferenceDurationMs}ms`);
+    this.logger.debug(`Hoàn tất suy luận AI song song (Dual-stream) thực tế trong ${inferenceDurationMs}ms`);
 
     // 2. Tổng hợp chỉ số FIS từ kết quả 2 mô hình
     return this.calculateFis({
@@ -214,7 +221,10 @@ export class CameraAiEngineService {
       anomalyReason = 'Biến động bất thường diện tích thức ăn trên sàng quan sát';
     }
 
-    const confidence = Number((0.85 + Math.random() * 0.12).toFixed(4));
+    const confidence = typeof extraMetadata.confidence === 'number'
+      ? extraMetadata.confidence
+      : Number((((extraMetadata.yoloDetails as YoloSegResult | undefined)?.shrimpMaskConfidence ?? 0.9) *
+          ((extraMetadata.mobileNetDetails as MobileNetResult | undefined)?.confidence ?? 0.9)).toFixed(4));
 
     return {
       raw: {
@@ -255,55 +265,46 @@ export class CameraAiEngineService {
     frameData?: string,
     frameUrl?: string,
     roi?: Record<string, unknown>,
-    simulatedMetrics?: {
-      remainingFeedAreaRt?: number;
-      shrimpDensityDt?: number;
-      behaviorClassificationCt?: number;
-    },
   ): Promise<YoloSegResult> {
     const aiEngineUrl = this.configService.get<string>('ai.engineUrl');
 
-    if (aiEngineUrl && (frameData || frameUrl)) {
-      try {
-        const response = await fetch(`${aiEngineUrl}/vision/yolo-seg`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ frameData, frameUrl, roi }),
-        });
+    if (!aiEngineUrl) {
+      throw new ServiceUnavailableException(
+        'Chưa cấu hình địa chỉ AI Engine (AI_ENGINE_URL). Không thể kết nối mô hình YOLO11n-seg để phân tích thực tế!',
+      );
+    }
 
-        if (response.ok) {
-          const data = (await response.json()) as YoloSegResult;
-          return data;
-        }
-      } catch (err) {
-        this.logger.warn(`Lỗi kết nối YOLO engine tại ${aiEngineUrl}, sử dụng engine cục bộ fallback: ${err}`);
+    try {
+      const response = await fetch(`${aiEngineUrl}/vision/yolo-seg`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ frameData, frameUrl, roi }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => response.statusText);
+        throw new BadGatewayException(
+          `YOLO AI Engine tại ${aiEngineUrl}/vision/yolo-seg báo lỗi (${response.status}): ${errorText}`,
+        );
       }
+
+      const data = (await response.json()) as YoloSegResult;
+      if (typeof data.remainingFeedAreaRt !== 'number' || typeof data.shrimpDensityDt !== 'number') {
+        throw new BadGatewayException(
+          `Dữ liệu từ YOLO AI Engine (${aiEngineUrl}) không hợp lệ hoặc thiếu trường số liệu (remainingFeedAreaRt, shrimpDensityDt).`,
+        );
+      }
+      return data;
+    } catch (err) {
+      if (err instanceof BadGatewayException || err instanceof ServiceUnavailableException) {
+        throw err;
+      }
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.error(`Không thể kết nối tới YOLO AI Engine tại ${aiEngineUrl}: ${message}`);
+      throw new BadGatewayException(
+        `Không thể kết nối tới dịch vụ AI YOLO11n-seg tại ${aiEngineUrl}: ${message}. Vui lòng kiểm tra dịch vụ AI Engine!`,
+      );
     }
-
-    // Fallback/Embedded AI Simulation (phản hồi thực tế dựa trên tham số hoặc đặc trưng khung hình)
-    if (simulatedMetrics?.remainingFeedAreaRt !== undefined || simulatedMetrics?.shrimpDensityDt !== undefined) {
-      return {
-        remainingFeedAreaRt: simulatedMetrics.remainingFeedAreaRt ?? 0.35,
-        shrimpDensityDt: simulatedMetrics.shrimpDensityDt ?? 14,
-        shrimpCount: Math.round((simulatedMetrics.shrimpDensityDt ?? 14) * 1.5),
-        shrimpMaskConfidence: 0.92,
-      };
-    }
-
-    // Mẫu mô phỏng theo phân phối tự nhiên nếu nhận frame ảnh
-    const remainingFeedAreaRt = Number((0.2 + Math.random() * 0.4).toFixed(4));
-    const shrimpDensityDt = Number((8 + Math.random() * 16).toFixed(2));
-
-    return {
-      remainingFeedAreaRt,
-      shrimpDensityDt,
-      shrimpCount: Math.round(shrimpDensityDt * 1.8),
-      shrimpMaskConfidence: 0.91,
-      detectedObjects: [
-        { label: 'feed_tray', confidence: 0.96, bbox: [120, 80, 520, 480] },
-        { label: 'shrimp_cluster', confidence: 0.91, bbox: [180, 140, 360, 380] },
-      ],
-    };
   }
 
   /**
@@ -313,57 +314,46 @@ export class CameraAiEngineService {
     frameData?: string,
     frameUrl?: string,
     roi?: Record<string, unknown>,
-    simulatedMetrics?: {
-      remainingFeedAreaRt?: number;
-      shrimpDensityDt?: number;
-      behaviorClassificationCt?: number;
-    },
   ): Promise<MobileNetResult> {
     const aiEngineUrl = this.configService.get<string>('ai.engineUrl');
 
-    if (aiEngineUrl && (frameData || frameUrl)) {
-      try {
-        const response = await fetch(`${aiEngineUrl}/vision/mobilenet-classify`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ frameData, frameUrl, roi }),
-        });
+    if (!aiEngineUrl) {
+      throw new ServiceUnavailableException(
+        'Chưa cấu hình địa chỉ AI Engine (AI_ENGINE_URL). Không thể kết nối mô hình MobileNetV3 để phân loại thực tế!',
+      );
+    }
 
-        if (response.ok) {
-          const data = (await response.json()) as MobileNetResult;
-          return data;
-        }
-      } catch (err) {
-        this.logger.warn(`Lỗi kết nối MobileNet engine tại ${aiEngineUrl}, sử dụng engine cục bộ fallback: ${err}`);
+    try {
+      const response = await fetch(`${aiEngineUrl}/vision/mobilenet-classify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ frameData, frameUrl, roi }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => response.statusText);
+        throw new BadGatewayException(
+          `MobileNet AI Engine tại ${aiEngineUrl}/vision/mobilenet-classify báo lỗi (${response.status}): ${errorText}`,
+        );
       }
-    }
 
-    // Fallback/Embedded AI Simulation
-    if (simulatedMetrics?.behaviorClassificationCt !== undefined) {
-      const ct = simulatedMetrics.behaviorClassificationCt;
-      return {
-        behaviorClassificationCt: ct,
-        confidence: 0.89,
-        classProbabilities: {
-          none: ct === 0 ? 0.9 : 0.05,
-          weak: ct === 1 ? 0.85 : 0.1,
-          normal: ct === 2 ? 0.88 : 0.1,
-          strong: ct === 3 ? 0.92 : 0.05,
-        },
-      };
+      const data = (await response.json()) as MobileNetResult;
+      if (typeof data.behaviorClassificationCt !== 'number') {
+        throw new BadGatewayException(
+          `Dữ liệu từ MobileNet AI Engine (${aiEngineUrl}) không hợp lệ hoặc thiếu trường behaviorClassificationCt.`,
+        );
+      }
+      return data;
+    } catch (err) {
+      if (err instanceof BadGatewayException || err instanceof ServiceUnavailableException) {
+        throw err;
+      }
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.error(`Không thể kết nối tới MobileNet AI Engine tại ${aiEngineUrl}: ${message}`);
+      throw new BadGatewayException(
+        `Không thể kết nối tới dịch vụ AI MobileNetV3 tại ${aiEngineUrl}: ${message}. Vui lòng kiểm tra dịch vụ AI Engine!`,
+      );
     }
-
-    const randomCt = Math.floor(Math.random() * 4); // 0, 1, 2, 3
-    return {
-      behaviorClassificationCt: randomCt,
-      confidence: 0.88,
-      classProbabilities: {
-        none: randomCt === 0 ? 0.85 : 0.05,
-        weak: randomCt === 1 ? 0.80 : 0.1,
-        normal: randomCt === 2 ? 0.85 : 0.1,
-        strong: randomCt === 3 ? 0.90 : 0.05,
-      },
-    };
   }
 
   private minMaxNormalize(val: number, min: number, max: number): number {

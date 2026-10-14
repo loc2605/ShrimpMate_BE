@@ -1,10 +1,11 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Device } from '../../database/entities/device.entity';
 import { Pond } from '../../database/entities/pond.entity';
 import { DeviceMode, DeviceStatus, DeviceType } from '../../database/entities/enums';
 import { PondAccessService } from '../../common/guards/pond-access.service';
+import { MqttService } from '../../mqtt/mqtt.service';
 import { DevicesService } from './devices.service';
 
 describe('DevicesService', () => {
@@ -12,13 +13,14 @@ describe('DevicesService', () => {
   let deviceRepository: any;
   let pondRepository: any;
   let pondAccessService: any;
+  let mqttService: any;
 
   beforeEach(async () => {
     deviceRepository = {
       findOne: jest.fn(),
       find: jest.fn(),
       create: jest.fn(),
-      save: jest.fn(),
+      save: jest.fn((entity) => Promise.resolve(entity)),
       remove: jest.fn(),
     };
 
@@ -29,6 +31,11 @@ describe('DevicesService', () => {
     pondAccessService = {
       ensureCanAccess: jest.fn(),
       findAssignedPondIds: jest.fn(),
+    };
+
+    mqttService = {
+      getIsConnected: jest.fn().mockReturnValue(true),
+      publishFeederCommand: jest.fn().mockResolvedValue(true),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -45,6 +52,10 @@ describe('DevicesService', () => {
         {
           provide: PondAccessService,
           useValue: pondAccessService,
+        },
+        {
+          provide: MqttService,
+          useValue: mqttService,
         },
       ],
     }).compile();
@@ -70,5 +81,37 @@ describe('DevicesService', () => {
     deviceRepository.findOne.mockResolvedValue(null);
 
     await expect(service.findDeviceById('missing-id')).rejects.toThrow(NotFoundException);
+  });
+
+  it('should trigger emergencyStop and publish STOP command via MQTT', async () => {
+    const mockFeeder = {
+      id: 'dev-1',
+      deviceUid: 'FEEDER-01',
+      name: 'Feeder 1',
+      type: DeviceType.FEEDER,
+      mode: DeviceMode.AUTOMATIC,
+    };
+    deviceRepository.findOne.mockResolvedValue(mockFeeder);
+
+    const result = await service.emergencyStop('dev-1');
+
+    expect(result.mode).toBe(DeviceMode.EMERGENCY_STOP);
+    expect(mqttService.publishFeederCommand).toHaveBeenCalledWith(
+      'FEEDER-01',
+      expect.objectContaining({ command: 'STOP' }),
+    );
+  });
+
+  it('should throw ServiceUnavailableException on emergencyStop when MQTT is disconnected', async () => {
+    const mockFeeder = {
+      id: 'dev-1',
+      deviceUid: 'FEEDER-01',
+      type: DeviceType.FEEDER,
+      mode: DeviceMode.AUTOMATIC,
+    };
+    deviceRepository.findOne.mockResolvedValue(mockFeeder);
+    mqttService.getIsConnected.mockReturnValue(false);
+
+    await expect(service.emergencyStop('dev-1')).rejects.toThrow(ServiceUnavailableException);
   });
 });

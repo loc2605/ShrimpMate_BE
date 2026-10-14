@@ -1576,11 +1576,6 @@ POST /camera/analyze
     "height": 600,
     "resolutionWidth": 1920,
     "resolutionHeight": 1080
-  },
-  "simulatedMetrics": {
-    "remainingFeedAreaRt": 0.12,
-    "shrimpDensityDt": 18.5,
-    "behaviorClassificationCt": 2.8
   }
 }
 ```
@@ -2103,13 +2098,6 @@ Hệ thống định tuyến dữ liệu IoT qua các Topic chuẩn:
     "timestamp": "2026-10-10T08:45:00.000Z"
   }
   ```
-
-*Kịch bản kiểm thử ESP32 mô phỏng bằng terminal:*
-```powershell
-node scripts/mqtt-simulator.js feeder
-node scripts/mqtt-simulator.js telemetry
-node scripts/mqtt-simulator.js abnormal
-```
 
 ---
 

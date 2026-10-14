@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { BadGatewayException, Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { Roles } from '../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -35,12 +35,16 @@ export class MqttController {
       timestamp: new Date().toISOString(),
     });
 
+    if (!success) {
+      throw new BadGatewayException(
+        `Gửi lệnh feeder test tới thiết bị ${deviceUid} thất bại (MQTT Broker chưa kết nối hoặc thiết bị không phản hồi).`,
+      );
+    }
+
     return {
-      success,
+      success: true,
       deviceUid,
-      message: success
-        ? `Đã gửi lệnh feeder test tới thiết bị ${deviceUid}`
-        : `Gửi lệnh test thất bại (broker chưa kết nối)`,
+      message: `Đã gửi lệnh feeder test tới thiết bị ${deviceUid}`,
     };
   }
 }

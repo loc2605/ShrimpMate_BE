@@ -58,12 +58,4 @@ export class AnalyzeFrameDto {
   @IsOptional()
   @IsObject()
   roi?: RoiConfigDto;
-
-  @IsOptional()
-  @IsObject()
-  simulatedMetrics?: {
-    remainingFeedAreaRt?: number;
-    shrimpDensityDt?: number;
-    behaviorClassificationCt?: number;
-  };
 }

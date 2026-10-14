@@ -5,7 +5,7 @@ import { CameraFisLog } from '../../database/entities/camera-fis-log.entity';
 import { Device } from '../../database/entities/device.entity';
 import { Pond } from '../../database/entities/pond.entity';
 import { FeedingRecord } from '../../database/entities/feeding-record.entity';
-import { AlertSeverity, DeviceStatus, DeviceType, UserRole } from '../../database/entities/enums';
+import { AlertSeverity, DeviceStatus, DeviceType } from '../../database/entities/enums';
 import { PondAccessService } from '../../common/guards/pond-access.service';
 import { User } from '../../database/entities/user.entity';
 import { AlertsService } from '../alerts/alerts.service';
@@ -76,7 +76,7 @@ export class CameraService {
       | Partial<VisionModelWeights>
       | undefined;
 
-    // 5. Chạy phân tích AI song song 2 luồng
+    // 5. Chạy phân tích AI song song 2 luồng thực tế
     const fisResult = await this.cameraAiEngineService.processFrameParallel(
       dto.frameData,
       dto.frameUrl,
@@ -84,7 +84,6 @@ export class CameraService {
       previousRt,
       timeDeltaSeconds,
       customWeights,
-      dto.simulatedMetrics,
     );
 
     // 6. Lưu vào bảng camera_fis_logs phục vụ chuỗi thời gian & huấn luyện lại mô hình

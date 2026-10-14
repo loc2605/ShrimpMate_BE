@@ -1,4 +1,10 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+	BadGatewayException,
+	BadRequestException,
+	Injectable,
+	NotFoundException,
+	ServiceUnavailableException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Device } from '../../database/entities/device.entity';
@@ -6,7 +12,13 @@ import { CropSeason } from '../../database/entities/crop-season.entity';
 import { FeedingRecord } from '../../database/entities/feeding-record.entity';
 import { FeedingSchedule } from '../../database/entities/feeding-schedule.entity';
 import { Pond } from '../../database/entities/pond.entity';
-import { AlertSeverity, CropSeasonStatus, FeedingStatus, SafetyDecision } from '../../database/entities/enums';
+import {
+	AlertSeverity,
+	CropSeasonStatus,
+	DeviceStatus,
+	FeedingStatus,
+	SafetyDecision,
+} from '../../database/entities/enums';
 import { CreateFeedingRecordDto } from './dto/create-feeding-record.dto';
 import { CreateFeedingScheduleDto } from './dto/create-feeding-schedule.dto';
 import { UpdateFeedingScheduleDto } from './dto/update-feeding-schedule.dto';
@@ -157,8 +169,24 @@ export class FeedingService {
 
 		const savedRecord = await this.recordRepository.save(record);
 
-		// Nếu an toàn và có thiết bị Feeder -> Gửi lệnh MQTT xuống thiết bị
+		// Nếu an toàn và có thiết bị Feeder -> Gửi lệnh MQTT thực tế xuống thiết bị
 		if (safetyResult.decision !== SafetyDecision.BLOCKED && device?.deviceUid) {
+			if (device.status === DeviceStatus.OFFLINE) {
+				savedRecord.status = FeedingStatus.FAILED;
+				savedRecord.finishedAt = new Date();
+				savedRecord.stoppedReason = `Thiết bị máy cho ăn (${device.name} - ${device.deviceUid}) đang ở trạng thái Ngoại tuyến (Offline). Không thể kích hoạt cữ ăn!`;
+				await this.recordRepository.save(savedRecord);
+				throw new BadRequestException(savedRecord.stoppedReason);
+			}
+
+			if (!this.mqttService.getIsConnected()) {
+				savedRecord.status = FeedingStatus.FAILED;
+				savedRecord.finishedAt = new Date();
+				savedRecord.stoppedReason = 'Hệ thống chưa kết nối tới MQTT Broker. Không thể truyền lệnh điều khiển tới thiết bị phần cứng!';
+				await this.recordRepository.save(savedRecord);
+				throw new ServiceUnavailableException(savedRecord.stoppedReason);
+			}
+
 			const commandSent = await this.mqttService.publishFeederCommand(device.deviceUid, {
 				command: 'FEED',
 				recordId: savedRecord.id,
@@ -170,6 +198,12 @@ export class FeedingService {
 			if (commandSent) {
 				savedRecord.status = FeedingStatus.RUNNING;
 				await this.recordRepository.save(savedRecord);
+			} else {
+				savedRecord.status = FeedingStatus.FAILED;
+				savedRecord.finishedAt = new Date();
+				savedRecord.stoppedReason = `Gửi lệnh điều khiển qua MQTT tới thiết bị (${device.deviceUid}) thất bại. Thiết bị không phản hồi!`;
+				await this.recordRepository.save(savedRecord);
+				throw new BadGatewayException(savedRecord.stoppedReason);
 			}
 		}
 

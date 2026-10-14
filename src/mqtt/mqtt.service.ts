@@ -80,7 +80,9 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
       this.client.on('error', (err) => {
         this.isConnected = false;
         if (!this.hasLoggedConnectionError) {
-          this.logger.warn(`[MQTT] Chưa phát hiện MQTT Broker tại ${brokerUrl}. Backend vẫn hoạt động bình thường và sẽ tự động kết nối khi broker bật.`);
+          this.logger.error(
+            `[MQTT] Mất kết nối tới MQTT Broker tại ${brokerUrl}: ${err.message}. Các lệnh điều khiển thiết bị thực tế sẽ báo lỗi cho đến khi kết nối được phục hồi!`,
+          );
           this.hasLoggedConnectionError = true;
         }
       });
