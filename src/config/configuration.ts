@@ -24,6 +24,12 @@ export default () => ({
     smtpPass: process.env.SMTP_PASS,
     smtpFrom: process.env.SMTP_FROM,
   },
+  esms: {
+    apiKey: process.env.ESMS_API_KEY,
+    secretKey: process.env.ESMS_SECRET_KEY,
+    brandname: process.env.ESMS_BRANDNAME ?? 'Baotrixemay',
+    smsType: process.env.ESMS_SMS_TYPE ?? '2',
+  },
   auth: {
     jwtSecret: process.env.JWT_SECRET,
     jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '1d',

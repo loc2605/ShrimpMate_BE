@@ -91,11 +91,79 @@ export class OtpDeliveryService {
       this.logger.log(
         `[DEV] Mã OTP đặt lại mật khẩu (SMS) cho ${phoneNumber}: ${otp} (hiệu lực ${expiresInMinutes} phút)`,
       );
+    }
+
+    const esmsApiKey = this.configService.get<string>('esms.apiKey');
+    const esmsSecretKey = this.configService.get<string>('esms.secretKey');
+
+    if (esmsApiKey && esmsSecretKey) {
+      await this.sendViaEsms(phoneNumber, otp, esmsApiKey, esmsSecretKey, expiresInMinutes);
       return;
     }
 
-    this.logger.warn(
-      `Password reset OTP requested for ${phoneNumber} but SMS gateway is not configured. Integrate SMS provider for production.`,
-    );
+    if (nodeEnv === 'production') {
+      this.logger.warn(
+        `Password reset OTP requested for ${phoneNumber} but eSMS is not configured. Set ESMS_API_KEY and ESMS_SECRET_KEY.`,
+      );
+    }
+  }
+
+  private async sendViaEsms(
+    phoneNumber: string,
+    otp: string,
+    apiKey: string,
+    secretKey: string,
+    expiresInMinutes: number,
+  ) {
+    const normalizedPhone = normalizePhoneNumber(phoneNumber);
+    const brandname = this.configService.get<string>('esms.brandname', 'Baotrixemay');
+    const smsType = this.configService.get<string>('esms.smsType', '2');
+    // Nếu dùng SmsType=2 với brandname test "Baotrixemay", bắt buộc đúng cú pháp nhà mạng đã duyệt:
+    // "{OTP} la ma xac minh dang ky Baotrixemay cua ban".
+    // Khi gửi qua đầu số cố định 10 số (SmsType=8) hoặc brandname riêng, dùng cú pháp chuẩn ShrimpMate:
+    const content =
+      smsType === '2' && brandname === 'Baotrixemay'
+        ? `${otp} la ma xac minh dang ky Baotrixemay cua ban`
+        : `${otp} la ma xac minh dat lai mat khau ShrimpMate cua ban. Ma co hieu luc trong ${expiresInMinutes} phut.`;
+
+    const payload: Record<string, string> = {
+      ApiKey: apiKey,
+      SecretKey: secretKey,
+      Phone: normalizedPhone,
+      Content: content,
+      SmsType: smsType,
+      IsUnicode: '0',
+    };
+
+    if (smsType !== '8' && brandname) {
+      payload.Brandname = brandname;
+    }
+
+    try {
+      const response = await fetch(
+        'https://rest.esms.vn/MainService.svc/json/SendMultipleMessage_V4_post_json/',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        },
+      );
+
+      const data = (await response.json()) as { CodeResult?: string; ErrorMessage?: string; SMSID?: string };
+
+      if (data.CodeResult !== '100') {
+        this.logger.error(
+          `eSMS gửi thất bại tới ${normalizedPhone} (CodeResult: ${data.CodeResult}): ${data.ErrorMessage || 'Lỗi không xác định từ eSMS'}`,
+        );
+        return;
+      }
+
+      this.logger.log(`Password reset OTP SMS sent via eSMS to ${normalizedPhone} (SMSID: ${data.SMSID})`);
+    } catch (error) {
+      this.logger.error(
+        `Failed to send SMS OTP via eSMS to ${normalizedPhone}`,
+        error instanceof Error ? error.stack : error,
+      );
+    }
   }
 }
