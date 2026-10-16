@@ -55,10 +55,11 @@ export class OtpDeliveryService {
     }
 
     const from = this.configService.get<string>('mail.smtpFrom', 'noreply@shrimpmate.local');
+    const sender = from.includes('<') ? from : `"ShrimpMate" <${from}>`;
 
     try {
       await this.transporter.sendMail({
-        from,
+        from: sender,
         to: email,
         subject: 'ShrimpMate - Mã OTP đặt lại mật khẩu',
         text: [
