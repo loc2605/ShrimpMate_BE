@@ -231,13 +231,30 @@ POST /auth/refresh-token
 POST /auth/forgot-password
 ```
 
-- **Quyền**: Public.
-- **Công dụng**: Khởi tạo mã OTP ngẫu nhiên gồm 6 chữ số có hiệu lực trong 5 phút. Mã OTP được gửi qua email/SMS mô phỏng.
+- **Quyền**: Public (Không cần đăng nhập).
+- **Công dụng**: Khởi tạo mã OTP ngẫu nhiên gồm 6 chữ số có hiệu lực trong 5 phút. Mã OTP được phân phối đa kênh thực tế tới người dùng (Email thật và SMS thật).
+- **Cơ chế phân phối mã OTP (Multi-channel OTP Delivery)**:
+  - **Email (Gmail SMTP)**: Nếu `identifier` là định dạng Email, mã OTP được gửi qua Gmail SMTP (`locphanhuu2605@gmail.com`) với template HTML chuẩn thương hiệu ShrimpMate.
+  - **SMS thật (Cổng eSMS.vn)**: Nếu `identifier` là số điện thoại Việt Nam (chấp nhận các đầu số `0xxxxxxxxx`, `+84xxxxxxxxx`, `84xxxxxxxxx`), hệ thống tự động chuẩn hóa về số điện thoại nội địa `0xxxxxxxxx` và phát lệnh gửi tin nhắn SMS thật qua cổng API của **eSMS.vn** trực tiếp tới điện thoại của người dùng.
+    * *Môi trường thử nghiệm / KLTN*: Sử dụng Brandname test **`Baotrixemay`** (`ESMS_SMS_TYPE=2`) với mẫu cú pháp đã được các nhà mạng (Viettel, VinaPhone, MobiFone) phê duyệt sẵn: `{OTP} la ma xac minh dang ky Baotrixemay cua ban`.
+    * *Môi trường doanh nghiệp*: Tùy biến `ESMS_BRANDNAME` theo tên thương hiệu riêng của cơ sở nuôi tôm sau khi hoàn tất đăng ký với nhà mạng.
+  - **Console Server Log (Môi trường Dev)**: Khi `NODE_ENV !== 'production'`, mã OTP đồng thời được in trực tiếp ra terminal console của server backend để lập trình viên kiểm thử nhanh mà không bắt buộc phải mở điện thoại/email.
+- **Bảo mật & Giới hạn tần suất (Rate Limiting & Security)**:
+  - **Thời gian hiệu lực**: 5 phút (`OTP_EXPIRES_IN_MINUTES=5`).
+  - **Thời gian chờ giữa các lần gửi (Cooldown)**: 60 giây (`OTP_REQUEST_COOLDOWN_SECONDS=60`). Nếu gửi liên tiếp trong vòng 60 giây, hệ thống trả về mã lỗi `429 Too Many Requests` kèm thời gian chờ còn lại.
+  - **Số lần thử tối đa**: Tối đa 5 lần nhập sai (`OTP_MAX_ATTEMPTS=5`). Quá 5 lần, mã OTP sẽ bị hủy hoàn toàn để chống tấn công brute-force.
 
-#### Body:
+#### Body (Yêu cầu qua Email):
 ```json
 {
-  "identifier": "farmer1@example.com"
+  "identifier": "locphanhuu2605@gmail.com"
+}
+```
+
+#### Body (Yêu cầu qua Số điện thoại):
+```json
+{
+  "identifier": "0865152043"
 }
 ```
 
@@ -248,6 +265,10 @@ POST /auth/forgot-password
 }
 ```
 
+#### Mã lỗi:
+- `400 Bad Request`: `identifier` không hợp lệ hoặc để trống.
+- `429 Too Many Requests`: Yêu cầu gửi lại quá nhanh khi chưa hết 60 giây cooldown.
+
 ---
 
 ### 3.5. Gửi lại mã OTP (Resend OTP)
@@ -257,14 +278,25 @@ POST /auth/resend-otp
 ```
 
 - **Quyền**: Public.
-- **Công dụng**: Vô hiệu hóa OTP cũ và phát hành mã OTP mới cho tài khoản.
+- **Công dụng**: Vô hiệu hóa mã OTP cũ trước đó và phát hành mã OTP mới cho tài khoản, phân phối lại qua Email thật (Gmail SMTP) hoặc SMS thật (eSMS Gateway). Vẫn áp dụng cơ chế Cooldown 60 giây để chống spam.
 
 #### Body:
 ```json
 {
-  "identifier": "farmer1@example.com"
+  "identifier": "0865152043"
 }
 ```
+
+#### Phản hồi thành công (`200 OK`):
+```json
+{
+  "message": "Nếu tài khoản tồn tại trong hệ thống, mã OTP đã được gửi. Vui lòng kiểm tra email/SMS hoặc liên hệ quản trị viên."
+}
+```
+
+#### Mã lỗi:
+- `400 Bad Request`: Thiếu `identifier`.
+- `429 Too Many Requests`: Gửi yêu cầu lại khi chưa hết 60 giây chờ.
 
 ---
 

@@ -83,7 +83,7 @@ Hệ thống sử dụng cơ chế xác thực không trạng thái (**Stateless
 
 | Nhóm chức năng | Mô tả chi tiết | Các API sử dụng |
 | --- | --- | --- |
-| **1. Xác thực & Hồ sơ cá nhân** | - Tự đăng ký tài khoản Quản lý mới bằng Email/Số điện thoại.<br>- Đăng nhập, đổi mật khẩu, quên mật khẩu qua mã OTP (SMS/Email). | `POST /auth/register`<br>`POST /auth/login`<br>`PATCH /auth/profile`<br>`PATCH /auth/change-password`<br>`POST /auth/forgot-password`<br>`GET /auth/manager-check` |
+| **1. Xác thực & Hồ sơ cá nhân** | - Tự đăng ký tài khoản Quản lý mới bằng Email/Số điện thoại.<br>- Đăng nhập, đổi mật khẩu.<br>- Khôi phục mật khẩu qua mã OTP đa kênh (Email thật qua Gmail SMTP & SMS thật qua cổng eSMS.vn). | `POST /auth/register`<br>`POST /auth/login`<br>`PATCH /auth/profile`<br>`PATCH /auth/change-password`<br>`POST /auth/forgot-password`<br>`POST /auth/resend-otp`<br>`POST /auth/verify-reset-otp`<br>`POST /auth/reset-password`<br>`GET /auth/manager-check` |
 | **2. Quản lý Người nuôi (Farmer Management - UC020)** | - Trực tiếp tạo tài khoản cho Farmer với mật khẩu ngẫu nhiên do hệ thống sinh ra.<br>- Xem danh sách Farmer thuộc quyền quản lý.<br>- Cập nhật thông tin họ tên, SĐT, Email của Farmer.<br>- Khóa/mở khóa tài khoản Farmer. | `POST /farmers`<br>`GET /farmers`<br>`GET /farmers/:id`<br>`PATCH /farmers/:id`<br>`PATCH /farmers/:id/status` |
 | **3. Phân công Ao nuôi (Farmer Assignment - UC021)** | - Phân công một hoặc nhiều ao nuôi (hoặc toàn bộ trang trại) cho Farmer phụ trách.<br>- Xem danh sách phân công của từng Farmer.<br>- Thay đổi hoặc thu hồi phân công. | `POST /farmers/:id/assignments`<br>`GET /farmers/:id/assignments`<br>`DELETE /farmers/:id/assignments/:assignmentId`<br>`DELETE /farmers/:id/assignments` |
 | **4. Quản lý Trang trại & Ao nuôi (UC005, UC006)** | - Khởi tạo trang trại (`farms`) do mình sở hữu (`owner_id = manager.id`).<br>- Khai báo danh mục các ao nuôi (`ponds`), diện tích (m²) và trạng thái hoạt động.<br>- Sửa, xóa (soft delete) trang trại và ao nuôi. | `POST /farms`<br>`GET /farms`<br>`PATCH /farms/:id`<br>`DELETE /farms/:id`<br>`POST /farms/:farmId/ponds`<br>`GET /farms/:farmId/ponds`<br>`PATCH /farms/:farmId/ponds/:id`<br>`DELETE /farms/:farmId/ponds/:id` |
@@ -108,7 +108,7 @@ Hệ thống sử dụng cơ chế xác thực không trạng thái (**Stateless
 
 | Nhóm chức năng | Mô tả chi tiết | Các API sử dụng |
 | --- | --- | --- |
-| **1. Xác thực & Đổi mật khẩu** | - Đăng nhập bằng tài khoản và mật khẩu do Manager cấp.<br>- Đổi mật khẩu tài khoản ở lần đăng nhập đầu tiên.<br>- Đặt lại mật khẩu qua mã OTP (SMS/Email) nếu quên. | `POST /auth/login`<br>`PATCH /auth/change-password`<br>`POST /auth/forgot-password`<br>`POST /auth/verify-reset-otp`<br>`POST /auth/reset-password`<br>`GET /auth/farmer-check` |
+| **1. Xác thực & Đổi mật khẩu** | - Đăng nhập bằng tài khoản và mật khẩu do Manager cấp.<br>- Đổi mật khẩu tài khoản ở lần đăng nhập đầu tiên.<br>- Khôi phục mật khẩu qua mã OTP đa kênh (SMS thật qua cổng eSMS.vn & Email thật qua Gmail SMTP). | `POST /auth/login`<br>`PATCH /auth/change-password`<br>`POST /auth/forgot-password`<br>`POST /auth/resend-otp`<br>`POST /auth/verify-reset-otp`<br>`POST /auth/reset-password`<br>`GET /auth/farmer-check` |
 | **2. Xem Ao nuôi được phân công** | - Xem danh sách trang trại và các ao nuôi mà mình được Manager phân công phụ trách.<br>- Chuyển đổi giữa các ao nuôi nhanh chóng. | `GET /farms`<br>`GET /farms/:farmId/ponds`<br>`GET /farms/:farmId/ponds/:id` |
 | **3. Giám sát Nước Tức thời (Gauges - UC013)** | - Xem thẻ tóm tắt màu cảnh báo nhanh (Xanh: Tối ưu / Vàng: Cảnh báo / Đỏ: Nguy cấp) cho 6 thông số: DO, pH, Nhiệt độ, Độ mặn, NH₃, Độ đục.<br>- Cập nhật tức thời thời gian đo gần nhất. | `GET /ponds/:pondId/telemetry/latest` |
 | **4. Xem Khuyến nghị AI Tóm tắt (UC014)** | - Xem lượng thức ăn khuyến nghị cho cữ ăn hiện tại.<br>- Xem chỉ số thèm ăn tức thời của đàn tôm (Mức 0: Không ăn, 1: Ăn yếu, 2: Bình thường, 3: Ăn mạnh). | `GET /camera/ponds/:pondId/latest-fis`<br>`GET /ai-integration/ponds/:pondId/recommendations` |
@@ -151,7 +151,13 @@ Hệ thống sử dụng cơ chế xác thực không trạng thái (**Stateless
 | :--- | :--- | :---: | :---: | :---: | :--- |
 | **Auth** | `POST /auth/register` | ❌ | 🟢 **Chính** | ❌ | Chỉ Manager tự đăng ký |
 | | `POST /auth/login` | 🟢 | 🟢 | 🟢 | Mọi vai trò |
+| | `POST /auth/forgot-password` | 🟢 | 🟢 | 🟢 | Public, yêu cầu OTP khôi phục mật khẩu (Email/SMS thật) |
+| | `POST /auth/resend-otp` | 🟢 | 🟢 | 🟢 | Public, gửi lại mã OTP (áp dụng cooldown 60s) |
+| | `POST /auth/verify-reset-otp` | 🟢 | 🟢 | 🟢 | Public, xác thực mã OTP trước khi đặt lại |
+| | `POST /auth/reset-password` | 🟢 | 🟢 | 🟢 | Public, đặt lại mật khẩu bằng mã OTP |
 | | `GET /auth/me` | 🟢 | 🟢 | 🟢 | Lấy thông tin cá nhân |
+| | `PATCH /auth/profile` | 🟢 | 🟢 | 🟢 | Cập nhật họ tên, SĐT cá nhân |
+| | `PATCH /auth/change-password` | 🟢 | 🟢 | 🟢 | Đổi mật khẩu (cần mật khẩu cũ) |
 | | `GET /auth/users` | 🟢 | ❌ | ❌ | Admin quản lý tài khoản |
 | | `PATCH /auth/users/:id/status` | 🟢 | ❌ | ❌ | Admin khóa/mở khóa tài khoản |
 | | `GET /auth/admin-check` | 🟢 | ❌ | ❌ | Guard kiểm tra Admin |
@@ -188,3 +194,47 @@ Hệ thống sử dụng cơ chế xác thực không trạng thái (**Stateless
 | | `PATCH /camera/ponds/:id/weights` | 🟢 | 🟢 | ❌ | Cấu hình trọng số FIS |
 | **Safety Rules**| CRUD `/safety-rules` | 🟢 | ❌ | ❌ | Admin cấu hình luật an toàn |
 | **Admin Reports**| `GET /admin/*` | 🟢 | ❌ | ❌ | Báo cáo toàn hệ thống |
+
+---
+
+## 8. Kiến Trúc Xác Thực & Phân Phối Mã OTP (Multi-Channel OTP Delivery)
+
+Hệ thống ShrimpMate triển khai giải pháp xác thực và khôi phục tài khoản hai lớp (Two-Factor Authentication / OTP Recovery) chuẩn hóa cho môi trường viễn thông Việt Nam:
+
+```text
+[ Yêu cầu: POST /auth/forgot-password ]
+                     |
+         +-----------+-----------+
+         |                       |
+   (Email format)        (Phone format: 0865152043)
+         |                       |
+         v                       v
+ [ Gmail SMTP Service ]  [ Phone Normalizer ]
+         |                       |
+         v                       v
+ [ HTML Email Template ]  [ eSMS.vn Gateway ]
+         |                       |
+         v                       v
+ (Hộp thư người dùng)     (SMS về điện thoại)
+```
+
+### 8.1. Các kênh phân phối OTP thực tế
+
+1. **Kênh Email (Gmail SMTP)**:
+   - Gửi qua dịch vụ SMTP chính thức (`smtp.gmail.com:587`, STARTTLS).
+   - Email hiển thị giao diện HTML định dạng thương hiệu **ShrimpMate**, cung cấp mã OTP 6 số cùng thời hạn hiệu lực rõ ràng.
+
+2. **Kênh SMS (Cổng eSMS.vn)**:
+   - Tích hợp trực tiếp qua REST API của cổng **eSMS.vn** (đơn vị cung cấp giải pháp SMS viễn thông trong nước).
+   - **Chuẩn hóa số điện thoại**: Tự động chuyển đổi các định dạng quốc tế (`+84865152043`, `84865152043`) hoặc nội địa thành chuẩn 10 chữ số `0xxxxxxxxx` trước khi gửi lên nhà mạng.
+   - **Tuân thủ quy định viễn thông**:
+     - *Môi trường kiểm thử / KLTN*: Sử dụng Brandname test **`Baotrixemay`** (`ESMS_SMS_TYPE=2`) kèm template chuẩn đã được các nhà mạng (Viettel, VinaPhone, MobiFone) phê duyệt sẵn: `{OTP} la ma xac minh dang ky Baotrixemay cua ban`.
+     - *Môi trường doanh nghiệp sản xuất*: Hỗ trợ cấu hình `ESMS_BRANDNAME` tùy biến theo tên cơ sở nuôi tôm sau khi hoàn tất thủ tục đăng ký thương hiệu với nhà mạng.
+   - **Log Development**: Khi chạy trong môi trường phát triển (`NODE_ENV !== 'production'`), mã OTP đồng thời được in ra terminal console của máy chủ Backend để hỗ trợ debug lập trình nhanh chóng.
+
+### 8.2. Cơ chế bảo mật & Chống lạm dụng (Security Controls)
+
+- **Thời hạn hiệu lực**: Mã OTP tồn tại tối đa 5 phút (`OTP_EXPIRES_IN_MINUTES=5`).
+- **Thời gian chờ chống spam (Cooldown Rate Limit)**: Bắt buộc tối thiểu 60 giây (`OTP_REQUEST_COOLDOWN_SECONDS=60`) giữa 2 lần bấm yêu cầu cấp mã.
+- **Giới hạn số lần thử (Brute-force Protection)**: Cho phép nhập sai tối đa 5 lần (`OTP_MAX_ATTEMPTS=5`). Quá 5 lần, mã OTP hiện tại bị thu hồi ngay lập tức.
+- **Vô hiệu hóa phiên đăng nhập cũ**: Sau khi đặt lại mật khẩu thành công bằng mã OTP, toàn bộ `refreshToken` trước đó bị thu hồi để đảm bảo kẻ gian không thể tiếp tục phiên truy cập trái phép.

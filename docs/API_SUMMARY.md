@@ -27,8 +27,8 @@ Tài liệu tra cứu nhanh (Quick Reference) toàn bộ các endpoint, phương
 | **2** | **Auth** | `/auth/register` | `POST` | Public | Quản lý (`manager`) tự đăng ký tài khoản mới trên Web App, chuẩn hóa SĐT Việt Nam |
 | **3** | | `/auth/login` | `POST` | Public | Đăng nhập bằng Email hoặc SĐT + Password, trả về `accessToken` & `refreshToken` |
 | **4** | | `/auth/refresh-token` | `POST` | Public | Cấp lại `accessToken` mới từ `refreshToken` hợp lệ |
-| **5** | | `/auth/forgot-password` | `POST` | Public | Gửi yêu cầu mã OTP 6 chữ số khôi phục mật khẩu (hiệu lực 5 phút qua Email/SMS) |
-| **6** | | `/auth/resend-otp` | `POST` | Public | Hủy OTP cũ và gửi lại mã OTP mới |
+| **5** | | `/auth/forgot-password` | `POST` | Public | Gửi mã OTP 6 số khôi phục mật khẩu (Email qua Gmail SMTP & SMS thật qua eSMS.vn, hiệu lực 5 phút) |
+| **6** | | `/auth/resend-otp` | `POST` | Public | Hủy OTP cũ và gửi lại mã OTP mới (cooldown 60s) |
 | **7** | | `/auth/verify-reset-otp` | `POST` | Public | Xác thực tính hợp lệ của OTP trước khi người dùng nhập mật khẩu mới |
 | **8** | | `/auth/reset-password` | `POST` | Public | Đặt lại mật khẩu mới bằng mã OTP, tự động hủy các refresh token cũ |
 | **9** | | `/auth/me` | `GET` | Authenticated | Lấy thông tin hồ sơ của tài khoản đang đăng nhập |
