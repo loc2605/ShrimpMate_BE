@@ -52,6 +52,7 @@ export class AuthService {
       fullName: registerDto.fullName.trim(),
       role: UserRole.MANAGER,
       isActive: true,
+      mustChangePassword: false,
     });
 
     const savedUser = await this.userRepository.save(user);
@@ -190,6 +191,7 @@ export class AuthService {
 
     user.passwordHash = await bcrypt.hash(dto.newPassword, 12);
     user.refreshTokenHash = null;
+    user.mustChangePassword = false;
     await this.userRepository.save(user);
 
     otpRecord.usedAt = new Date();
@@ -209,8 +211,16 @@ export class AuthService {
     }
     user.passwordHash = await bcrypt.hash(dto.newPassword, 12);
     user.refreshTokenHash = null;
+    user.mustChangePassword = false;
     await this.userRepository.save(user);
     return { message: 'Đổi mật khẩu thành công, vui lòng đăng nhập lại' };
+  }
+
+  async logout(userId: string) {
+    const user = await this.findUser(userId);
+    user.refreshTokenHash = null;
+    await this.userRepository.save(user);
+    return { message: 'Đăng xuất thành công' };
   }
 
   async findAllUsers() {
@@ -242,7 +252,12 @@ export class AuthService {
   }
 
   private async createAuthResponse(user: User) {
-    const payload = { sub: user.id, email: user.email, role: user.role };
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+      mustChangePassword: user.mustChangePassword,
+    };
     const accessToken = await this.jwtService.signAsync(payload);
     const refreshToken = await this.jwtService.signAsync(
       { sub: user.id, type: 'refresh' },

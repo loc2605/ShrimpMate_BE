@@ -128,6 +128,7 @@ POST /auth/register
     "fullName": "Nguyen Van Farmer",
     "role": "farmer",
     "isActive": true,
+    "mustChangePassword": false,
     "createdAt": "2026-10-10T08:00:00.000Z",
     "updatedAt": "2026-10-10T08:00:00.000Z"
   }
@@ -177,6 +178,7 @@ POST /auth/login
     "fullName": "Nguyen Van Farmer",
     "role": "farmer",
     "isActive": true,
+    "mustChangePassword": false,
     "createdAt": "2026-10-10T08:00:00.000Z",
     "updatedAt": "2026-10-10T08:00:00.000Z"
   }
@@ -215,7 +217,8 @@ POST /auth/refresh-token
     "phoneNumber": "0901234567",
     "fullName": "Nguyen Van Farmer",
     "role": "farmer",
-    "isActive": true
+    "isActive": true,
+    "mustChangePassword": false
   }
 }
 ```
@@ -225,7 +228,33 @@ POST /auth/refresh-token
 
 ---
 
-### 3.4. Yêu cầu mã OTP khôi phục mật khẩu (Forgot Password)
+### 3.4. Đăng xuất hệ thống (Logout)
+
+```http
+POST /auth/logout
+```
+
+- **Quyền**: Authenticated (`Bearer <access_token>`).
+- **Công dụng**: Đăng xuất khỏi hệ thống, hủy bỏ phiên làm việc và xóa bỏ `refreshTokenHash` trong CSDL, ngăn chặn hoàn toàn việc tái sử dụng refresh token cũ.
+
+#### Header:
+```http
+Authorization: Bearer <access_token>
+```
+
+#### Phản hồi thành công (`200 OK`):
+```json
+{
+  "message": "Đăng xuất thành công"
+}
+```
+
+#### Mã lỗi:
+- `401 Unauthorized`: Token không hợp lệ hoặc đã hết hạn.
+
+---
+
+### 3.5. Yêu cầu mã OTP khôi phục mật khẩu (Forgot Password)
 
 ```http
 POST /auth/forgot-password

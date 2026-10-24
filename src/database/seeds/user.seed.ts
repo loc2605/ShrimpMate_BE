@@ -81,6 +81,7 @@ export async function seedUserData(dataSource: DataSource) {
         fullName: seedUser.fullName,
         role: seedUser.role,
         isActive: true,
+        mustChangePassword: false,
       }),
     );
     users.push(created);

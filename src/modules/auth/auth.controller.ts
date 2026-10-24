@@ -37,6 +37,13 @@ export class AuthController {
     return this.authService.refreshToken(dto.refreshToken);
   }
 
+  @Post('logout')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  logout(@CurrentUser() user: User) {
+    return this.authService.logout(user.id);
+  }
+
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
   forgotPassword(@Body() dto: ForgotPasswordDto) {

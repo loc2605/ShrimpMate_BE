@@ -40,6 +40,7 @@ Lưu tài khoản đăng nhập hệ thống.
 | `role` | ENUM | `admin`, `manager`, `farmer` (mặc định: `farmer`) |
 | `manager_id` | UUID | FK -> `users.id`, ID của Manager quản lý (chỉ áp dụng cho Farmer) |
 | `isActive` | BOOLEAN | Mặc định `true` (Admin hoặc Manager có thể khóa/mở khóa) |
+| `must_change_password` | BOOLEAN | Mặc định `false`. Được đặt thành `true` khi Manager tạo tài khoản Farmer |
 | `created_at` | TIMESTAMPTZ | Thời gian tạo |
 | `updated_at` | TIMESTAMPTZ | Thời gian cập nhật |
 

@@ -51,6 +51,7 @@ export class FarmersService {
       role: UserRole.FARMER,
       managerId: manager.role === UserRole.ADMIN ? null : manager.id,
       isActive: true,
+      mustChangePassword: true,
     });
 
     const savedFarmer = await this.userRepository.save(farmer);
