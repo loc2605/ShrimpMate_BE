@@ -1,10 +1,12 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import Joi from 'joi';
+import { ScheduleModule } from '@nestjs/schedule';
 import { createObserveModule } from '@nestjs/observe';
 import configuration from './config/configuration';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { EventsModule } from './modules/events/events.module';
 import { AiIntegrationModule } from './modules/ai-integration/ai-integration.module';
 import { SafetyRuleModule } from './modules/safety-rule/safety-rule.module';
 import { AlertsModule } from './modules/alerts/alerts.module';
@@ -74,6 +76,8 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     AiIntegrationModule,
     SafetyRuleModule,
     AlertsModule,
+    ScheduleModule.forRoot(),
+    EventsModule,
     NotificationsModule,
     CameraModule,
   ],

@@ -6,10 +6,13 @@ import { PondAccessModule } from '../../common/guards/pond-access.module';
 import { AlertsController } from './alerts.controller';
 import { AlertsService } from './alerts.service';
 
+import { NotificationsModule } from '../notifications/notifications.module';
+
 @Module({
   imports: [
     TypeOrmModule.forFeature([Alert, Pond]),
     PondAccessModule,
+    NotificationsModule,
   ],
   controllers: [AlertsController],
   providers: [AlertsService],

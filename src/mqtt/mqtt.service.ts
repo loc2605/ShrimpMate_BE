@@ -8,6 +8,7 @@ import { FeedingRecord } from '../database/entities/feeding-record.entity';
 import { DeviceStatus, FeedingStatus } from '../database/entities/enums';
 import { TelemetryService } from '../modules/telemetry/telemetry.service';
 import { CameraService } from '../modules/camera/camera.service';
+import { EventsGateway } from '../modules/events/events.gateway';
 import {
   MQTT_TOPICS,
   MqttCameraFramePayload,
@@ -33,6 +34,7 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
     private readonly deviceRepository: Repository<Device>,
     @InjectRepository(FeedingRecord)
     private readonly feedingRecordRepository: Repository<FeedingRecord>,
+    private readonly eventsGateway: EventsGateway,
   ) {}
 
   onModuleInit() {
@@ -259,8 +261,22 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
     }
 
     // Ghi nhận telemetry vào database thông qua TelemetryService
-    await this.telemetryService.recordTelemetry(pondId, {
+    const recorded = await this.telemetryService.recordTelemetry(pondId, {
       deviceId: device?.id,
+      ph: data.ph,
+      dissolvedOxygenMgL: data.dissolvedOxygenMgL,
+      temperatureC: data.temperatureC,
+      salinityPpt: data.salinityPpt,
+      ammoniaMgL: data.ammoniaMgL,
+      turbidityNtu: data.turbidityNtu,
+      measuredAt: data.measuredAt ?? new Date().toISOString(),
+    });
+
+    // Phát sự kiện WebSocket thời gian thực tới Web SCADA
+    this.eventsGateway.broadcastTelemetry(pondId, {
+      readingId: recorded.id,
+      deviceId: device?.id,
+      deviceUid,
       ph: data.ph,
       dissolvedOxygenMgL: data.dissolvedOxygenMgL,
       temperatureC: data.temperatureC,
@@ -300,6 +316,15 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
 
         await this.feedingRecordRepository.save(record);
         this.logger.log(`[MQTT] Đã cập nhật feeding record ${record.id} sang trạng thái ${record.status}`);
+
+        // Phát sự kiện WebSocket trạng thái feeder tới Web SCADA
+        this.eventsGateway.broadcastFeederStatus(record.pondId, {
+          recordId: record.id,
+          status: record.status,
+          actualAmountKg: record.actualAmountKg,
+          stoppedReason: record.stoppedReason,
+          finishedAt: record.finishedAt,
+        });
       }
     }
   }
@@ -323,6 +348,14 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
       }
       await this.deviceRepository.save(device);
       this.logger.debug(`[MQTT] Heartbeat cập nhật cho thiết bị ${device.deviceUid}`);
+
+      // Phát sự kiện WebSocket trạng thái thiết bị
+      this.eventsGateway.broadcastDeviceStatus(device.id, {
+        deviceUid: device.deviceUid,
+        status: device.status,
+        lastSeenAt: device.lastSeenAt,
+        rssi: data.rssi,
+      });
     }
   }
 
@@ -342,6 +375,12 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
           resolve(false);
         } else {
           this.logger.log(`[MQTT] Đã gửi lệnh feeder thành công tới ${topic}: ${message}`);
+          this.eventsGateway.broadcastFeederStatus('all', {
+            deviceUid,
+            command: payload.command,
+            feedAmountKg: payload.feedAmountKg,
+            timestamp: payload.timestamp || new Date().toISOString(),
+          });
           resolve(true);
         }
       });

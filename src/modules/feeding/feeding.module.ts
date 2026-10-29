@@ -11,6 +11,7 @@ import { MqttModule } from '../../mqtt/mqtt.module';
 import { AlertsModule } from '../alerts/alerts.module';
 import { FeedingController } from './feeding.controller';
 import { FeedingService } from './feeding.service';
+import { FeedingSchedulerService } from './feeding-scheduler.service';
 
 @Module({
   imports: [
@@ -21,7 +22,7 @@ import { FeedingService } from './feeding.service';
     AlertsModule,
   ],
   controllers: [FeedingController],
-  providers: [FeedingService],
-  exports: [FeedingService],
+  providers: [FeedingService, FeedingSchedulerService],
+  exports: [FeedingService, FeedingSchedulerService],
 })
 export class FeedingModule {}

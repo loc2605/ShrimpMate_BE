@@ -8,6 +8,9 @@ import { PondAccessService } from '../../common/guards/pond-access.service';
 import { User } from '../../database/entities/user.entity';
 import { QueryAlertDto } from './dto/query-alert.dto';
 
+import { NotificationsService } from '../notifications/notifications.service';
+import { EventsGateway } from '../events/events.gateway';
+
 @Injectable()
 export class AlertsService {
   constructor(
@@ -16,6 +19,8 @@ export class AlertsService {
     @InjectRepository(Pond)
     private readonly pondRepository: Repository<Pond>,
     private readonly pondAccessService: PondAccessService,
+    private readonly notificationsService: NotificationsService,
+    private readonly eventsGateway: EventsGateway,
   ) {}
 
   async getAllAlerts(user: User, queryDto?: QueryAlertDto) {
@@ -196,7 +201,19 @@ export class AlertsService {
       metadata: data.metadata ?? {},
     });
 
-    return this.alertRepository.save(alert);
+    const savedAlert = await this.alertRepository.save(alert);
+
+    // 1. Phát sự kiện WebSocket tức thì tới màn hình SCADA
+    this.eventsGateway.broadcastAlert(savedAlert as any);
+
+    // 2. Nếu mức độ CRITICAL, kích hoạt gửi Email & SMS khẩn cấp qua NotificationsService
+    if (savedAlert.severity === AlertSeverity.CRITICAL) {
+      this.notificationsService.notifyCriticalAlert(savedAlert).catch((err) => {
+        console.error('Lỗi khi gửi thông báo khẩn cấp cho alert:', err);
+      });
+    }
+
+    return savedAlert;
   }
 
   async acknowledgeAlert(id: string, user: User) {
@@ -212,7 +229,9 @@ export class AlertsService {
 
     alert.status = AlertStatus.ACKNOWLEDGED;
     alert.acknowledgedAt = new Date();
-    return this.alertRepository.save(alert);
+    const updated = await this.alertRepository.save(alert);
+    this.eventsGateway.broadcastAlert(updated as any);
+    return updated;
   }
 
   async resolveAlert(id: string, user: User) {
@@ -228,7 +247,9 @@ export class AlertsService {
 
     alert.status = AlertStatus.RESOLVED;
     alert.resolvedAt = new Date();
-    return this.alertRepository.save(alert);
+    const updated = await this.alertRepository.save(alert);
+    this.eventsGateway.broadcastAlert(updated as any);
+    return updated;
   }
 
   private async ensurePondExists(pondId: string) {
