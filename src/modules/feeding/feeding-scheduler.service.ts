@@ -14,11 +14,14 @@ import {
   FeedingSource,
   FeedingStatus,
   SafetyDecision,
+  UserRole,
 } from '../../database/entities/enums';
+import { User } from '../../database/entities/user.entity';
 import { SafetyRuleEngineService } from '../safety-rule/safety-rule-engine.service';
 import { MqttService } from '../../mqtt/mqtt.service';
 import { AlertsService } from '../alerts/alerts.service';
 import { EventsGateway } from '../events/events.gateway';
+import { AiIntegrationService } from '../ai-integration/ai-integration.service';
 
 @Injectable()
 export class FeedingSchedulerService {
@@ -39,6 +42,7 @@ export class FeedingSchedulerService {
     private readonly mqttService: MqttService,
     private readonly alertsService: AlertsService,
     private readonly eventsGateway: EventsGateway,
+    private readonly aiService: AiIntegrationService,
   ) {}
 
   /**
@@ -114,7 +118,20 @@ export class FeedingSchedulerService {
         where: { pondId: schedule.pondId, type: DeviceType.FEEDER },
       });
 
-      const requestedAmount = Number(schedule.feedAmountKg) || 10.0;
+      let requestedAmount = Number(schedule.feedAmountKg);
+      if (isNaN(requestedAmount) || requestedAmount <= 0) {
+        // Nếu lịch ăn không đặt kg cố định -> Tự động tính toán lượng ăn tối ưu bằng mô hình AI
+        try {
+          const systemUser = { role: UserRole.ADMIN } as User;
+          const aiResult = await this.aiService.predictFeedDemand(schedule.pondId, systemUser);
+          requestedAmount = aiResult.predictedFeedAmountKg;
+          this.logger.log(
+            `[FeedingScheduler] AI đã tự động dự báo lượng ăn cho cữ [${schedule.name}]: ${requestedAmount} kg`,
+          );
+        } catch {
+          requestedAmount = 10.0;
+        }
+      }
 
       // 4. KIỂM DUYỆT AN TOÀN QUA SAFETY RULE ENGINE
       const evaluation = await this.safetyRuleEngineService.evaluateFeedingSafety(

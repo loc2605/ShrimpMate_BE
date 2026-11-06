@@ -15,6 +15,10 @@ export interface SafetyEvaluationResult {
   appliedRules: string[];
   telemetrySnapshot: Partial<TelemetryReading> | null;
   visionSnapshot: Partial<CameraFisLog> | null;
+  contextSnapshot?: {
+    deltaTan?: number;
+    morningRainMm?: number;
+  };
 }
 
 interface ConditionItem {
@@ -44,12 +48,29 @@ export class SafetyRuleEngineService {
     pondId: string,
     deviceId?: string,
     requestedAmountKg = 10.0,
+    contextOverrides?: {
+      morningRainMm?: number;
+      deltaTan?: number;
+    },
   ): Promise<SafetyEvaluationResult> {
-    // 1. Lấy telemetry mới nhất của ao
-    const latestReading = await this.readingRepository.findOne({
+    // 1. Lấy telemetry mới nhất và cữ trước để tính deltaTan
+    const recentReadings = await this.readingRepository.find({
       where: { pondId },
       order: { measuredAt: 'DESC' },
+      take: 2,
     });
+    const latestReading = recentReadings[0] ?? null;
+
+    let computedDeltaTan = 0;
+    if (recentReadings.length >= 2) {
+      const tanLatest = Number(recentReadings[0].ammoniaMgL) || 0;
+      const tanPrev = Number(recentReadings[1].ammoniaMgL) || 0;
+      computedDeltaTan = Number((tanLatest - tanPrev).toFixed(3));
+    }
+    const deltaTan = contextOverrides?.deltaTan !== undefined
+      ? contextOverrides.deltaTan
+      : computedDeltaTan;
+    const morningRainMm = contextOverrides?.morningRainMm ?? 0.0;
 
     // 2. Lấy thông tin thiết bị (nếu có)
     let device: Device | null = null;
@@ -76,7 +97,14 @@ export class SafetyRuleEngineService {
 
     // 5. Đánh giá qua bộ quy tắc an toàn động cấu hình trong CSDL
     for (const rule of rules) {
-      const isTriggered = this.evaluateCondition(rule.condition, latestReading, device, latestFis);
+      const isTriggered = this.evaluateCondition(
+        rule.condition,
+        latestReading,
+        device,
+        latestFis,
+        deltaTan,
+        morningRainMm,
+      );
 
       if (isTriggered) {
         appliedRules.push(rule.code);
@@ -168,6 +196,10 @@ export class SafetyRuleEngineService {
             behaviorClassificationCt: latestFis.behaviorClassificationCt,
           }
         : null,
+      contextSnapshot: {
+        deltaTan,
+        morningRainMm,
+      },
     };
   }
 
@@ -176,6 +208,8 @@ export class SafetyRuleEngineService {
     reading: TelemetryReading | null,
     device: Device | null,
     vision: CameraFisLog | null,
+    deltaTan = 0,
+    morningRainMm = 0,
   ): boolean {
     if (!condition) return false;
 
@@ -192,19 +226,19 @@ export class SafetyRuleEngineService {
     // Điều kiện OR
     if (Array.isArray(condition.or)) {
       return (condition.or as ConditionItem[]).some((subCond) =>
-        this.evaluateSingleCondition(subCond, reading, device, vision),
+        this.evaluateSingleCondition(subCond, reading, device, vision, deltaTan, morningRainMm),
       );
     }
 
     // Điều kiện AND
     if (Array.isArray(condition.and)) {
       return (condition.and as ConditionItem[]).every((subCond) =>
-        this.evaluateSingleCondition(subCond, reading, device, vision),
+        this.evaluateSingleCondition(subCond, reading, device, vision, deltaTan, morningRainMm),
       );
     }
 
     // Điều kiện đơn lẻ
-    return this.evaluateSingleCondition(condition as ConditionItem, reading, device, vision);
+    return this.evaluateSingleCondition(condition as ConditionItem, reading, device, vision, deltaTan, morningRainMm);
   }
 
   private evaluateSingleCondition(
@@ -212,6 +246,8 @@ export class SafetyRuleEngineService {
     reading: TelemetryReading | null,
     device: Device | null,
     vision: CameraFisLog | null,
+    deltaTan = 0,
+    morningRainMm = 0,
   ): boolean {
     if (item.checkDevice) {
       if (device) {
@@ -222,6 +258,14 @@ export class SafetyRuleEngineService {
 
     if (!item.field) {
       return false;
+    }
+
+    // Kiểm tra các trường tính toán từ môi trường & thời tiết (ΔTAN, Lượng mưa)
+    if (item.field === 'deltaTan') {
+      return this.compareNumeric(deltaTan, Number(item.value), item.operator);
+    }
+    if (item.field === 'morningRainMm') {
+      return this.compareNumeric(morningRainMm, Number(item.value), item.operator);
     }
 
     // Kiểm tra trường thuộc Vision (Camera FIS)

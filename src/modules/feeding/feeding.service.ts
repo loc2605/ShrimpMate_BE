@@ -28,6 +28,8 @@ import { PondAccessService } from '../../common/guards/pond-access.service';
 import { SafetyRuleEngineService } from '../safety-rule/safety-rule-engine.service';
 import { MqttService } from '../../mqtt/mqtt.service';
 import { AlertsService } from '../alerts/alerts.service';
+import { AiIntegrationService } from '../ai-integration/ai-integration.service';
+import { DeviceType } from '../../database/entities/enums';
 
 @Injectable()
 export class FeedingService {
@@ -46,6 +48,7 @@ export class FeedingService {
 		private readonly safetyRuleEngineService: SafetyRuleEngineService,
 		private readonly mqttService: MqttService,
 		private readonly alertsService: AlertsService,
+		private readonly aiService: AiIntegrationService,
 	) { }
 
 	async createSchedule(pondId: string, dto: CreateFeedingScheduleDto, user?: User) {
@@ -106,6 +109,11 @@ export class FeedingService {
 			if (device.pondId && device.pondId !== pondId) {
 				throw new BadRequestException('Thiết bị không được gán cho ao này');
 			}
+		} else {
+			// Tự động tìm thiết bị Feeder đã gán cho ao
+			device = await this.deviceRepository.findOne({
+				where: { pondId, type: DeviceType.FEEDER },
+			});
 		}
 
 		if (dto.scheduleId) {
@@ -118,11 +126,25 @@ export class FeedingService {
 			}
 		}
 
-		// Đánh giá Safety Rule Engine trước khi tạo và kích hoạt cho ăn
-		const requestedAmount = Number(dto.requestedAmountKg) || 10.0;
+		// 1. Tự động tính toán lượng thức ăn bằng AI nếu có cờ useAiPrediction hoặc không chỉ định số kg
+		let requestedAmount = Number(dto.requestedAmountKg);
+		if (dto.useAiPrediction || isNaN(requestedAmount) || requestedAmount <= 0) {
+			if (user) {
+				try {
+					const aiResult = await this.aiService.predictFeedDemand(pondId, user);
+					requestedAmount = aiResult.predictedFeedAmountKg;
+				} catch {
+					requestedAmount = Number(dto.requestedAmountKg) || 10.0;
+				}
+			} else {
+				requestedAmount = Number(dto.requestedAmountKg) || 10.0;
+			}
+		}
+
+		// 2. Đánh giá Safety Rule Engine trước khi tạo và kích hoạt cho ăn
 		const safetyResult = await this.safetyRuleEngineService.evaluateFeedingSafety(
 			pondId,
-			dto.deviceId ?? undefined,
+			device?.id ?? dto.deviceId ?? undefined,
 			requestedAmount,
 		);
 
@@ -136,7 +158,7 @@ export class FeedingService {
 			// Tự động tạo Alert mức CRITICAL để thông báo cho người nuôi
 			await this.alertsService.createAlert({
 				pondId,
-				deviceId: dto.deviceId ?? undefined,
+				deviceId: device?.id ?? dto.deviceId ?? undefined,
 				type: 'FEEDING_SAFETY_BLOCKED',
 				severity: AlertSeverity.CRITICAL,
 				message: `Cữ cho ăn bị chặn an toàn: ${safetyResult.reasons[0] || 'Chỉ số môi trường không đạt chuẩn'}`,
@@ -154,9 +176,10 @@ export class FeedingService {
 		const record = this.recordRepository.create({
 			...dto,
 			pondId,
-			deviceId: dto.deviceId ?? null,
+			deviceId: device?.id ?? dto.deviceId ?? null,
 			scheduleId: dto.scheduleId ?? null,
 			startedAt: dto.startedAt ? new Date(dto.startedAt) : new Date(),
+			requestedAmountKg: requestedAmount,
 			actualAmountKg: actualAmount,
 			status: initialStatus,
 			safetyDecision: safetyResult.decision,

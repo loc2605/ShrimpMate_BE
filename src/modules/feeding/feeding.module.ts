@@ -9,6 +9,7 @@ import { PondAccessModule } from '../../common/guards/pond-access.module';
 import { SafetyRuleModule } from '../safety-rule/safety-rule.module';
 import { MqttModule } from '../../mqtt/mqtt.module';
 import { AlertsModule } from '../alerts/alerts.module';
+import { AiIntegrationModule } from '../ai-integration/ai-integration.module';
 import { FeedingController } from './feeding.controller';
 import { FeedingService } from './feeding.service';
 import { FeedingSchedulerService } from './feeding-scheduler.service';
@@ -20,6 +21,7 @@ import { FeedingSchedulerService } from './feeding-scheduler.service';
     SafetyRuleModule,
     MqttModule,
     AlertsModule,
+    AiIntegrationModule,
   ],
   controllers: [FeedingController],
   providers: [FeedingService, FeedingSchedulerService],

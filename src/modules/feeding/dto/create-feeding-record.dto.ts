@@ -1,4 +1,4 @@
-import { IsDateString, IsEnum, IsNumber, IsOptional, IsUUID, Min } from 'class-validator';
+import { IsBoolean, IsDateString, IsEnum, IsNumber, IsOptional, IsUUID, Min } from 'class-validator';
 import { AppetiteLevel, FeedingSource, FeedingStatus } from '../../../database/entities/enums';
 
 export class CreateFeedingRecordDto {
@@ -14,9 +14,14 @@ export class CreateFeedingRecordDto {
   @IsDateString()
   startedAt?: string;
 
+  @IsOptional()
   @IsNumber({ maxDecimalPlaces: 3 })
   @Min(0.001)
-  requestedAmountKg!: number;
+  requestedAmountKg?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  useAiPrediction?: boolean;
 
   @IsOptional()
   @IsNumber({ maxDecimalPlaces: 3 })

@@ -80,6 +80,30 @@ export const defaultSafetyRules = [
       reason: 'Nồng độ khí độc Ammonia (NH3) ở mức nguy hiểm (> 0.3 mg/L). Cấm cho ăn để tránh gây độc cho đàn tôm.',
     },
   },
+  {
+    code: 'DELTA_TAN_SPIKE_ADJUST',
+    name: 'Giảm 50% thức ăn khi biến thiên Ammonia ΔTAN > 0.5 mg/L',
+    priority: 6,
+    isEnabled: true,
+    condition: { field: 'deltaTan', operator: '>', value: 0.5 },
+    action: {
+      decision: 'adjusted',
+      factor: 0.5,
+      reason: 'Biến thiên đạm Amoniac gia tăng đột biến (ΔTAN > 0.5 mg/L). Cảnh báo tồn đọng hữu cơ đáy ao, giảm 50% lượng thức ăn.',
+    },
+  },
+  {
+    code: 'HEAVY_RAIN_ADJUST',
+    name: 'Giảm 30% thức ăn khi có mưa lớn sáng sớm (≥ 15 mm)',
+    priority: 7,
+    isEnabled: true,
+    condition: { field: 'morningRainMm', operator: '>=', value: 15.0 },
+    action: {
+      decision: 'adjusted',
+      factor: 0.7,
+      reason: 'Ghi nhận mưa lớn sáng sớm (≥ 15 mm) gây nguy cơ phân tầng và sụt nhiệt độ nước. Giảm 30% lượng thức ăn để chống sốc môi trường.',
+    },
+  },
 ];
 
 export async function seedSafetyRuleData(dataSource: DataSource) {
