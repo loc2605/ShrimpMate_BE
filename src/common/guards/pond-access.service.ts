@@ -1,6 +1,6 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 import { User } from '../../database/entities/user.entity';
 import { Pond } from '../../database/entities/pond.entity';
 import { Farm } from '../../database/entities/farm.entity';
@@ -45,7 +45,7 @@ export class PondAccessService {
       const assignment = await this.assignmentRepository.findOne({
         where: [
           { farmerId: user.id, pondId: pond.id },
-          { farmerId: user.id, farmId: pond.farmId, pondId: null as any },
+          { farmerId: user.id, farmId: pond.farmId, pondId: IsNull() },
         ],
       });
       if (assignment) {

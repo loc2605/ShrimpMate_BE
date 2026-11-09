@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import Joi from 'joi';
 import { ScheduleModule } from '@nestjs/schedule';
-import { createObserveModule } from '@nestjs/observe';
 import configuration from './config/configuration';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -22,8 +21,6 @@ import { FeedingModule } from './modules/feeding/feeding.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { CameraModule } from './modules/camera/camera.module';
 import { FarmersModule } from './modules/farmers/farmers.module';
-
-export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
 @Module({
   imports: [
@@ -66,13 +63,6 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     DevicesModule,
     TelemetryModule,
     MqttModule,
-    // Distributed tracing, auto-correlated logs, request/job metrics, error
-    // telemetry, alarms, and more — out of the box. Sign up at https://observe.nestjs.com
-    ObserveModule.forRoot({
-      appKey: 'P5MSz2SaFTqqq8lh',
-      appSecret: 'PBoE%lIdblmbvSFwibHHWhT7!4Whh%pM6g6ApWjxcKvEk',
-      serviceId: 'shrimpmate-backend',
-    }),
     AiIntegrationModule,
     SafetyRuleModule,
     AlertsModule,

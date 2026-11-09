@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 import nodemailer, { type Transporter } from 'nodemailer';
 import { Alert } from '../../database/entities/alert.entity';
 import { Pond } from '../../database/entities/pond.entity';
@@ -88,7 +88,7 @@ export class NotificationsService {
     const assignments = await this.assignmentRepository.find({
       where: [
         { pondId: pond.id },
-        { farmId: pond.farmId, pondId: null as any },
+        { farmId: pond.farmId, pondId: IsNull() },
       ],
       relations: { farmer: true },
     });
