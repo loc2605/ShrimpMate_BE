@@ -161,22 +161,36 @@ export class AiIntegrationService {
     let aiResponse: AiMicroserviceFeedResponse;
 
     try {
+      // Thiết lập timeout 6 giây qua AbortController
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
+
       const response = await fetch(`${aiEngineBaseUrl}/ai/predict-feed-demand`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(featurePayload),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`AI Microservice phản hồi lỗi HTTP ${response.status}: ${errorText}`);
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
       aiResponse = (await response.json()) as AiMicroserviceFeedResponse;
     } catch (err: unknown) {
       const errorMsg = err instanceof Error ? err.message : String(err);
-      this.logger.error(`Lỗi khi gọi AI Microservice (${aiEngineBaseUrl}): ${errorMsg}`);
-      throw new BadGatewayException(
-        `Không thể kết nối tới AI Microservice để dự báo lượng thức ăn: ${errorMsg}`,
+      this.logger.warn(
+        `[AiIntegration] Không thể kết nối AI Microservice (${aiEngineBaseUrl}): ${errorMsg}. Tự động kích hoạt cơ chế Chịu lỗi Dự phòng (Heuristic Aquaculture Fallback).`,
+      );
+      aiResponse = this.calculateHeuristicFeedDemand(
+        doc,
+        avgWeightG,
+        shrimpCount,
+        doMin,
+        recentReadings[0]?.temperatureC ?? 28.5,
+        morningRainMm,
+        pondAreaM2,
       );
     }
 
@@ -294,5 +308,71 @@ export class AiIntegrationService {
       throw new NotFoundException(`Không tìm thấy ao nuôi với id ${pondId}`);
     }
     return pond;
+  }
+
+  /**
+   * Bộ quy tắc dự phòng Heuristic dựa trên khoa học thủy sản (tiêu chuẩn nuôi tôm thẻ chân trắng)
+   * Tự động kích hoạt khi AI Microservice ngoại vi gặp sự cố hoặc timeout quá 6 giây
+   */
+  private calculateHeuristicFeedDemand(
+    doc: number,
+    avgWeightG: number,
+    shrimpCount: number,
+    doMin: number,
+    temperatureC: number,
+    morningRainMm: number,
+    _pondAreaM2: number,
+  ): AiMicroserviceFeedResponse {
+    const biomassKg = Number(((shrimpCount * avgWeightG) / 1000).toFixed(2));
+
+    // 1. Tỷ lệ ăn cơ bản theo trọng lượng mẫu (ABW)
+    let dailyRatePercent = 3.5;
+    if (avgWeightG < 3) dailyRatePercent = 5.5;
+    else if (avgWeightG < 8) dailyRatePercent = 4.2;
+    else if (avgWeightG < 15) dailyRatePercent = 3.2;
+    else dailyRatePercent = 2.5;
+
+    // Khẩu phần cho 1 cữ ăn (chia đều 4 cữ ăn/ngày)
+    const mealFeedKg = (biomassKg * (dailyRatePercent / 100)) / 4;
+
+    // 2. Hệ số hiệu chỉnh môi trường Heuristic
+    let factor = 1.0;
+    const constraints: string[] = [];
+
+    if (temperatureC < 26) {
+      factor *= 0.8;
+      constraints.push(`Nhiệt độ nước thấp (${temperatureC}°C), giảm 20%`);
+    } else if (temperatureC > 32) {
+      factor *= 0.85;
+      constraints.push(`Nhiệt độ nước cao (${temperatureC}°C), giảm 15%`);
+    }
+
+    if (doMin < 4.5 && doMin >= 3.5) {
+      factor *= 0.75;
+      constraints.push(`Oxy cận ngưỡng an toàn (${doMin} mg/L), giảm 25%`);
+    }
+
+    if (morningRainMm > 10) {
+      factor *= 0.7;
+      constraints.push(`Trời mưa (${morningRainMm}mm), giảm 30%`);
+    }
+
+    const predictedFeedAmountKg = Number(Math.max(1.0, mealFeedKg * factor).toFixed(2));
+
+    return {
+      predictedFeedAmountKg,
+      biomassKg,
+      feedRatePercent: Number((dailyRatePercent * factor).toFixed(2)),
+      modelName: 'Heuristic-Aquaculture-Fallback',
+      modelVersion: 'v1.0.0-heuristic',
+      confidence: 0.78,
+      featureImportance: {
+        biomass: 0.45,
+        temperature: 0.2,
+        dissolved_oxygen: 0.2,
+        rain: 0.15,
+      },
+      explanation: `Mô hình thủy sản Heuristic dự phòng (AI Microservice timeout/offline): Dựa trên sinh khối ${biomassKg}kg (DOC ${doc}), tỷ lệ cơ bản ${dailyRatePercent}%. Hiệu chỉnh: ${constraints.length > 0 ? constraints.join(', ') : 'môi trường tối ưu'}. Khuyến nghị: ${predictedFeedAmountKg}kg.`,
+    };
   }
 }

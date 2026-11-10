@@ -16,6 +16,9 @@ export interface SafetyEvaluationResult {
   contextSnapshot?: {
     deltaTan?: number;
     morningRainMm?: number;
+    predictedDo1h?: number;
+    predictedDo2h?: number;
+    isAdaptiveAdjusted?: boolean;
   };
 }
 
@@ -122,6 +125,52 @@ export class SafetyRuleEngineService {
       }
     }
 
+    // 5. NÂNG CẤP DỰ BÁO XU HƯỚNG TRƯỚC CỮ ĂN (Pre-feeding DO Trend Prediction & Adaptive Feeding)
+    let predictedDo1h: number | undefined;
+    let predictedDo2h: number | undefined;
+    let isAdaptiveAdjusted = false;
+
+    if (currentDecision !== SafetyDecision.BLOCKED && latestReading?.dissolvedOxygenMgL) {
+      const currentDo = Number(latestReading.dissolvedOxygenMgL);
+
+      // Tính tốc độ biến thiên DO trong các lần đo gần đây
+      let doSlopePerHour = 0;
+      if (recentReadings.length >= 2 && recentReadings[1].dissolvedOxygenMgL) {
+        const prevDo = Number(recentReadings[1].dissolvedOxygenMgL);
+        const timeDiffHours = Math.max(
+          0.05,
+          (new Date(latestReading.measuredAt).getTime() - new Date(recentReadings[1].measuredAt).getTime()) /
+            (1000 * 3600),
+        );
+        doSlopePerHour = (currentDo - prevDo) / timeDiffHours;
+      }
+
+      // Chu kỳ ngày đêm (đêm/sáng sớm: tảo hô hấp làm DO tự nhiên giảm)
+      const currentHour = new Date().getHours();
+      let diurnalDrop = 0;
+      if (currentHour >= 18 || currentHour <= 6) {
+        diurnalDrop = 0.35;
+      }
+
+      // Tác động oxy sinh học sau khi cho ăn (BOD demand do tôm tranh mồi và phân hủy cám)
+      const feedOxygenDemand = 0.25 * Math.min(2.0, allowedAmount / 8.0);
+
+      predictedDo1h = Number((currentDo + doSlopePerHour - diurnalDrop - feedOxygenDemand).toFixed(2));
+      predictedDo2h = Number((currentDo + doSlopePerHour * 2 - diurnalDrop * 2 - feedOxygenDemand).toFixed(2));
+
+      // LUẬT ĐIỀU CHỈNH THÍCH ỨNG (Adaptive Feeding):
+      // Nếu hiện tại an toàn (DO >= 3.5 mg/L), nhưng dự báo sau 1-2h nữa DO tụt < 3.2 mg/L
+      if (currentDo >= 3.5 && (predictedDo2h < 3.2 || predictedDo1h < 3.2)) {
+        currentDecision = SafetyDecision.ADJUSTED;
+        allowedAmount = Number((allowedAmount * 0.6).toFixed(3)); // Giảm 40% lượng thức ăn
+        isAdaptiveAdjusted = true;
+        const trendReason = `Dự báo xu hướng DO tụt xuống ${predictedDo2h} mg/L trong 2 giờ tới (nhu cầu oxy tăng sau khi ăn). Hệ thống tự động giảm 40% lượng thức ăn để chống ngạt tôm.`;
+        reasons.push(trendReason);
+        appliedRules.push('ADAPTIVE_FEEDING_PREDICTED_DO_DROP');
+        this.logger.warn(`[SafetyRuleEngine] ⚠️ ${trendReason} (Khẩu phần điều chỉnh: ${allowedAmount}kg)`);
+      }
+    }
+
     this.logger.log(
       `Đánh giá an toàn ao ${pondId}: Quyết định=${currentDecision}, Khối lượng cho phép=${allowedAmount}/${requestedAmountKg} kg`,
     );
@@ -147,6 +196,9 @@ export class SafetyRuleEngineService {
       contextSnapshot: {
         deltaTan,
         morningRainMm,
+        predictedDo1h,
+        predictedDo2h,
+        isAdaptiveAdjusted,
       },
     };
   }
