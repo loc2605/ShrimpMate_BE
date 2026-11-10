@@ -13,13 +13,13 @@
 
 ## 1. System Overview
 
-**ShrimpMate Backend** bridges physical pond edge devices (ESP32 microcontrollers, water quality sensors, automatic feeders, and underwater cameras) with mobile and web client interfaces. It orchestrates telemetry streaming, pre-feeding safety validation, emergency controls, real-time alert dispatching, and computer vision-based appetite estimation.
+**ShrimpMate Backend** bridges physical pond edge devices (ESP32 microcontrollers, water quality sensors, and automatic feeders) with mobile and web client interfaces. It orchestrates telemetry streaming, pre-feeding safety validation, emergency controls, real-time alert dispatching, and AI-driven feeding optimization.
 
 ### Key Capabilities
 
 - **Real-Time Water Telemetry**: Ingests temperature, pH, Dissolved Oxygen (DO), salinity, turbidity, and ammonia (NH₃). Automatically triggers incident alerts with a 15-minute anti-spam debounce window.
 - **Safety Rule Engine**: Validates environmental criteria before any feeding operation executes. Automatically blocks feeder activation (`decision: blocked`) and prevents MQTT dispatch if conditions are unsafe (e.g. DO < 3.5 mg/L).
-- **Dual Computer Vision FIS Pipeline**: Analyzes feeding tray frames using YOLO11n-seg (residual feed & shrimp density) and MobileNetV3 (feeding behavior classification) to calculate the **Feeding Intensity Score (FIS)** across 4 appetite levels (`0: None`, `1: Weak`, `2: Normal`, `3: Strong`).
+- **AI Feed Demand Prediction Pipeline**: Predicts optimal feeding amounts for each meal using machine learning (XGBoost Regressor) considering pond DOC, shrimp average weight, water quality telemetry, and historical consumption.
 - **Crop Season & FCR Analytics**: Automatically tracks Days of Culture (DOC), surviving population, feed consumed, biomass gain, and Feed Conversion Ratio (FCR).
 - **Hardware Catalog & Claiming**: Admins manage standardized IoT hardware (`deviceUid`); managers securely claim devices to their ponds.
 - **Role-Based Ecosystem**: Strict separation of concerns between `admin` (platform governance & hardware catalog), `manager` (farm, pond & farmer operations via Web App), and `farmer` (pond-side field monitoring & quick emergency controls via Mobile App).
@@ -45,7 +45,7 @@
          - Global Audit & FCR- Crop Seasons/FCR - 1-Tap Quick-Feed
          - System Oversight - Weekly Schedules  - Push Alerts (FCM)
                             - Time-Series Charts- Incident Resolution
-                            - Camera ROI & FIS
+                            - AI Feed Forecast
 ```
 
 ---
@@ -53,35 +53,36 @@
 ## 3. Architecture & Data Flow
 
 ```text
-  [ ESP32 + Sensors ]            [ Underwater Camera ]
-           |                               |
-        (MQTT)                       (HTTP / MQTT)
-           |                               |
-           v                               v
-    +-------------+                 +--------------+
-    | MQTT Broker |                 | Edge Gateway |
-    +------+------+                 +-------+------+
-           |                                |
-           +----------------+---------------+
-                            |
-                            v
-             +------------------------------+
-             |      ShrimpMate Backend      |
-             |       (NestJS 12 + TS)       |
-             +--------------+---------------+
-                            |
-           +----------------+----------------+
-           |                |                |
-           v                v                v
-     +------------+   +-----------+   +--------------+
-     | PostgreSQL |   | Safety    |   | Camera FIS   |
-     | (TypeORM)  |   | Rule Eng. |   | Dual AI Pipe |
-     +------------+   +-----------+   +--------------+
-                            |
-           +----------------+----------------+
-           |                |                |
-           v                v                v
-   [ Admin Dashboard ] [ Manager Web App ] [ Farmer Mobile App ]
+  [ ESP32 + Sensor Nodes ]       [ Automated Feeders ]
+            |                               |
+          (MQTT)                          (MQTT)
+            |                               |
+            v                               v
+     +--------------+                +--------------+
+     |  MQTT Broker |<==============>| Control Cmds |
+     +-------+------+                +--------------+
+             |
+             v
+  +------------------------------+
+  |      ShrimpMate Backend      |
+  |       (NestJS 12 + TS)       |
+  +--------------+---------------+
+                 |
+        +--------+--------+
+        |                 |
+        v                 v
+  +------------+    +-----------+    +----------------+
+  | PostgreSQL |    | Safety    |    | AI Integration |
+  | (TypeORM)  |    | Rule Eng. |    | (XGBoost Svc)  |
+  +------------+    +-----------+    +----------------+
+        |                 |
+        +--------+--------+
+                 |
+                 v
+   +-------------+---------------+
+   |                             |
+   v                             v
+[ Manager Web App ]    [ Farmer Mobile App ]
 ```
 
 ---
@@ -95,7 +96,7 @@
 | **IoT Protocol** | MQTT 5.x (`mqtt.js`) | Bidirectional pub/sub messaging with ESP32 nodes |
 | **Security & Auth** | Passport JWT, Bcrypt | Stateless JWT access/refresh token authentication & RBAC |
 | **Validation** | `class-validator`, `class-transformer` | Strict runtime DTO schema validation |
-| **Computer Vision** | YOLO11n-seg, MobileNetV3 | Tray segmentation, shrimp density, and appetite scoring |
+| **Machine Learning**| XGBoost Regressor | Optimal feed demand prediction and biomass forecasting |
 | **Testing & Quality**| Jest (ESM mode), Oxlint | Unit and integration test suites, linting |
 
 ---
@@ -109,7 +110,7 @@ src/
 │   └── guards/         # JwtAuthGuard, RolesGuard, PondAccessService
 ├── config/             # Environment configuration and schema validation
 ├── database/           # TypeORM setup, entity models, migrations, and seeds
-│   ├── entities/       # User, Farm, Pond, Device, Feeding, Telemetry, Camera, Alert...
+│   ├── entities/       # User, Farm, Pond, Device, Feeding, Telemetry, Alert...
 │   ├── migrations/     # Versioned relational schema migrations
 │   └── seeds/          # Default admin, farmer, and sample farm datasets
 ├── mqtt/               # MQTT client service and hardware diagnostic controller
@@ -118,7 +119,6 @@ src/
     ├── ai-integration/ # Feed optimization and biomass recommendations
     ├── alerts/         # Incident detection, acknowledgment, and resolution
     ├── auth/           # Registration, login, OTP recovery, and user management
-    ├── camera/         # Computer vision engine, FIS scoring, and ROI management
     ├── crop-season/    # Season lifecycle, stocking density, and FCR statistics
     ├── devices/        # Hardware catalog, claim/unassign, and emergency stop
     ├── farm-pond/      # Farm & pond CRUD with soft deletion
@@ -230,8 +230,8 @@ npm run build
 Detailed specifications and integration guides are maintained in the [`docs/`](./docs) directory:
 
 - **[API Specification (`docs/API.md`)](./docs/API.md)**: Exhaustive documentation of all endpoints, request bodies, query parameters, response structures, and HTTP error codes.
-- **[API Summary Reference (`docs/API_SUMMARY.md`)](./docs/API_SUMMARY.md)**: Master numbered quick-reference table covering all 85 endpoints and MQTT topics across Admin, Manager, and Farmer.
+- **[API Summary Reference (`docs/API_SUMMARY.md`)](./docs/API_SUMMARY.md)**: Master numbered quick-reference table covering all endpoints and MQTT topics across Admin, Manager, and Farmer.
 - **[Database Architecture (`docs/DATABASE.md`)](./docs/DATABASE.md)**: Complete database schema, table specifications, `farmer_assignments`, `users.manager_id`, indices, cascading rules, and Mermaid ERD diagram.
 - **[Roles & Permissions Specification (`docs/ROLES_AND_PERMISSIONS.md`)](./docs/ROLES_AND_PERMISSIONS.md)**: RBAC permission matrix comparing Admin Web Dashboard, Manager Web App, and Farmer Mobile App scopes (UC001–UC021).
 - **[Postman Test Collections (`docs/POSTMAN_SAMPLES.md`)](./docs/POSTMAN_SAMPLES.md)**: Ready-to-use Postman test scenarios, flow diagrams, and raw payload bodies.
-- **[Postman End-to-End Test Flows (`docs/POSTMAN_TEST_FLOWS.md`)](./docs/POSTMAN_TEST_FLOWS.md)**: 5 core business testing flows covering 100% features across Admin, Manager, and Farmer.
+- **[Postman End-to-End Test Flows (`docs/POSTMAN_TEST_FLOWS.md`)](./docs/POSTMAN_TEST_FLOWS.md)**: Core business testing flows covering features across Admin, Manager, and Farmer.

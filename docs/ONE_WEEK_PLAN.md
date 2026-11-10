@@ -89,7 +89,7 @@ Kết quả cần đạt: hoàn chỉnh phần quản lý trang trại, ao và v
 - [x] Phân quyền Device theo role.
 - [x] Bổ sung seed một số Device mẫu.
 
-Kết quả cần đạt: quản lý được sensor, feeder, camera và gateway.
+Kết quả cần đạt: quản lý được sensor, feeder và gateway.
 
 ### Ngày 4 - Hoàn thiện Feeding
 

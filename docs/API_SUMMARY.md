@@ -13,7 +13,7 @@ Tài liệu tra cứu nhanh (Quick Reference) toàn bộ các endpoint, phương
   ```
 - **Phân quyền (3 Roles)**:
   - `admin`: Quản trị viên hệ thống (Web Dashboard: quản lý người dùng, catalog phần cứng, luật an toàn, báo cáo tổng quan & FCR toàn nền tảng).
-  - `manager`: Quản lý sở hữu cơ sở nuôi (Web App: quản lý Farmer, phân công ao, trang trại, ao nuôi, vụ nuôi, gán thiết bị, tạo lịch ăn, camera AI, báo cáo).
+  - `manager`: Quản lý sở hữu cơ sở nuôi (Web App: quản lý Farmer, phân công ao, trang trại, ao nuôi, vụ nuôi, gán thiết bị, tạo lịch ăn, khai thác AI dự báo, báo cáo).
   - `farmer`: Người nuôi trực tiếp vận hành bờ ao (Mobile App: giám sát tức thời, cho ăn nhanh, dừng khẩn cấp, nhận cảnh báo FCM trên các ao được phân công).
   - `Public`: Không yêu cầu token.
 
@@ -88,27 +88,22 @@ Tài liệu tra cứu nhanh (Quick Reference) toàn bộ các endpoint, phương
 | **63** | **Telemetry (UC013, 017)**| `/ponds/:pondId/telemetry/latest` | `GET` | `admin`, `manager`, `farmer` | Chỉ số nước mới nhất (pH, DO, nhiệt độ, độ mặn, NH₃, độ đục) |
 | **64** | | `/ponds/:pondId/telemetry/history` | `GET` | `admin`, `manager`, `farmer` | Lịch sử chuỗi thời gian 24h/7d phục vụ vẽ đồ thị giám sát |
 | **65** | | `/ponds/:pondId/telemetry` | `POST` | `admin`, `manager`, `farmer` | Thu nhận đo đạc cảm biến, tự động kiểm tra ngưỡng vi phạm & debounce alert |
-| **66** | **Camera & FIS (UC019)** | `/camera/analyze` | `POST` | `admin`, `manager`, `farmer` | Phân tích ảnh sàng ăn song song qua YOLO11n-seg & MobileNetV3 để tính FIS |
-| **67** | | `/camera/ingest-metrics` | `POST` | Public | Thu nhận chỉ số tiền xử lý ($R_t, D_t, C_t$) từ Camera AI Edge Gateway |
-| **68** | | `/camera/ponds/:pondId/latest-fis` | `GET` | `admin`, `manager`, `farmer` | Chỉ số thèm ăn FIS mới nhất của ao (0: Không ăn, 1: Yếu, 2: Bình thường, 3: Mạnh) |
-| **69** | | `/camera/ponds/:pondId/fis-history`| `GET` | `admin`, `manager`, `farmer` | Lịch sử biến thiên điểm FIS theo thời gian kèm đồ thị |
-| **70** | | `/camera/ponds/:pondId/devices` | `GET` | `admin`, `manager`, `farmer` | Danh sách thiết bị camera lắp đặt tại ao nuôi |
-| **71** | | `/camera/devices/:deviceId/roi` | `PATCH` | `manager`, `admin` | Cập nhật vùng quan sát ROI cố định cho camera sàng ăn |
-| **72** | | `/camera/ponds/:pondId/weights` | `PATCH` | `manager`, `admin` | Tinh chỉnh trọng số $w_1 - w_4$ và ngưỡng phân vị $q_{25}, q_{50}, q_{75}$ của thuật toán FIS |
-| **73** | **Alerts (UC015)** | `/alerts/summary` | `GET` | `admin`, `manager`, `farmer` | Thống kê số lượng cảnh báo theo mức độ (`critical`, `warning`, `info`) |
-| **74** | | `/alerts` | `GET` | `admin`, `manager`, `farmer` | Danh sách sự cố toàn bộ ao thuộc quyền truy cập |
-| **75** | | `/ponds/:pondId/alerts` | `GET` | `admin`, `manager`, `farmer` | Danh sách sự cố theo từng ao nuôi cụ thể |
-| **76** | | `/alerts/:id/acknowledge` | `PATCH` | `admin`, `manager`, `farmer` | Tiếp nhận cảnh báo (`status: acknowledged`) |
-| **77** | | `/alerts/:id/resolve` | `PATCH` | `admin`, `manager`, `farmer` | Đánh dấu sự cố đã được khắc phục xong (`status: resolved`) |
-| **78** | **Safety Rules (UC018)** | `/safety-rules` | `GET` | `admin`, `manager`, `farmer` | Xem danh sách các quy tắc an toàn môi trường đang kích hoạt |
-| **79** | | `/safety-rules` | `POST` | `admin` | Admin tạo quy tắc an toàn mới áp dụng toàn hệ thống |
-| **80** | | `/safety-rules/:id` | `PATCH` | `admin` | Admin cập nhật ngưỡng kiểm duyệt, độ ưu tiên, bật/tắt quy tắc |
-| **81** | | `/safety-rules/:id` | `DELETE` | `admin` | Admin xóa quy tắc an toàn |
-| **82** | | `/safety-rules/evaluate` | `POST` | `admin`, `manager`, `farmer` | Kiểm tra thử nghiệm tính an toàn của một bộ chỉ số nước |
-| **83** | **AI Integration (UC014)** | `/ai-integration/ponds/:pondId/recommendations` | `GET` | `admin`, `manager`, `farmer` | Lấy khuyến nghị lượng thức ăn tối ưu từ AI |
-| **84** | | `/ai-integration/ponds/:pondId/forecast-biomass` | `GET` | `admin`, `manager`, `farmer` | Dự báo sinh khối tôm và sản lượng thu hoạch dự kiến |
-| **85** | **MQTT Diagnostics** | `/mqtt/status` | `GET` | `admin` | Kiểm tra trạng thái kết nối tới MQTT Broker và danh sách topic đăng ký |
-| **86** | | `/mqtt/devices/:deviceUid/feeder-test` | `POST` | `admin` | Phát gói tin test máy cho ăn trực tiếp qua MQTT tới thiết bị phần cứng |
+| **66** | **AI Integration (UC014)** | `/ponds/:pondId/ai/predict-feed` | `POST` | `admin`, `manager`, `farmer` | Dự báo lượng thức ăn thông minh qua AI (XGBoost 7 đặc trưng môi trường & sinh học) |
+| **67** | | `/ponds/:pondId/ai/forecast-biomass` | `GET` | `admin`, `manager`, `farmer` | Dự báo sinh khối ao nuôi và nhu cầu thức ăn ngày |
+| **68** | | `/ponds/:pondId/ai/recommendations/latest` | `GET` | `admin`, `manager`, `farmer` | Lấy khuyến nghị AI mới nhất kèm giải thích chi tiết |
+| **69** | | `/ponds/:pondId/ai/recommendations` | `GET` | `admin`, `manager`, `farmer` | Lịch sử các khuyến nghị lượng thức ăn do AI đề xuất |
+| **70** | **Alerts (UC015)** | `/alerts/summary` | `GET` | `admin`, `manager`, `farmer` | Thống kê số lượng cảnh báo theo mức độ (`critical`, `warning`, `info`) |
+| **71** | | `/alerts` | `GET` | `admin`, `manager`, `farmer` | Danh sách sự cố toàn bộ ao thuộc quyền truy cập |
+| **72** | | `/ponds/:pondId/alerts` | `GET` | `admin`, `manager`, `farmer` | Danh sách sự cố theo từng ao nuôi cụ thể |
+| **73** | | `/alerts/:id/acknowledge` | `PATCH` | `admin`, `manager`, `farmer` | Tiếp nhận cảnh báo (`status: acknowledged`) |
+| **74** | | `/alerts/:id/resolve` | `PATCH` | `admin`, `manager`, `farmer` | Đánh dấu sự cố đã được khắc phục xong (`status: resolved`) |
+| **75** | **Safety Rules (UC018)** | `/safety-rules` | `GET` | `admin`, `manager`, `farmer` | Xem danh sách các quy tắc an toàn môi trường đang kích hoạt |
+| **76** | | `/safety-rules` | `POST` | `admin` | Admin tạo quy tắc an toàn mới áp dụng toàn hệ thống |
+| **77** | | `/safety-rules/:id` | `PATCH` | `admin` | Admin cập nhật ngưỡng kiểm duyệt, độ ưu tiên, bật/tắt quy tắc |
+| **78** | | `/safety-rules/:id` | `DELETE` | `admin` | Admin xóa quy tắc an toàn |
+| **79** | | `/safety-rules/evaluate` | `POST` | `admin`, `manager`, `farmer` | Kiểm tra thử nghiệm tính an toàn của một bộ chỉ số nước |
+| **80** | **MQTT Diagnostics** | `/mqtt/status` | `GET` | `admin` | Kiểm tra trạng thái kết nối tới MQTT Broker và danh sách topic đăng ký |
+| **81** | | `/mqtt/devices/:deviceUid/feeder-test` | `POST` | `admin` | Phát gói tin test máy cho ăn trực tiếp qua MQTT tới thiết bị phần cứng |
 
 ---
 

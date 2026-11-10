@@ -1,4 +1,4 @@
-import { forwardRef, Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -7,12 +7,9 @@ import { Device } from '../database/entities/device.entity';
 import { FeedingRecord } from '../database/entities/feeding-record.entity';
 import { DeviceStatus, FeedingStatus } from '../database/entities/enums';
 import { TelemetryService } from '../modules/telemetry/telemetry.service';
-import { CameraService } from '../modules/camera/camera.service';
 import { EventsGateway } from '../modules/events/events.gateway';
 import {
   MQTT_TOPICS,
-  MqttCameraFramePayload,
-  MqttCameraMetricsPayload,
   MqttFeederCommandPayload,
   MqttFeederStatusPayload,
   MqttHeartbeatPayload,
@@ -28,8 +25,6 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly configService: ConfigService,
     private readonly telemetryService: TelemetryService,
-    @Inject(forwardRef(() => CameraService))
-    private readonly cameraService: CameraService,
     @InjectRepository(Device)
     private readonly deviceRepository: Repository<Device>,
     @InjectRepository(FeedingRecord)
@@ -94,7 +89,7 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
       });
 
       this.client.on('reconnect', () => {
-        // Tự động kết nối lại ở background, không in log làm đầy màn hình
+        // Tự động kết nối lại ở background
       });
     } catch (err) {
       this.logger.error('[MQTT] Không thể khởi tạo MQTT client', err);
@@ -109,8 +104,6 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
       MQTT_TOPICS.POND_DEVICE_TELEMETRY_WILDCARD,
       MQTT_TOPICS.FEEDER_STATUS_WILDCARD,
       MQTT_TOPICS.HEARTBEAT_WILDCARD,
-      MQTT_TOPICS.CAMERA_FRAME_WILDCARD,
-      MQTT_TOPICS.CAMERA_METRICS_WILDCARD,
     ];
 
     for (const topic of topics) {
@@ -135,95 +128,13 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
         await this.processFeederStatusMessage(topic, data);
       } else if (topic.includes('/heartbeat')) {
         await this.processHeartbeatMessage(topic, data);
-      } else if (topic.includes('/camera/') && topic.endsWith('/frame')) {
-        await this.processCameraFrameMessage(topic, data);
-      } else if (topic.includes('/camera/') && topic.endsWith('/metrics')) {
-        await this.processCameraMetricsMessage(topic, data);
       }
     } catch (err) {
       this.logger.error(`[MQTT] Lỗi phân tích gói tin từ topic [${topic}]`, err);
     }
   }
 
-  private async processCameraFrameMessage(topic: string, data: MqttCameraFramePayload) {
-    let deviceUid = data.deviceUid;
-    if (!deviceUid) {
-      const parts = topic.split('/');
-      // shrimpmate/camera/{deviceUid}/frame
-      if (parts.length === 4) {
-        deviceUid = parts[2];
-      }
-    }
-
-    let pondId = data.pondId;
-    let device: Device | null = null;
-    if (deviceUid) {
-      device = await this.deviceRepository.findOne({ where: { deviceUid } });
-      if (device) {
-        device.lastSeenAt = new Date();
-        device.status = DeviceStatus.ONLINE;
-        await this.deviceRepository.save(device);
-        pondId = pondId ?? device.pondId ?? undefined;
-      }
-    }
-
-    if (!pondId) {
-      this.logger.warn(`[MQTT] Không xác định được pondId cho camera frame (deviceUid: ${deviceUid})`);
-      return;
-    }
-
-    await this.cameraService.analyzeFrame({
-      pondId,
-      deviceId: device?.id,
-      frameData: data.frameData,
-      frameUrl: data.frameUrl,
-      roi: data.roi as any,
-    });
-    this.logger.log(`[MQTT] Đã phân tích frame camera từ thiết bị ${deviceUid ?? 'unknown'} cho ao ${pondId}`);
-  }
-
-  private async processCameraMetricsMessage(topic: string, data: MqttCameraMetricsPayload) {
-    let deviceUid = data.deviceUid;
-    if (!deviceUid) {
-      const parts = topic.split('/');
-      // shrimpmate/camera/{deviceUid}/metrics
-      if (parts.length === 4) {
-        deviceUid = parts[2];
-      }
-    }
-
-    let pondId = data.pondId;
-    let device: Device | null = null;
-    if (deviceUid) {
-      device = await this.deviceRepository.findOne({ where: { deviceUid } });
-      if (device) {
-        device.lastSeenAt = new Date();
-        device.status = DeviceStatus.ONLINE;
-        await this.deviceRepository.save(device);
-        pondId = pondId ?? device.pondId ?? undefined;
-      }
-    }
-
-    if (!pondId) {
-      this.logger.warn(`[MQTT] Không xác định được pondId cho camera metrics (deviceUid: ${deviceUid})`);
-      return;
-    }
-
-    await this.cameraService.ingestMetrics({
-      pondId,
-      deviceId: device?.id,
-      deviceUid,
-      remainingFeedAreaRt: data.remainingFeedAreaRt,
-      shrimpDensityDt: data.shrimpDensityDt,
-      behaviorClassificationCt: data.behaviorClassificationCt,
-      confidence: data.confidence,
-      timestamp: data.timestamp,
-    });
-    this.logger.log(`[MQTT] Đã thu nhận chỉ số camera edge từ thiết bị ${deviceUid ?? 'unknown'} cho ao ${pondId}`);
-  }
-
   private async processTelemetryMessage(topic: string, data: MqttTelemetryPayload) {
-    // 1. Phân giải deviceUid từ payload hoặc từ topic
     let deviceUid = data.deviceUid;
     let pondId = data.pondId;
 
@@ -243,12 +154,10 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
     if (deviceUid) {
       device = await this.deviceRepository.findOne({ where: { deviceUid } });
       if (device) {
-        // Cập nhật trạng thái và thời điểm nhìn thấy thiết bị
         device.lastSeenAt = new Date();
         device.status = DeviceStatus.ONLINE;
         await this.deviceRepository.save(device);
 
-        // Lấy pondId đã gán cho thiết bị nếu payload không gửi kèm
         if (!pondId && device.pondId) {
           pondId = device.pondId;
         }
@@ -260,7 +169,6 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    // Ghi nhận telemetry vào database thông qua TelemetryService
     const recorded = await this.telemetryService.recordTelemetry(pondId, {
       deviceId: device?.id,
       ph: data.ph,
@@ -272,7 +180,6 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
       measuredAt: data.measuredAt ?? new Date().toISOString(),
     });
 
-    // Phát sự kiện WebSocket thời gian thực tới Web SCADA
     this.eventsGateway.broadcastTelemetry(pondId, {
       readingId: recorded.id,
       deviceId: device?.id,
@@ -317,7 +224,6 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
         await this.feedingRecordRepository.save(record);
         this.logger.log(`[MQTT] Đã cập nhật feeding record ${record.id} sang trạng thái ${record.status}`);
 
-        // Phát sự kiện WebSocket trạng thái feeder tới Web SCADA
         this.eventsGateway.broadcastFeederStatus(record.pondId, {
           recordId: record.id,
           status: record.status,
@@ -349,7 +255,6 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
       await this.deviceRepository.save(device);
       this.logger.debug(`[MQTT] Heartbeat cập nhật cho thiết bị ${device.deviceUid}`);
 
-      // Phát sự kiện WebSocket trạng thái thiết bị
       this.eventsGateway.broadcastDeviceStatus(device.id, {
         deviceUid: device.deviceUid,
         status: device.status,

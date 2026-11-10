@@ -19,7 +19,6 @@ import { FarmPondModule } from './modules/farm-pond/farm-pond.module';
 import { CropSeasonModule } from './modules/crop-season/crop-season.module';
 import { FeedingModule } from './modules/feeding/feeding.module';
 import { AdminModule } from './modules/admin/admin.module';
-import { CameraModule } from './modules/camera/camera.module';
 import { FarmersModule } from './modules/farmers/farmers.module';
 
 @Module({
@@ -69,7 +68,6 @@ import { FarmersModule } from './modules/farmers/farmers.module';
     ScheduleModule.forRoot(),
     EventsModule,
     NotificationsModule,
-    CameraModule,
   ],
   controllers: [AppController],
   providers: [AppService],

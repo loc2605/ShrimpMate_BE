@@ -1,6 +1,5 @@
 export * from './alert.entity';
 export * from './ai-recommendation.entity';
-export * from './camera-fis-log.entity';
 export * from './crop-season.entity';
 export * from './device.entity';
 export * from './enums';
@@ -17,7 +16,6 @@ export * from './password-reset-otp.entity';
 
 import { Alert } from './alert.entity';
 import { AiRecommendation } from './ai-recommendation.entity';
-import { CameraFisLog } from './camera-fis-log.entity';
 import { CropSeason } from './crop-season.entity';
 import { Device } from './device.entity';
 import { Farm } from './farm.entity';
@@ -44,7 +42,6 @@ export const entities = [
 	FeedingRecord,
 	TelemetryReading,
 	AiRecommendation,
-	CameraFisLog,
 	SafetyRule,
 	Alert,
 ];

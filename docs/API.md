@@ -55,7 +55,7 @@ npx cloudflared tunnel --url http://localhost:3000
    - **Quản lý vụ nuôi và tính toán FCR (UC007, UC016)**: Thiết lập vụ nuôi mới (`/ponds/:pondId/crop-seasons`), quản lý mật độ, ngày thả giống và theo dõi hệ số chuyển đổi thức ăn FCR (`GET /crop-seasons/:id/statistics`).
    - **Gán thiết bị và điều khiển (UC009, UC012)**: Tìm mã `deviceUid` phần cứng để gán (`claim`) vào ao nuôi (`POST /devices/claim`), gỡ thiết bị khi cần (`POST /devices/:id/unassign`), bật/tắt máy cho ăn và chuyển chế độ tự động/thủ công.
    - **Cấu hình lịch cho ăn tự động (UC011)**: Thiết lập cữ ăn tự động theo tuần (`/feeding-schedules`).
-   - **Giám sát môi trường & Khai thác AI (UC013, UC014)**: Xem đồ thị chuỗi thời gian 24h/7d chi tiết (`/telemetry`); cấu hình ROI và tinh chỉnh trọng số FIS ($w_1 - w_4$) của camera AI (`/camera`).
+   - **Giám sát môi trường & Khai thác AI (UC013, UC014)**: Xem đồ thị chuỗi thời gian 24h/7d chi tiết (`/telemetry`); nhận khuyến nghị lượng thức ăn tối ưu từ mô hình AI (`/ponds/:pondId/ai/predict-feed`).
    - **Tiếp nhận & xử lý cảnh báo (UC015)**: Theo dõi, tiếp nhận (`PATCH /alerts/:id/acknowledge`) và giải quyết sự cố (`PATCH /alerts/:id/resolve`).
 
 3. **Người nuôi (Farmer - `farmer` - Mobile App)**:
@@ -63,7 +63,7 @@ npx cloudflared tunnel --url http://localhost:3000
    - **Không tự đăng ký**: Tài khoản do Manager tạo; đăng nhập bằng mật khẩu do Manager bàn giao và đổi mật khẩu ở lần đăng nhập đầu tiên.
    - **Xem cơ sở nuôi được phân công**: Xem danh sách trang trại và các ao nuôi mà mình được Manager phân công phụ trách.
    - **Giám sát tức thời (UC013)**: Xem thẻ tóm tắt màu cảnh báo nhanh (Xanh / Vàng / Đỏ) cho 6 thông số: DO, pH, Nhiệt độ, Độ mặn, NH₃, Độ đục.
-   - **Xem khuyến nghị AI tóm tắt (UC014)**: Xem lượng thức ăn khuyến nghị và cường độ thèm ăn của tôm (FIS).
+   - **Xem khuyến nghị AI tóm tắt (UC014)**: Xem lượng thức ăn khuyến nghị tối ưu và dự báo sinh khối ao nuôi.
    - **Điều khiển thiết bị nhanh (UC012)**: Cho ăn nhanh (Quick Feed) và Dừng khẩn cấp (1-Tap Emergency Stop) tức thì ngoài bờ ao.
    - **Tiếp nhận cảnh báo đẩy (UC015)**: Nhận thông báo đẩy (Push Notification qua FCM) trên màn hình khóa điện thoại; xác nhận đã xử lý sự cố.
 
@@ -851,12 +851,12 @@ GET /admin/reports/operational
   "recentAlerts": [
     {
       "id": "uuid",
-      "type": "CAMERA_FEEDING_ANOMALY",
+      "type": "FEEDING_SAFETY_BLOCKED",
       "severity": 3,
       "status": "open",
-      "message": "Phát hiện bất thường tại sàng ăn: FIS=0.15, thức ăn thừa 65%",
+      "message": "Cữ cho ăn bị chặn an toàn: Nồng độ DO dưới ngưỡng sinh tồn (<3.5 mg/L)",
       "pondName": "Ao số 1",
-      "deviceUid": "CAM-01-A1",
+      "deviceUid": "FEEDER-01-A1",
       "triggeredAt": "2026-10-10T08:25:00.000Z"
     }
   ],
@@ -1157,19 +1157,19 @@ POST /devices
 - **Body**:
   - `deviceUid`: Mã định danh phần cứng duy nhất (Unique), ví dụ: `ESP32_SENSOR_01`.
   - `name`: Tên thiết bị.
-  - `type`: Loại thiết bị (`feeder`, `sensor_node`, `camera`, `edge_gateway`).
+  - `type`: Loại thiết bị (`feeder`, `sensor_node`, `edge_gateway`).
   - `firmwareVersion`: Phiên bản firmware ban đầu (mặc định: `1.0.0`).
   - `metadata`: Đối tượng JSON chứa cấu hình phần cứng bổ sung.
 
 ```json
 {
-  "deviceUid": "CAM-01-A1",
-  "name": "Camera giám sát sàng ăn Ao 1",
-  "type": "camera",
+  "deviceUid": "FEEDER-01-A1",
+  "name": "Máy cho ăn tự động Ao 1",
+  "type": "feeder",
   "firmwareVersion": "1.0.0",
   "metadata": {
-    "resolution": "1920x1080",
-    "fps": 30
+    "capacityKg": 50,
+    "spreadRateKgPerMin": 1.5
   }
 }
 ```
@@ -1592,301 +1592,124 @@ POST /ponds/:pondId/telemetry
 
 ---
 
-## 11. Module Thị giác Máy tính & Cường độ Bắt mồi FIS (Camera Computer Vision) (`/camera`)
+## 11. Module Khai thác AI & Dự báo Định mức Thức ăn (`/ponds/:pondId/ai`)
 
-Hệ thống xử lý thị giác máy tính chạy **2 luồng AI song song**:
-1. **YOLO11n-seg**: Phân đoạn hình ảnh sàng ăn (Tray Segmentation) để tính tỷ lệ diện tích thức ăn còn lại ($R_t$) và đếm mật độ tôm tập trung quanh sàng ($D_t$).
-2. **MobileNetV3-Small**: Phân loại chuyển động và hành vi ăn tức thời ($C_t$) theo 4 mức độ.
+Tích hợp mô hình AI Machine Learning (XGBoost Regressor) tối ưu lượng thức ăn theo sinh khối, tuổi tôm, điều kiện quan trắc môi trường và lịch sử tiêu thụ. Yêu cầu quyền **`admin`**, **`manager`** hoặc **`farmer`**.
 
-Chỉ số cường độ bắt mồi tổng hợp:
-$$FIS = w_1 \cdot \text{norm}(1 - R_t) + w_2 \cdot \text{norm}(v_t) + w_3 \cdot \text{norm}(D_t) + w_4 \cdot \text{norm}(C_t)$$
-
-Trong đó $v_t = \frac{\Delta R_t}{\Delta t}$ là tốc độ tiêu thụ thức ăn. 4 mức bắt mồi:
-- **0: None (Không ăn)** ($FIS < q_{25}$)
-- **1: Weak (Ăn yếu)** ($q_{25} \le FIS < q_{50}$)
-- **2: Normal (Bình thường)** ($q_{50} \le FIS < q_{75}$)
-- **3: Strong (Ăn mạnh)** ($FIS \ge q_{75}$)
-
----
-
-### 11.1. Phân tích khung hình Camera bằng AI (Song song 2 luồng)
+### 11.1. Dự báo lượng thức ăn thông minh qua AI
 
 ```http
-POST /camera/analyze
+POST /ponds/:pondId/ai/predict-feed
 ```
 
-- **Quyền**: Đã đăng nhập (`admin`, `farmer`).
-- **Công dụng**: Nhận ảnh khung hình (dạng chuỗi Base64 hoặc URL ảnh), chạy đồng thời YOLO11n-seg và MobileNetV3-Small, tính toán các chỉ số $R_t, v_t, D_t, C_t$, điểm FIS và mức độ thèm ăn.
-- **Tự động liên kết**:
-  - Tự động cập nhật `appetiteLevel` và `leftoverPercent` vào cữ ăn `feedingRecordId` (nếu có).
-  - Tự động cập nhật trạng thái Camera thành `online` và ghi nhận `lastSeenAt`.
-  - Tự động kích hoạt `Alert` mức `CRITICAL` nếu phát hiện thức ăn tồn đọng bất thường (> 50% sau thời gian dài) với độ trễ $\le 5$ giây.
+- **Quyền**: `admin`, `manager`, `farmer`.
+- **Công dụng**: Tự động tổng hợp 7 đặc trưng sinh học và môi trường thời gian thực (DOC, ABW, $DO_{min}$, $\Delta TAN$, lượng mưa, lượng ăn cữ trước, lượng nước thay) để mô hình AI tính toán khối lượng thức ăn tối ưu cho cữ ăn tiếp theo, sau đó tự động kiểm duyệt qua Safety Rule Engine.
 
-#### Body:
+#### Body (Tùy chọn ghi đè tham số):
 ```json
 {
-  "pondId": "3cb49a46-81cf-4a47-a365-1d6fa55e8d89",
-  "deviceId": "22fffa98-46eb-4606-93a0-faae9f70691e",
-  "feedingRecordId": "uuid-cu-an-neu-co",
-  "frameUrl": "https://storage.shrimpmate.vn/frames/pond1_tray_20261010.jpg",
-  "timeDeltaSeconds": 20,
-  "roi": {
-    "x": 250,
-    "y": 180,
-    "width": 600,
-    "height": 600,
-    "resolutionWidth": 1920,
-    "resolutionHeight": 1080
-  }
+  "doc": 45,
+  "avgWeightG": 12.5,
+  "doMin": 5.2,
+  "deltaTan": 0.05,
+  "morningRainMm": 0.0,
+  "prevFeedAmountKg": 8.0,
+  "waterChangeM3": 20.0
 }
 ```
 
 #### Phản hồi thành công (`201 Created`):
 ```json
 {
-  "success": true,
-  "data": {
-    "id": "uuid-fis-log",
-    "pondId": "3cb49a46-81cf-4a47-a365-1d6fa55e8d89",
-    "deviceId": "22fffa98-46eb-4606-93a0-faae9f70691e",
-    "timestamp": "2026-10-10T08:45:00.000Z",
-    "remainingFeedAreaRt": 0.12,
-    "feedConsumptionVelocityVt": 0.015,
-    "shrimpDensityDt": 18.5,
-    "behaviorClassificationCt": 2.8,
-    "normalizedRt": 0.88,
-    "normalizedVt": 0.3,
-    "normalizedDt": 0.6167,
-    "normalizedCt": 0.9333,
-    "fisScore": 0.785,
-    "appetiteLevel": 3,
-    "confidence": 0.92,
-    "frameUrl": "https://storage.shrimpmate.vn/frames/pond1_tray_20261010.jpg"
+  "recommendationId": "uuid-rec",
+  "pondId": "uuid-ao",
+  "predictedFeedAmountKg": 9.42,
+  "safeAllowedAmountKg": 9.42,
+  "biomassKg": 1125.0,
+  "feedRatePercent": 0.84,
+  "safetyDecision": "allowed",
+  "safetyReasons": [],
+  "featureBreakdown": {
+    "doc": 45,
+    "avgWeightG": 12.5,
+    "doMin": 5.2,
+    "deltaTan": 0.05,
+    "morningRainMm": 0.0,
+    "prevFeedAmountKg": 8.0,
+    "waterChangeM3": 20.0,
+    "pondAreaM2": 1000.0,
+    "shrimpCount": 90000
   },
-  "analysisSummary": {
-    "fisScore": 0.785,
-    "appetiteLevel": 3,
-    "appetiteLevelDescription": "Ăn mạnh (Mức 3)",
-    "feedLeftoverPercent": 12.0,
-    "shrimpDensity": 18.5,
-    "consumptionVelocity": 0.015,
-    "isAnomaly": false,
-    "anomalyReason": null
-  }
+  "explanation": "Tôm 45 ngày tuổi, trọng lượng mẫu bình quân 12.5 g/con (Tổng sinh khối ước tính 1125.0 kg). Lượng ăn cữ trước: 8.0 kg. Khuyến nghị AI cấp phát: 9.42 kg cho cữ ăn này.",
+  "createdAt": "2026-10-10T08:45:00.000Z"
 }
 ```
 
 ---
 
-### 11.2. Thu nhận chỉ số tiền xử lý từ Camera AI Edge Gateway
+### 11.2. Dự báo tổng sinh khối ao nuôi (Biomass Forecast)
 
 ```http
-POST /camera/ingest-metrics
+GET /ponds/:pondId/ai/forecast-biomass
 ```
 
-- **Quyền**: Public / Edge Gateway token.
-- **Công dụng**: Dành cho các thiết bị phần cứng tại biên (như Raspberry Pi / Jetson Nano) đã chạy mô hình YOLO/MobileNet cục bộ, gửi trực tiếp các chỉ số $R_t, D_t, C_t$ lên máy chủ qua HTTP REST hoặc MQTT.
-
-#### Body:
-```json
-{
-  "pondId": "3cb49a46-81cf-4a47-a365-1d6fa55e8d89",
-  "deviceUid": "CAM-01-A1",
-  "remainingFeedAreaRt": 0.25,
-  "shrimpDensityDt": 12.0,
-  "behaviorClassificationCt": 2.0,
-  "timeDeltaSeconds": 20,
-  "confidence": 0.89
-}
-```
-
-#### Phản hồi thành công (`201 Created`): Trả về bản ghi `CameraFisLog` đã được lưu trữ.
-
----
-
-### 11.3. Lấy kết quả FIS mới nhất theo ao nuôi
-
-```http
-GET /camera/ponds/:pondId/latest-fis
-```
-
-- **Quyền**: `admin`, `farmer`.
-- **Công dụng**: Lấy trạng thái bắt mồi mới nhất của ao, kiểm tra độ tươi của dữ liệu (`ageSeconds`, đánh dấu `isStale = true` nếu quá 120 giây không có khung hình mới) và thông tin camera quan sát.
+- **Quyền**: `admin`, `manager`, `farmer`.
+- **Công dụng**: Dự báo tổng sinh khối đàn tôm trong ao (kg), kích thước bình quân, tỷ lệ sống và nhu cầu thức ăn ngày dựa trên dữ liệu vụ nuôi đang hoạt động.
 
 #### Phản hồi thành công (`200 OK`):
 ```json
 {
-  "hasData": true,
-  "pondId": "3cb49a46-81cf-4a47-a365-1d6fa55e8d89",
-  "status": {
-    "fisScore": 0.785,
-    "appetiteLevel": 3,
-    "appetiteLevelDescription": "Ăn mạnh (Mức 3)",
-    "remainingFeedPercent": 12.0,
-    "shrimpDensity": 18.5,
-    "consumptionVelocity": 0.015,
-    "timestamp": "2026-10-10T08:45:00.000Z",
-    "ageSeconds": 25,
-    "isStale": false
-  },
-  "camera": {
-    "id": "uuid-cam",
-    "name": "Camera quan sát Ao 1",
-    "status": "online",
-    "lastSeenAt": "2026-10-10T08:45:00.000Z"
-  }
+  "pondId": "uuid-ao",
+  "cropSeasonId": "uuid-vu-nuoi",
+  "daysOfCulture": 45,
+  "estimatedShrimpCount": 90000,
+  "estimatedAverageWeightG": 12.5,
+  "estimatedSurvivalRatePercent": 85,
+  "estimatedBiomassKg": 1125.0,
+  "dailyFeedDemandKg": 37.68
 }
 ```
 
 ---
 
-### 11.4. Lấy lịch sử chuỗi thời gian FIS (Vẽ biểu đồ trực quan)
-
-```http
-GET /camera/ponds/:pondId/fis-history?from=2026-10-01T00:00:00.000Z&to=2026-10-10T23:59:59.000Z&appetiteLevel=3&page=1&limit=50
-```
-
-- **Query Parameters**:
-  - `from`, `to` (ISO Date String): Khoảng thời gian lọc.
-  - `deviceId` (UUID): Lọc theo camera.
-  - `feedingRecordId` (UUID): Lọc theo cữ ăn.
-  - `appetiteLevel` (`0`, `1`, `2`, `3`): Lọc theo mức thèm ăn.
-  - `page`, `limit`: Phân trang (mặc định: page 1, limit 50, tối đa 500).
-
-#### Phản hồi thành công (`200 OK`):
-```json
-{
-  "data": [ ... ],
-  "total": 150,
-  "page": 1,
-  "limit": 50,
-  "totalPages": 3,
-  "summary": {
-    "avgFisScore": 0.684,
-    "distribution": {
-      "none": 5,
-      "weak": 20,
-      "normal": 75,
-      "strong": 50
-    }
-  }
-}
-```
-
----
-
-### 11.5. Danh sách camera thuộc ao nuôi
-
-```http
-GET /camera/ponds/:pondId/devices
-```
-
-- **Quyền**: `admin`, `farmer`. Trả về danh sách tất cả các thiết bị có `type = 'camera'` đang được gán vào ao nuôi này.
-
----
-
-### 11.6. Cập nhật vùng quan sát cố định cho Camera (ROI)
-
-```http
-PATCH /camera/devices/:deviceId/roi
-```
-
-- **Quyền**: `admin`, `farmer`.
-- **Công dụng**: Thiết lập tọa độ hộp chữ nhật hoặc đa giác của sàng ăn trên khung hình camera, lưu vào `metadata.roi` của thiết bị để AI tự động cắt đúng vùng sàng ăn trong các lần phân tích sau.
-
-#### Body:
-```json
-{
-  "x": 200,
-  "y": 150,
-  "width": 650,
-  "height": 650,
-  "polygon": [
-    [200, 150],
-    [850, 150],
-    [850, 800],
-    [200, 800]
-  ],
-  "resolutionWidth": 1920,
-  "resolutionHeight": 1080
-}
-```
-
-#### Phản hồi thành công (`200 OK`): Trả về đối tượng thiết bị đã cập nhật ROI.
-
----
-
-### 11.7. Tinh chỉnh trọng số và phân vị thuật toán FIS
-
-```http
-PATCH /camera/ponds/:pondId/weights
-```
-
-- **Quyền**: `admin`, `farmer`.
-- **Công dụng**: Điều chỉnh trọng số thành phần ($w_1, w_2, w_3, w_4$) và các ngưỡng phân vị ($q_{25}, q_{50}, q_{75}$) phù hợp với đặc thù nước đục/nước trong hoặc giống tôm của từng ao.
-
-#### Body:
-```json
-{
-  "weightRt": 0.35,
-  "weightVt": 0.25,
-  "weightDt": 0.20,
-  "weightCt": 0.20,
-  "quantile25": 0.25,
-  "quantile50": 0.50,
-  "quantile75": 0.75,
-  "samplingIntervalSeconds": 20
-}
-```
-
-#### Phản hồi thành công (`200 OK`):
-```json
-{
-  "message": "Đã cập nhật trọng số và phân vị FIS cho 1 camera trong ao",
-  "weights": { ... }
-}
-```
-
----
-
-## 12. Module Đề xuất AI & Tối ưu cữ ăn (`/ponds/:pondId/ai`)
-
-Tích hợp mô hình AI tối ưu lượng thức ăn theo sinh khối và dữ liệu môi trường. Yêu cầu quyền **`farmer`**.
-
-### 12.1. Lấy khuyến nghị AI mới nhất cho ao nuôi
+### 11.3. Lấy khuyến nghị AI mới nhất cho ao nuôi
 
 ```http
 GET /ponds/:pondId/ai/recommendations/latest
 ```
 
+- **Quyền**: `admin`, `manager`, `farmer`.
+
 #### Phản hồi thành công (`200 OK`):
 ```json
 {
-  "id": "uuid",
-  "pondId": "uuid-ao",
-  "modelName": "ShrimpMate-FeedOpt-v2",
-  "modelVersion": "2.1.0",
-  "predictedFeedAmountKg": 16.2,
-  "spreadRateKgPerMinute": 1.6,
-  "appetiteLevel": 3,
-  "biomassKg": 780.0,
-  "anomalyScore": 0.04,
-  "confidence": 0.94,
-  "safetyDecision": "allowed",
-  "safetyReason": null,
-  "explanation": "Tôm bắt mồi mạnh (FIS cao), DO=5.5 mg/L và nhiệt độ 28.5°C nằm trong ngưỡng tối ưu. Đề xuất tăng nhẹ lượng thức ăn 5%."
+  "recommendation": {
+    "id": "uuid-rec",
+    "pondId": "uuid-ao",
+    "modelName": "XGBoost-Regressor",
+    "modelVersion": "v2.0.0",
+    "predictedFeedAmountKg": 9.42,
+    "spreadRateKgPerMinute": 1.5,
+    "biomassKg": 1125.0,
+    "confidence": 0.92,
+    "safetyDecision": "allowed",
+    "safetyReason": "Môi trường an toàn",
+    "explanation": "Tôm 45 ngày tuổi, trọng lượng mẫu bình quân 12.5 g/con (Tổng sinh khối ước tính 1125.0 kg). Khuyến nghị AI cấp phát: 9.42 kg cho cữ ăn này.",
+    "status": "pending",
+    "createdAt": "2026-10-10T08:45:00.000Z"
+  }
 }
 ```
 
 ---
 
-### 12.2. Lịch sử các khuyến nghị AI
+### 11.4. Lịch sử các khuyến nghị AI
 
 ```http
 GET /ponds/:pondId/ai/recommendations?limit=10
 ```
 
-- **Query Parameters**: `limit` (mặc định: 10).
+- **Query Parameters**: `limit` (mặc định: 10, tối đa 100).
 
 ---
 
@@ -2169,4 +1992,4 @@ Hệ thống tự động khởi tạo các tài khoản chuẩn khi chạy seed
 | Vai trò (Role) | Email | Số điện thoại | Mật khẩu | Phạm vi quyền hạn |
 | --- | --- | --- | --- | --- |
 | `admin` | `admin@shrimpmate.local` | `0901000001` | `Admin@123456` | Quản trị viên hệ thống: Quản lý catalog phần cứng, khóa/phân quyền tài khoản, cấu hình luật an toàn, báo cáo tổng quan và FCR toàn hệ thống |
-| `farmer` | `farmer@shrimpmate.local` | `0901000002` | `Farmer@123456` | Người nuôi tôm: Sở hữu và tự chủ các Farm và Pond mẫu, gán thiết bị, tạo lịch ăn, phân tích AI camera FIS và tiếp nhận cảnh báo |
+| `farmer` | `farmer@shrimpmate.local` | `0901000002` | `Farmer@123456` | Người nuôi tôm: Sở hữu và tự chủ các Farm và Pond mẫu, gán thiết bị, tạo lịch ăn, khai thác dự báo AI và tiếp nhận cảnh báo |

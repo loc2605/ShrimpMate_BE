@@ -9,7 +9,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AiRecommendation } from '../../database/entities/ai-recommendation.entity';
 import { Pond } from '../../database/entities/pond.entity';
-import { CameraFisLog } from '../../database/entities/camera-fis-log.entity';
 import { CropSeason } from '../../database/entities/crop-season.entity';
 import { TelemetryReading } from '../../database/entities/telemetry-reading.entity';
 import { FeedingRecord } from '../../database/entities/feeding-record.entity';
@@ -18,7 +17,6 @@ import {
   AppetiteLevel,
   CropSeasonStatus,
   FeedingStatus,
-  SafetyDecision,
 } from '../../database/entities/enums';
 import { PondAccessService } from '../../common/guards/pond-access.service';
 import { User } from '../../database/entities/user.entity';
@@ -45,8 +43,6 @@ export class AiIntegrationService {
     private readonly recommendationRepository: Repository<AiRecommendation>,
     @InjectRepository(Pond)
     private readonly pondRepository: Repository<Pond>,
-    @InjectRepository(CameraFisLog)
-    private readonly cameraFisLogRepository: Repository<CameraFisLog>,
     @InjectRepository(CropSeason)
     private readonly cropSeasonRepository: Repository<CropSeason>,
     @InjectRepository(TelemetryReading)
@@ -59,8 +55,8 @@ export class AiIntegrationService {
   ) {}
 
   /**
-   * Dự báo nhu cầu thức ăn thông minh sử dụng mô hình XGBoost Regressor (IUH 2025)
-   * Tự động tổng hợp 8 đặc trưng từ CSDL & Camera FIS, sau đó kiểm duyệt qua Safety Rule Engine
+   * Dự báo nhu cầu thức ăn thông minh sử dụng mô hình AI Machine Learning (XGBoost)
+   * Tự động tổng hợp 7 đặc trưng từ CSDL sinh học & cảm biến môi trường (không dùng camera/FIS)
    */
   async predictFeedDemand(pondId: string, user: User, dto?: PredictFeedOverrideDto) {
     const pond = await this.ensurePondExists(pondId);
@@ -82,7 +78,7 @@ export class AiIntegrationService {
       doc = Math.max(1, diffDays);
 
       const initialWeight = Number(activeSeason.initialAverageWeightG) || 0.8;
-      // Tăng trưởng bình quân 0.28g/ngày theo mô hình thực nghiệm IUH
+      // Tăng trưởng bình quân 0.28g/ngày theo mô hình thực nghiệm nuôi tôm
       avgWeightG = Number((initialWeight + doc * 0.28).toFixed(2));
 
       const survivalRate = (Number(activeSeason.estimatedSurvivalRate) || 85) / 100;
@@ -93,16 +89,7 @@ export class AiIntegrationService {
     if (dto?.doc !== undefined) doc = dto.doc;
     if (dto?.avgWeightG !== undefined) avgWeightG = dto.avgWeightG;
 
-    // 3. Lấy chỉ số thèm ăn FIS mới nhất từ camera sàng ăn
-    const latestFis = await this.cameraFisLogRepository.findOne({
-      where: { pondId },
-      order: { timestamp: 'DESC' },
-    });
-    const fisScore = dto?.fisScore !== undefined
-      ? dto.fisScore
-      : (latestFis ? Number(latestFis.fisScore) : 0.65);
-
-    // 4. Lấy dữ liệu quan trắc môi trường (DO_min và Delta_TAN)
+    // 3. Lấy dữ liệu quan trắc môi trường (DO_min và Delta_TAN)
     const recentReadings = await this.readingRepository.find({
       where: { pondId },
       order: { measuredAt: 'DESC' },
@@ -126,7 +113,7 @@ export class AiIntegrationService {
     }
     if (dto?.deltaTan !== undefined) deltaTan = dto.deltaTan;
 
-    // 5. Lấy lượng thức ăn tiêu thụ cữ liền trước
+    // 4. Lấy lượng thức ăn tiêu thụ cữ liền trước
     const lastRecord = await this.recordRepository.findOne({
       where: { pondId, status: FeedingStatus.COMPLETED },
       order: { startedAt: 'DESC' },
@@ -138,11 +125,10 @@ export class AiIntegrationService {
     const waterChangeM3 = dto?.waterChangeM3 ?? 0.0;
     const pondAreaM2 = Number(pond.areaM2) || 1000.0;
 
-    // 6. Đóng gói vector 8 đặc trưng và gửi sang AI Microservice (FastAPI)
+    // 5. Đóng gói vector đặc trưng môi trường & sinh học gửi sang AI Microservice (FastAPI)
     const featurePayload = {
       doc,
       avgWeightG,
-      fisScore,
       doMin,
       deltaTan,
       morningRainMm,
@@ -175,27 +161,21 @@ export class AiIntegrationService {
       );
     }
 
-    // 7. Kiểm duyệt bắt buộc qua Lớp Quy tắc An toàn (Safety Rule Engine)
+    // 6. Kiểm duyệt bắt buộc qua Lớp Quy tắc An toàn (Safety Rule Engine)
     const safetyResult = await this.safetyRuleEngineService.evaluateFeedingSafety(
       pondId,
       undefined,
       aiResponse.predictedFeedAmountKg,
     );
 
-    // Xác định mức độ thèm ăn tương ứng từ điểm FIS
-    let appetiteLevel: AppetiteLevel = AppetiteLevel.NORMAL;
-    if (fisScore < 0.25) appetiteLevel = AppetiteLevel.NONE;
-    else if (fisScore < 0.50) appetiteLevel = AppetiteLevel.WEAK;
-    else if (fisScore >= 0.75) appetiteLevel = AppetiteLevel.STRONG;
-
-    // 8. Lưu lịch sử khuyến nghị AI vào bảng ai_recommendations
+    // 7. Lưu lịch sử khuyến nghị AI vào bảng ai_recommendations
     const recommendation = this.recommendationRepository.create({
       pondId,
       modelName: aiResponse.modelName,
       modelVersion: aiResponse.modelVersion,
       predictedFeedAmountKg: safetyResult.allowedAmountKg,
       spreadRateKgPerMinute: 1.5,
-      appetiteLevel,
+      appetiteLevel: AppetiteLevel.NORMAL,
       biomassKg: aiResponse.biomassKg,
       confidence: aiResponse.confidence,
       inputSnapshot: featurePayload,
@@ -219,15 +199,6 @@ export class AiIntegrationService {
       featureBreakdown: featurePayload,
       featureImportance: aiResponse.featureImportance,
       explanation: aiResponse.explanation,
-      visionSnapshot: latestFis
-        ? {
-            fisScore: Number(latestFis.fisScore),
-            appetiteLevel: latestFis.appetiteLevel,
-            remainingFeedAreaRt: Number(latestFis.remainingFeedAreaRt),
-            shrimpDensityDt: Number(latestFis.shrimpDensityDt),
-            measuredAt: latestFis.timestamp,
-          }
-        : null,
       createdAt: saved.createdAt,
     };
   }
@@ -236,32 +207,17 @@ export class AiIntegrationService {
     await this.ensurePondExists(pondId);
     await this.pondAccessService.ensureCanAccess(user, pondId);
 
-    const [recommendation, latestFis] = await Promise.all([
-      this.recommendationRepository.findOne({
-        where: { pondId },
-        order: { createdAt: 'DESC' },
-      }),
-      this.cameraFisLogRepository.findOne({
-        where: { pondId },
-        order: { timestamp: 'DESC' },
-      }),
-    ]);
+    const recommendation = await this.recommendationRepository.findOne({
+      where: { pondId },
+      order: { createdAt: 'DESC' },
+    });
 
-    if (!recommendation && !latestFis) {
+    if (!recommendation) {
       return { message: 'Chưa có dữ liệu khuyến nghị AI cho ao này' };
     }
 
     return {
-      recommendation: recommendation ?? null,
-      visionInsights: latestFis
-        ? {
-            fisScore: Number(latestFis.fisScore),
-            appetiteLevel: latestFis.appetiteLevel,
-            remainingFeedAreaRt: Number(latestFis.remainingFeedAreaRt),
-            shrimpDensityDt: Number(latestFis.shrimpDensityDt),
-            measuredAt: latestFis.timestamp,
-          }
-        : null,
+      recommendation,
     };
   }
 

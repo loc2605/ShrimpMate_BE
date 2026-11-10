@@ -387,7 +387,7 @@ He thong da co san 3 tai khoan voi 3 phan quyen khac nhau:
   }
 }
 ```
-*(Gia tri type: `feeder`, `sensor_node`, `camera`, `edge_gateway`)*  
+*(Gia tri type: `feeder`, `sensor_node`, `edge_gateway`)*  
 *(Gia tri status: `online`, `offline`, `error`, `maintenance`)*  
 *(Gia tri mode: `automatic`, `manual`, `emergency_stop`)*
 

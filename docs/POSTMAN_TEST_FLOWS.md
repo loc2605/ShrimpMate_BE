@@ -87,10 +87,10 @@ graph TD
         T2 --> T3["4.3 Safety Rule Đánh Giá: Block Feeder"]
     end
 
-    subgraph Flow5["Luồng 5: AI Camera FIS & Khuyến Nghị"]
-        C1["5.1 Cấu Hình ROI & Trọng Số Vision"] --> C2["5.2 Phân Tích Khung Hình Khay Ăn (YOLO + MobileNet)"]
-        C2 --> C3["5.3 Lấy Điểm Thèm Ăn FIS & Lịch Sử"]
-        C3 --> C4["5.4 Lấy Khuyến Nghị Lượng Thức Ăn Tối Ưu"]
+    subgraph Flow5["Luồng 5: AI Dự Báo Định Mức Thức Ăn & Khuyến Nghị"]
+        C1["5.1 Dự Báo Lượng Thức Ăn AI (XGBoost)"] --> C2["5.2 Dự Báo Tổng Sinh Khối Ao Nuôi"]
+        C2 --> C3["5.3 Xem Khuyến Nghị AI Mới Nhất"]
+        C3 --> C4["5.4 Lịch Sử Đề Xuất AI"]
         C4 --> C5["5.5 Ghi Nhận & Cập Nhật Feeding Record"]
     end
 
@@ -440,64 +440,40 @@ graph TD
 
 ---
 
-## LUỒNG 5: TRÍ TUỆ NHÂN TẠO AI & THỊ GIÁC MÁY TÍNH
+## LUỒNG 5: TRÍ TUỆ NHÂN TẠO AI DỰ BÁO LƯỢNG THỨC ĂN & KHUYẾN NGHỊ
 
-### Bước 5.1: Cấu hình ROI khay ăn & Trọng số FIS
-- **5.1.1 Cập nhật vùng ROI khay ăn**:
-  - **Method & URL**: `PATCH {{baseUrl}}/camera/devices/{{deviceId}}/roi`
-  - **Header**: `Authorization: Bearer {{managerToken}}`
-  - **Body (raw JSON)**:
-    ```json
-    {
-      "roiPolygon": [
-        {"x": 100, "y": 150},
-        {"x": 500, "y": 150},
-        {"x": 500, "y": 550},
-        {"x": 100, "y": 550}
-      ]
-    }
-    ```
-  - **Kỳ vọng**: `200 OK`.
-- **5.1.2 Tinh chỉnh trọng số thuật toán FIS**:
-  - **Method & URL**: `PATCH {{baseUrl}}/camera/ponds/{{pondId}}/weights`
-  - **Body (raw JSON)**:
-    ```json
-    {
-      "w1": 0.35,
-      "w2": 0.25,
-      "w3": 0.25,
-      "w4": 0.15,
-      "q25": 25.0,
-      "q50": 50.0,
-      "q75": 75.0
-    }
-    ```
-  - **Kỳ vọng**: `200 OK`.
-
-### Bước 5.2: Phân tích khung hình khay ăn (Dual AI Pipeline)
-- **Method & URL**: `POST {{baseUrl}}/camera/analyze`
+### Bước 5.1: Dự báo lượng thức ăn thông minh qua AI (XGBoost Regressor)
+- **Method & URL**: `POST {{baseUrl}}/ponds/{{pondId}}/ai/predict-feed`
 - **Header**: `Authorization: Bearer {{managerToken}}`
 - **Body (raw JSON)**:
   ```json
   {
-    "deviceId": "{{deviceId}}",
-    "imageUrl": "https://shrimpmate.storage/samples/tray_frame_01.jpg"
+    "doc": 45,
+    "avgWeightG": 12.5,
+    "doMin": 5.2,
+    "deltaTan": 0.05,
+    "morningRainMm": 0.0,
+    "prevFeedAmountKg": 8.0,
+    "waterChangeM3": 20.0
   }
   ```
+- **Kỳ vọng**: `201 Created`. Trả về:
+  - `predictedFeedAmountKg`: Lượng thức ăn AI dự báo.
+  - `safeAllowedAmountKg`: Lượng thức ăn sau kiểm duyệt Safety Engine.
+  - `biomassKg`: Ước lượng sinh khối tôm.
+  - `explanation`: Giải thích cơ sở tính toán AI.
+
+### Bước 5.2: Dự báo tổng sinh khối ao nuôi (Biomass Forecast)
+- **Method & URL**: `GET {{baseUrl}}/ponds/{{pondId}}/ai/forecast-biomass`
+- **Header**: `Authorization: Bearer {{managerToken}}`
 - **Kỳ vọng**: `200 OK`. Trả về:
-  - `fisScore`: Điểm thèm ăn (ví dụ: `78.5`).
-  - `appetiteLevel`: Mức độ thèm ăn (`0: None`, `1: Weak`, `2: Normal`, `3: Strong`).
-  - `shrimpCount`: Số lượng tôm phát hiện quanh sàng.
-  - `residualFeedPercent`: Tỷ lệ thức ăn thừa trên khay.
+  - `estimatedBiomassKg`: Tổng sinh khối tôm ao nuôi (kg).
+  - `estimatedShrimpCount`: Số lượng tôm sống ước tính.
+  - `dailyFeedDemandKg`: Định mức thức ăn cả ngày.
 
-### Bước 5.3: Xem chỉ số thèm ăn FIS & Lịch sử
-- **5.3.1 FIS tức thời**: `GET {{baseUrl}}/camera/ponds/{{pondId}}/latest-fis` -> `200 OK`.
-- **5.3.2 Lịch sử chuỗi thời gian FIS**: `GET {{baseUrl}}/camera/ponds/{{pondId}}/fis-history?range=24h` -> `200 OK`.
-
-### Bước 5.4: Khai thác khuyến nghị dinh dưỡng tối ưu từ AI
-- **5.4.1 Khuyến nghị thức ăn**: `GET {{baseUrl}}/ai-integration/ponds/{{pondId}}/feed-recommendation` -> `200 OK`.
-  - Trả về lượng thức ăn tối ưu đề xuất dựa trên sinh khối tôm và điểm thèm ăn FIS.
-- **5.4.2 Ước tính sinh khối ao**: `GET {{baseUrl}}/ai-integration/ponds/{{pondId}}/biomass` -> `200 OK`.
+### Bước 5.3: Xem khuyến nghị AI mới nhất & Lịch sử
+- **5.3.1 Khuyến nghị mới nhất**: `GET {{baseUrl}}/ponds/{{pondId}}/ai/recommendations/latest` -> `200 OK`.
+- **5.3.2 Lịch sử các khuyến nghị AI**: `GET {{baseUrl}}/ponds/{{pondId}}/ai/recommendations?limit=10` -> `200 OK`.
 
 ### Bước 5.5: Tạo và cập nhật nhật ký cho ăn (Feeding Records)
 - **5.5.1 Tạo bản ghi cữ ăn**:

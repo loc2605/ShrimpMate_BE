@@ -16,12 +16,6 @@ export class PredictFeedOverrideDto {
   @IsOptional()
   @IsNumber()
   @Min(0.0)
-  @Max(1.0)
-  fisScore?: number;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0.0)
   @Max(15.0)
   doMin?: number;
 
@@ -46,4 +40,3 @@ export class PredictFeedOverrideDto {
   @Min(0.0)
   waterChangeM3?: number;
 }
-

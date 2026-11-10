@@ -15,11 +15,10 @@ Tài liệu mô tả kiến trúc cơ sở dữ liệu hiện tại dựa trên 
 - `feeding_schedules`: Lịch cho ăn tự động của ao
 - `feeding_records`: Nhật ký các lần cho ăn
 - `telemetry_readings`: Dữ liệu đo đạc chỉ số môi trường nước (pH, DO, nhiệt độ, độ mặn, NH₃, độ đục)
-- `ai_recommendations`: Đề xuất lượng thức ăn, cường độ bắt mồi (FIS) và quyết định an toàn từ AI
+- `ai_recommendations`: Đề xuất lượng thức ăn tối ưu theo sinh khối, chất lượng nước và quyết định an toàn từ AI
 - `safety_rules`: Luật an toàn môi trường nước
 - `alerts`: Cảnh báo nguy hiểm / sự cố thiết bị
 - `password_reset_otps`: Mã OTP khôi phục mật khẩu
-- `camera_fis_logs`: Nhật ký phân tích thị giác máy tính (Computer Vision) từ camera sàng ăn, bao gồm các chỉ số $R_t, v_t, D_t, C_t$, điểm FIS và 4 mức bắt mồi (0: không ăn, 1: ăn yếu, 2: ăn bình thường, 3: ăn mạnh)
 
 ---
 
@@ -131,7 +130,7 @@ Index: Unique partial index trên `pond_id` với điều kiện `status = 'acti
 
 ### `devices`
 
-Lưu danh mục thiết bị IoT chuẩn (feeder, sensor node, camera, edge gateway).
+Lưu danh mục thiết bị IoT chuẩn (feeder, sensor node, edge gateway).
 
 | Cột | Kiểu | Ràng buộc / Mô tả |
 |---|---|---|
@@ -139,7 +138,7 @@ Lưu danh mục thiết bị IoT chuẩn (feeder, sensor node, camera, edge gate
 | `pond_id` | UUID | FK -> `ponds.id`, có thể rỗng |
 | `device_uid` | VARCHAR(100) | Định danh phần cứng duy nhất (Unique) |
 | `name` | VARCHAR(150) | Tên thiết bị |
-| `type` | ENUM | `feeder`, `sensor_node`, `camera`, `edge_gateway` |
+| `type` | ENUM | `feeder`, `sensor_node`, `edge_gateway` |
 | `status` | ENUM | `online`, `offline`, `error`, `maintenance` |
 | `mode` | ENUM | `automatic`, `manual`, `emergency_stop` |
 | `firmware_version` | VARCHAR(50) | Phiên bản firmware chuẩn (do Admin cấu hình) |
@@ -192,7 +191,7 @@ Lưu nhật ký từng lần cho ăn thực tế của ao nuôi.
 | `actual_amount_kg` | NUMERIC(10,3) | Lượng thức ăn thực tế đã rải |
 | `source` | ENUM | `schedule`, `manual`, `ai` |
 | `status` | ENUM | `requested`, `running`, `completed`, `stopped`, `failed` |
-| `appetite_level` | SMALLINT | Cường độ bắt mồi (FIS): `0` none, `1` weak, `2` normal, `3` strong |
+| `appetite_level` | SMALLINT | Cường độ bắt mồi: `0` none, `1` weak, `2` normal, `3` strong |
 | `leftover_percent` | NUMERIC(5,2) | Tỷ lệ thức ăn thừa trên vó (%) |
 | `stopped_reason` | TEXT | Lý do dừng (nếu dừng khẩn cấp hoặc sự cố) |
 | `safety_decision` | ENUM | Đánh giá từ Safety Rule Engine: `allowed`, `adjusted`, `blocked` |
@@ -238,7 +237,7 @@ Lưu các đề xuất tối ưu hóa cữ ăn từ mô hình AI.
 | `model_version` | VARCHAR(50) | Phiên bản mô hình |
 | `predicted_feed_amount_kg` | NUMERIC(10,3) | Lượng thức ăn dự báo tối ưu |
 | `spread_rate_kg_per_minute` | NUMERIC(10,3) | Tốc độ rải khuyến nghị |
-| `appetite_level` | SMALLINT | Mức độ thèm ăn dự đoán (FIS) |
+| `appetite_level` | SMALLINT | Mức độ thèm ăn dự đoán |
 | `biomass_kg` | NUMERIC(12,3) | Ước lượng sinh khối tôm trong ao (kg) |
 | `anomalyScore` | DOUBLE PRECISION | Điểm số bất thường môi trường |
 | `confidence` | DOUBLE PRECISION | Độ tin cậy của mô hình (0 - 1) |
@@ -309,40 +308,6 @@ Lưu mã xác thực OTP phục vụ khôi phục tài khoản người nuôi.
 
 ---
 
-### `camera_fis_logs`
-
-Lưu dữ liệu phân tích thị giác máy tính (Computer Vision) từ khung hình camera quan sát sàng ăn (YOLO11n-seg & MobileNetV3-Small), phục vụ tính toán chỉ số bắt mồi FIS (Feeding Intensity Score) thời gian thực và huấn luyện lại mô hình AI.
-
-| Cột | Kiểu | Ràng buộc / Mô tả |
-|---|---|---|
-| `id` | UUID | PK |
-| `pond_id` | UUID | FK -> `ponds.id`, bắt buộc (CASCADE khi xóa ao) |
-| `device_id` | UUID | FK -> `devices.id`, có thể rỗng (SET NULL khi xóa thiết bị) |
-| `feeding_record_id` | UUID | FK -> `feeding_records.id`, có thể rỗng (SET NULL khi xóa cữ ăn) |
-| `timestamp` | TIMESTAMPTZ | Thời điểm chụp khung hình và phân tích (Mặc định: CURRENT_TIMESTAMP) |
-| `remaining_feed_area_rt` | NUMERIC(8,4) | $R_t$: Diện tích hoặc tỷ lệ thức ăn còn lại trên sàng quan sát (0.0 - 1.0 hoặc $m^2$) |
-| `feed_consumption_velocity_vt` | NUMERIC(8,4) | $v_t$: Tốc độ tiêu thụ thức ăn ($\Delta R_t / \Delta t$) |
-| `shrimp_density_dt` | NUMERIC(8,4) | $D_t$: Mật độ tôm quan sát được trong vùng quan sát ROI |
-| `behaviorClassificationCt` | NUMERIC(8,4) | $C_t$: Nhãn / điểm số phân loại hành vi ăn tức thời (0..3) |
-| `normalized_rt` | NUMERIC(6,4) | Giá trị $R_t$ sau khi chuẩn hóa Min-Max (0 - 1) |
-| `normalized_vt` | NUMERIC(6,4) | Giá trị $v_t$ sau khi chuẩn hóa Min-Max (0 - 1) |
-| `normalized_dt` | NUMERIC(6,4) | Giá trị $D_t$ sau khi chuẩn hóa Min-Max (0 - 1) |
-| `normalized_ct` | NUMERIC(6,4) | Giá trị $C_t$ sau khi chuẩn hóa Min-Max (0 - 1) |
-| `fis_score` | NUMERIC(6,4) | Điểm số cường độ bắt mồi tổng hợp FIS: $w_1 R_t + w_2 v_t + w_3 D_t + w_4 C_t$ |
-| `appetite_level` | SMALLINT | 4 mức độ bắt mồi: `0` None (không ăn), `1` Weak (ăn yếu), `2` Normal (bình thường), `3` Strong (ăn mạnh) |
-| `confidence` | NUMERIC(5,4) | Độ tin cậy tổng thể của mô hình AI vision (0.0 - 1.0) |
-| `frame_url` | VARCHAR(500) | Đường dẫn lưu trữ khung hình ảnh camera (nếu có) |
-| `metadata` | JSONB | Cấu hình ROI (tọa độ x, y, width, height, đa giác polygon), bộ trọng số weights [$w_1..w_4$], bounding boxes và polygon segmentations |
-| `created_at` | TIMESTAMPTZ | Thời gian tạo bản ghi |
-| `updated_at` | TIMESTAMPTZ | Thời gian cập nhật bản ghi |
-
-Index:
-- `IDX_camera_fis_logs_pond_timestamp` trên (`pond_id`, `timestamp`)
-- `IDX_camera_fis_logs_device_timestamp` trên (`device_id`, `timestamp`)
-- `IDX_camera_fis_logs_pond_appetite` trên (`pond_id`, `appetite_level`)
-
----
-
 ## 3. Quan hệ giữa các bảng
 
 | Bảng nguồn | Bảng đích | Quan hệ | Hành vi khi xóa (On Delete) |
@@ -356,13 +321,10 @@ Index:
 | `ponds` | `telemetry_readings` | 1 - N | Cascade khi hard delete; giữ dữ liệu khi soft delete |
 | `ponds` | `ai_recommendations` | 1 - N | Cascade khi hard delete; giữ dữ liệu khi soft delete |
 | `ponds` | `alerts` | 1 - N | Cascade khi hard delete; giữ dữ liệu khi soft delete |
-| `ponds` | `camera_fis_logs` | 1 - N | Cascade khi hard delete; giữ dữ liệu khi soft delete |
 | `devices` | `feeding_records` | 1 - N (tùy chọn) | Set `device_id = NULL` |
 | `devices` | `telemetry_readings` | 1 - N (tùy chọn) | Set `device_id = NULL` |
 | `devices` | `alerts` | 1 - N (tùy chọn) | Set `device_id = NULL` |
-| `devices` | `camera_fis_logs` | 1 - N (tùy chọn) | Set `device_id = NULL` |
 | `feeding_schedules` | `feeding_records` | 1 - N (tùy chọn) | Set `schedule_id = NULL` |
-| `feeding_records` | `camera_fis_logs` | 1 - N (tùy chọn) | Set `feeding_record_id = NULL` |
 | `users` | `password_reset_otps` | 1 - N | Xóa user sẽ xóa các OTP tương ứng |
 
 ---
@@ -540,29 +502,6 @@ erDiagram
         timestamptz updated_at
     }
 
-    CAMERA_FIS_LOGS {
-        uuid id PK
-        uuid pond_id FK
-        uuid device_id FK
-        uuid feeding_record_id FK
-        timestamptz timestamp
-        numeric remaining_feed_area_rt
-        numeric feed_consumption_velocity_vt
-        numeric shrimp_density_dt
-        numeric behavior_classification_ct
-        numeric normalized_rt
-        numeric normalized_vt
-        numeric normalized_dt
-        numeric normalized_ct
-        numeric fis_score
-        smallint appetite_level
-        numeric confidence
-        varchar frame_url
-        jsonb metadata
-        timestamptz created_at
-        timestamptz updated_at
-    }
-
     FARMER_ASSIGNMENTS {
         uuid id PK
         uuid farmer_id FK
@@ -585,13 +524,10 @@ erDiagram
     PONDS ||--o{ TELEMETRY_READINGS : "measures"
     PONDS ||--o{ AI_RECOMMENDATIONS : "receives"
     PONDS ||--o{ ALERTS : "generates"
-    PONDS ||--o{ CAMERA_FIS_LOGS : "captures"
     DEVICES o|--o{ FEEDING_RECORDS : "dispenses"
     DEVICES o|--o{ TELEMETRY_READINGS : "sends"
     DEVICES o|--o{ ALERTS : "triggers"
-    DEVICES o|--o{ CAMERA_FIS_LOGS : "observes"
     FEEDING_SCHEDULES o|--o{ FEEDING_RECORDS : "generates"
-    FEEDING_RECORDS o|--o{ CAMERA_FIS_LOGS : "monitored_by"
 ```
 
 ---
@@ -605,7 +541,3 @@ erDiagram
    - Tên bảng và phần lớn các cột dùng chuẩn `snake_case`.
    - Một số ít thuộc tính TypeScript giữ camelCase gồm `isActive` (users), `isEnabled` (feeding_schedules, safety_rules) và `rawData` (telemetry_readings).
 5. **Soft Delete**: Áp dụng cột `deleted_at` cho `farms` và `ponds` để đảm bảo khi người nuôi xóa ao hay trang trại, lịch sử các vụ nuôi cũ, nhật ký cho ăn, chỉ số cảm biến và cảnh báo sự cố vẫn được bảo toàn nguyên vẹn trong hệ thống.
-6. **Chuỗi thời gian Computer Vision & Tích hợp FIS**:
-   - Bảng `camera_fis_logs` ghi nhận kết quả phân tích song song 2 mô hình (YOLO11n-seg cho phân đoạn thức ăn & đếm mật độ tôm, MobileNetV3-Small cho phân loại hành vi).
-   - Mỗi bản ghi liên kết trực tiếp với ao nuôi (`pond_id`), camera chụp (`device_id`) và cữ ăn đang diễn ra (`feeding_record_id`).
-   - Cột `metadata` dạng JSONB chứa tọa độ ROI và trọng số cấu hình, cho phép truy vết và tinh chỉnh thuật toán mà không cần thay đổi cấu trúc bảng.

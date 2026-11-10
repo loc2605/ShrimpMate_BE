@@ -35,7 +35,7 @@ Hệ thống sử dụng cơ chế xác thực không trạng thái (**Stateless
       - Báo cáo FCR toàn diện        - Lập Lịch cho ăn tự động       - Cho ăn nhanh (Quick Feed)
       - Thanh tra dữ liệu mọi trại   - Khai báo & đóng Vụ nuôi       - Dừng khẩn cấp (1-Tap E-Stop)
       - Test phần cứng qua MQTT      - Đồ thị chuỗi thời gian 24h/7d - Nhận Push Notification (FCM)
-                                     - Khai thác AI (FIS, Forecast)  - Xác nhận & xử lý sự cố
+                                     - Khai thác AI (Feed, Forecast) - Xác nhận & xử lý sự cố
                                      - Thống kê & Báo cáo FCR vụ
 ```
 
@@ -91,7 +91,7 @@ Hệ thống sử dụng cơ chế xác thực không trạng thái (**Stateless
 | **6. Gán & Quản lý Thiết bị (UC009)** | - Liên kết thiết bị IoT từ kho vào ao nuôi thuộc quyền quản lý (`claim`).<br>- Gỡ thiết bị khỏi ao (`unassign`) khi cần bảo dưỡng/thay thế.<br>- Theo dõi thời điểm phản hồi gần nhất (`lastSeenAt`) và trạng thái online/offline. | `POST /devices/claim`<br>`POST /devices/:id/unassign`<br>`GET /devices`<br>`GET /devices/:id` |
 | **7. Cấu hình Lịch cho ăn Tự động (UC011)** | - Thiết lập lịch cho ăn tự động trong tuần: khung giờ cho ăn, định mức kg thức ăn, tốc độ rải.<br>- Bật/tắt hoặc xóa lịch cho ăn. | `POST /ponds/:pondId/feeding-schedules`<br>`GET /ponds/:pondId/feeding-schedules`<br>`PATCH /feeding-schedules/:id`<br>`DELETE /feeding-schedules/:id` |
 | **8. Giám sát Môi trường & Đồ thị Chuỗi thời gian (UC013)** | - Xem biểu đồ chuỗi thời gian 24h/7d chi tiết 6 thông số nước (pH, DO, nhiệt độ, độ mặn, NH₃, độ đục).<br>- Phân tích xu hướng biến động môi trường. | `GET /ponds/:pondId/telemetry/history`<br>`GET /ponds/:pondId/telemetry/latest` |
-| **9. Khai thác AI & Camera Vision (UC014)** | - Xem dự báo nhu cầu thức ăn và sinh khối ước tính.<br>- Xem chỉ số thèm ăn FIS (0-3), ảnh phân tích YOLO11n-seg & MobileNetV3.<br>- Cấu hình tọa độ ROI và tinh chỉnh trọng số FIS ($w_1 - w_4$). | `GET /camera/ponds/:pondId/latest-fis`<br>`GET /camera/ponds/:pondId/fis-history`<br>`PATCH /camera/devices/:deviceId/roi`<br>`PATCH /camera/ponds/:pondId/weights`<br>`GET /ai-integration/ponds/:pondId/forecast-biomass` |
+| **9. Khai thác AI Dự báo Lượng Thức Ăn (UC014)** | - Dự báo nhu cầu thức ăn tối ưu qua mô hình AI Machine Learning (XGBoost 7 đặc trưng).<br>- Xem dự báo tổng sinh khối và lượng thức ăn ngày.<br>- Lịch sử các khuyến nghị AI. | `POST /ponds/:pondId/ai/predict-feed`<br>`GET /ponds/:pondId/ai/forecast-biomass`<br>`GET /ponds/:pondId/ai/recommendations/latest`<br>`GET /ponds/:pondId/ai/recommendations` |
 | **10. Điều khiển Thiết bị & Cho ăn (UC012)** | - Bật/tắt máy cho ăn, chuyển chế độ tự động/thủ công.<br>- Kích hoạt cữ cho ăn có kiểm duyệt an toàn.<br>- Dừng khẩn cấp máy cho ăn. | `POST /ponds/:pondId/feeding-records`<br>`POST /devices/:id/emergency-stop`<br>`POST /devices/:id/feeder-command` |
 | **11. Tiếp nhận & Xử lý Cảnh báo (UC015)** | - Xem toàn bộ sự cố môi trường và thiết bị trong các ao thuộc quyền quản lý.<br>- Xác nhận đã tiếp nhận (`acknowledged`) và đánh dấu đã khắc phục (`resolved`). | `GET /alerts`<br>`GET /alerts/summary`<br>`GET /ponds/:pondId/alerts`<br>`PATCH /alerts/:id/acknowledge`<br>`PATCH /alerts/:id/resolve` |
 | **12. Thống kê & Xuất báo cáo Vụ nuôi (UC016)** | - Đánh giá lượng thức ăn tiêu thụ tích lũy, tính hệ số FCR chuẩn.<br>- Báo cáo tổng kết hiệu quả vụ nuôi. | `GET /crop-seasons/:id/statistics` |
@@ -111,7 +111,7 @@ Hệ thống sử dụng cơ chế xác thực không trạng thái (**Stateless
 | **1. Xác thực & Đổi mật khẩu** | - Đăng nhập bằng tài khoản và mật khẩu do Manager cấp.<br>- Nhận biết cờ `mustChangePassword` và đổi mật khẩu ở lần đăng nhập đầu tiên.<br>- Đăng xuất an toàn, thu hồi phiên làm việc.<br>- Khôi phục mật khẩu qua mã OTP đa kênh (SMS thật qua cổng eSMS.vn & Email thật qua Gmail SMTP). | `POST /auth/login`<br>`POST /auth/logout`<br>`PATCH /auth/change-password`<br>`POST /auth/forgot-password`<br>`POST /auth/resend-otp`<br>`POST /auth/verify-reset-otp`<br>`POST /auth/reset-password`<br>`GET /auth/farmer-check` |
 | **2. Xem Ao nuôi được phân công** | - Xem danh sách trang trại và các ao nuôi mà mình được Manager phân công phụ trách.<br>- Chuyển đổi giữa các ao nuôi nhanh chóng. | `GET /farms`<br>`GET /farms/:farmId/ponds`<br>`GET /farms/:farmId/ponds/:id` |
 | **3. Giám sát Nước Tức thời (Gauges - UC013)** | - Xem thẻ tóm tắt màu cảnh báo nhanh (Xanh: Tối ưu / Vàng: Cảnh báo / Đỏ: Nguy cấp) cho 6 thông số: DO, pH, Nhiệt độ, Độ mặn, NH₃, Độ đục.<br>- Cập nhật tức thời thời gian đo gần nhất. | `GET /ponds/:pondId/telemetry/latest` |
-| **4. Xem Khuyến nghị AI Tóm tắt (UC014)** | - Xem lượng thức ăn khuyến nghị cho cữ ăn hiện tại.<br>- Xem chỉ số thèm ăn tức thời của đàn tôm (Mức 0: Không ăn, 1: Ăn yếu, 2: Bình thường, 3: Ăn mạnh). | `GET /camera/ponds/:pondId/latest-fis`<br>`GET /ai-integration/ponds/:pondId/recommendations` |
+| **4. Xem Khuyến nghị AI Tóm tắt (UC014)** | - Xem lượng thức ăn khuyến nghị tối ưu cho cữ ăn hiện tại.<br>- Xem dự báo sinh khối ao nuôi. | `GET /ponds/:pondId/ai/recommendations/latest`<br>`GET /ponds/:pondId/ai/recommendations` |
 | **5. Điều khiển Thiết bị Nhanh (1-Tap Control - UC012)** | - **Cho ăn nhanh (Quick Feed)**: Nhập lượng thức ăn và bấm cho ăn ngay tại bờ ao (tự động kiểm duyệt qua Safety Rule Engine).<br>- **Dừng khẩn cấp (Emergency Stop)**: 1 chạm ngắt lập tức động cơ máy cho ăn qua MQTT khi phát hiện sự cố tại ao. | `POST /ponds/:pondId/feeding-records` (Quick Feed)<br>`POST /devices/:id/emergency-stop` (E-Stop) |
 | **6. Tiếp nhận & Xử lý Cảnh báo Đẩy (FCM Push - UC015)** | - Nhận thông báo đẩy (Push Notification) tức thời trên màn hình khóa điện thoại khi nước vượt ngưỡng nguy cấp.<br>- Xem chi tiết nguyên nhân sự cố.<br>- Bấm xác nhận đã xử lý sự cố tại bờ ao. | `GET /ponds/:pondId/alerts`<br>`PATCH /alerts/:id/acknowledge`<br>`PATCH /alerts/:id/resolve` |
 
@@ -134,12 +134,12 @@ Hệ thống sử dụng cơ chế xác thực không trạng thái (**Stateless
 | **UC011** | Thiết lập lịch cho ăn tự động | **Manager** | Web App | Tạo, sửa hoặc tạm ngưng các lịch cho ăn tự động theo khung giờ trong tuần. |
 | **UC012** | Điều khiển thiết bị từ xa | **Manager, Farmer** | Web App / Mobile App | Quản lý bật/tắt động cơ, chuyển chế độ trên Web App; Farmer Cho ăn nhanh và Dừng khẩn cấp trên Mobile App. |
 | **UC013** | Giám sát môi trường thời gian thực | **Manager, Farmer** | Web App / Mobile App | Quản lý xem biểu đồ chuỗi thời gian (Web App); Farmer xem thẻ tóm tắt màu cảnh báo (Mobile App). |
-| **UC014** | Xem khuyến nghị AI | **Manager, Farmer** | Web App / Mobile App | Quản lý xem phân tích chuyên sâu FIS, sinh khối; Farmer xem khuyến nghị tóm tắt lượng ăn. |
+| **UC014** | Xem khuyến nghị AI | **Manager, Farmer** | Web App / Mobile App | Quản lý xem phân tích chuyên sâu sinh khối và lượng ăn; Farmer xem khuyến nghị tóm tắt lượng ăn. |
 | **UC015** | Tiếp nhận và xử lý cảnh báo | **Farmer, Manager** | Mobile App / Web App | Farmer nhận Push Notification và xử lý ngoài bờ ao; Manager theo dõi và xác nhận trên Web App. |
 | **UC016** | Thống kê và xuất báo cáo vụ nuôi | **Manager** | Web App | Đánh giá tổng lượng ăn tiêu thụ, tính hệ số FCR và trích xuất báo cáo vụ. |
 | **UC017** | Thu nhận dữ liệu cảm biến IoT | Thiết bị ESP32 | MQTT Broker | Cảm biến định kỳ gửi thông số chất lượng nước lên Backend. |
 | **UC018** | Kiểm duyệt lệnh cho ăn an toàn | Safety Rule Engine | Backend | Tự động kiểm tra chất lượng nước trước khi phát lệnh điều khiển máy cho ăn. |
-| **UC019** | Phân tích thị giác máy tính sàng ăn | Camera AI Engine | Backend / Edge | Chạy song song YOLO11n-seg và MobileNetV3 để tính chỉ số bắt mồi FIS. |
+| **UC019** | Dự báo lượng thức ăn thông minh AI | AI Engine | Backend / AI | Mô hình XGBoost Regressor tự động phân tích 7 chỉ số sinh học và môi trường để tính định mức ăn tối ưu. |
 | **UC020** | **Quản lý Người nuôi (Mới)** | **Manager** | Web App | Quản lý tạo tài khoản cho Farmer với mật khẩu ngẫu nhiên; sửa thông tin, khóa/mở khóa. |
 | **UC021** | **Gán ao nuôi cho Người nuôi (Mới)** | **Manager** | Web App | Quản lý phân công một hoặc nhiều ao nuôi (hoặc cả trang trại) cho Farmer phụ trách. |
 
@@ -189,9 +189,9 @@ Hệ thống sử dụng cơ chế xác thực không trạng thái (**Stateless
 | **Alerts** | `GET /alerts` | 🟢 | 🟢 | 🟢 | Xem cảnh báo |
 | | `PATCH /alerts/:id/acknowledge` | 🟢 | 🟢 | 🟢 | Tiếp nhận xử lý sự cố |
 | | `PATCH /alerts/:id/resolve` | 🟢 | 🟢 | 🟢 | Đóng/hoàn tất sự cố |
-| **Camera & AI**| `GET /camera/ponds/:id/latest-fis` | 🟢 | 🟢 | 🟢 | Xem chỉ số FIS |
-| | `PATCH /camera/devices/:id/roi` | 🟢 | 🟢 | ❌ | Cấu hình vùng ROI camera |
-| | `PATCH /camera/ponds/:id/weights` | 🟢 | 🟢 | ❌ | Cấu hình trọng số FIS |
+| **AI Integration** | `POST /ponds/:id/ai/predict-feed` | 🟢 | 🟢 | 🟢 | Dự báo lượng thức ăn AI |
+| | `GET /ponds/:id/ai/forecast-biomass` | 🟢 | 🟢 | 🟢 | Dự báo sinh khối ao |
+| | `GET /ponds/:id/ai/recommendations` | 🟢 | 🟢 | 🟢 | Xem đề xuất AI |
 | **Safety Rules**| CRUD `/safety-rules` | 🟢 | ❌ | ❌ | Admin cấu hình luật an toàn |
 | **Admin Reports**| `GET /admin/*` | 🟢 | ❌ | ❌ | Báo cáo toàn hệ thống |
 
