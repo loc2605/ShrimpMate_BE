@@ -7,6 +7,7 @@ import { AuthService } from './auth.service';
 import { User } from '../../database/entities/user.entity';
 import { PasswordResetOtp } from '../../database/entities/password-reset-otp.entity';
 import { OtpDeliveryService } from './otp-delivery.service';
+import { TokenBlacklistService } from './token-blacklist.service';
 import { UserRole } from '../../database/entities/enums';
 
 describe('AuthService', () => {
@@ -73,6 +74,16 @@ describe('AuthService', () => {
         {
           provide: OtpDeliveryService,
           useValue: otpDeliveryService,
+        },
+        {
+          provide: TokenBlacklistService,
+          useValue: {
+            blacklistToken: jest.fn().mockResolvedValue(undefined),
+            isTokenBlacklisted: jest.fn().mockResolvedValue(false),
+            checkLockout: jest.fn().mockResolvedValue({ isLocked: false }),
+            recordFailedLogin: jest.fn().mockResolvedValue({ isLocked: false }),
+            resetFailedAttempts: jest.fn().mockResolvedValue(undefined),
+          },
         },
       ],
     }).compile();

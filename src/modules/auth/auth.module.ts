@@ -11,6 +11,7 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
 import { OtpDeliveryService } from './otp-delivery.service';
+import { TokenBlacklistService } from './token-blacklist.service';
 
 @Global()
 @Module({
@@ -29,7 +30,7 @@ import { OtpDeliveryService } from './otp-delivery.service';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, JwtAuthGuard, OtpDeliveryService],
-  exports: [AuthService, PassportModule, JwtModule, JwtAuthGuard],
+  providers: [AuthService, JwtStrategy, JwtAuthGuard, OtpDeliveryService, TokenBlacklistService],
+  exports: [AuthService, PassportModule, JwtModule, JwtAuthGuard, TokenBlacklistService],
 })
 export class AuthModule {}

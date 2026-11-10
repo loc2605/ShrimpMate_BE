@@ -2,7 +2,7 @@ import { BadRequestException, ConflictException, ForbiddenException, Injectable,
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import { randomInt } from 'crypto';
+import { randomInt, randomUUID } from 'crypto';
 import type { SignOptions } from 'jsonwebtoken';
 import { IsNull, MoreThan, Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -19,6 +19,7 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { OtpDeliveryService } from './otp-delivery.service';
+import { TokenBlacklistService } from './token-blacklist.service';
 import { isEmailIdentifier, normalizePhoneNumber } from '../../common/utils/phone.util';
 
 type SafeUser = Omit<User, 'passwordHash' | 'refreshTokenHash'>;
@@ -36,6 +37,7 @@ export class AuthService {
     private readonly configService: ConfigService,
     @InjectRepository(PasswordResetOtp) private readonly passwordResetOtpRepository: Repository<PasswordResetOtp>,
     private readonly otpDeliveryService: OtpDeliveryService,
+    private readonly tokenBlacklistService: TokenBlacklistService,
   ) { }
 
   async register(registerDto: RegisterDto) {
@@ -76,12 +78,36 @@ export class AuthService {
   }
 
   async login(loginDto: LoginDto) {
-    const user = await this.findUserByIdentifier(loginDto.identifier);
+    const trimmedIdentifier = loginDto.identifier.trim();
+
+    // 1. Kiểm tra trạng thái khóa (Lockout) do brute-force
+    const lockout = await this.tokenBlacklistService.checkLockout(trimmedIdentifier);
+    if (lockout.isLocked) {
+      throw new ForbiddenException(lockout.message);
+    }
+
+    const user = await this.findUserByIdentifier(trimmedIdentifier);
+
+    if (user && user.isAdminLocked) {
+      throw new ForbiddenException(
+        'Tài khoản đang trong trạng thái ACCOUNT_PENDING_ADMIN_UNLOCK do nhập sai quá nhiều lần. Vui lòng liên hệ Admin để mở khóa.',
+      );
+    }
 
     if (!user || !user.isActive || !(await bcrypt.compare(loginDto.password, user.passwordHash))) {
+      const failedStatus = await this.tokenBlacklistService.recordFailedLogin(trimmedIdentifier);
+      if (failedStatus.isLocked) {
+        if (failedStatus.lockType === 'ADMIN' && user) {
+          user.isAdminLocked = true;
+          await this.userRepository.save(user);
+        }
+        throw new ForbiddenException(failedStatus.message);
+      }
       throw new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE);
     }
 
+    // Đăng nhập thành công -> Reset số lần sai
+    await this.tokenBlacklistService.resetFailedAttempts(trimmedIdentifier);
     return this.createAuthResponse(user);
   }
 
@@ -216,10 +242,23 @@ export class AuthService {
     return { message: 'Đổi mật khẩu thành công, vui lòng đăng nhập lại' };
   }
 
-  async logout(userId: string) {
+  async logout(userId: string, rawToken?: string) {
     const user = await this.findUser(userId);
     user.refreshTokenHash = null;
     await this.userRepository.save(user);
+
+    if (rawToken) {
+      try {
+        const decoded = this.jwtService.decode(rawToken) as any;
+        if (decoded?.jti && decoded?.exp) {
+          const remainingTtl = Math.max(1, decoded.exp - Math.floor(Date.now() / 1000));
+          await this.tokenBlacklistService.blacklistToken(decoded.jti, remainingTtl);
+        }
+      } catch {
+        // bỏ qua nếu token không đúng định dạng
+      }
+    }
+
     return { message: 'Đăng xuất thành công' };
   }
 
@@ -234,6 +273,8 @@ export class AuthService {
       throw new ForbiddenException('Không thể tự khóa tài khoản đang đăng nhập');
     }
     user.isActive = dto.isActive;
+    // Tăng tokenVersion để vô hiệu hóa toàn bộ token cũ trên các thiết bị
+    user.tokenVersion = (user.tokenVersion || 0) + 1;
     if (!dto.isActive) {
       user.refreshTokenHash = null;
     }
@@ -247,16 +288,33 @@ export class AuthService {
       throw new ForbiddenException('Không thể tự hạ quyền tài khoản đang đăng nhập');
     }
     user.role = dto.role;
+    // Tăng tokenVersion để các phiên làm việc cũ không thể dùng quyền mới
+    user.tokenVersion = (user.tokenVersion || 0) + 1;
     await this.userRepository.save(user);
     return this.toSafeUser(user);
   }
 
+  async adminUnlockUser(id: string) {
+    const user = await this.findUser(id);
+    user.isAdminLocked = false;
+    user.lockedUntil = null;
+    await this.tokenBlacklistService.resetFailedAttempts(user.email);
+    if (user.phoneNumber) {
+      await this.tokenBlacklistService.resetFailedAttempts(user.phoneNumber);
+    }
+    await this.userRepository.save(user);
+    return { message: `Đã mở khóa tài khoản ${user.email} thành công`, user: this.toSafeUser(user) };
+  }
+
   private async createAuthResponse(user: User) {
+    const jti = randomUUID();
     const payload = {
       sub: user.id,
       email: user.email,
       role: user.role,
       mustChangePassword: user.mustChangePassword,
+      tokenVersion: user.tokenVersion ?? 0,
+      jti,
     };
     const accessToken = await this.jwtService.signAsync(payload);
     const refreshToken = await this.jwtService.signAsync(

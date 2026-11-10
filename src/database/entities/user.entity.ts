@@ -34,6 +34,15 @@ export class User {
   @Column({ default: true })
   isActive!: boolean;
 
+  @Column({ name: 'token_version', type: 'integer', default: 0 })
+  tokenVersion!: number;
+
+  @Column({ name: 'locked_until', type: 'timestamptz', nullable: true })
+  lockedUntil!: Date | null;
+
+  @Column({ name: 'is_admin_locked', type: 'boolean', default: false })
+  isAdminLocked!: boolean;
+
   @Column({ name: 'must_change_password', type: 'boolean', default: false })
   mustChangePassword!: boolean;
 

@@ -1,4 +1,5 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import type { Request } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -40,8 +41,9 @@ export class AuthController {
   @Post('logout')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
-  logout(@CurrentUser() user: User) {
-    return this.authService.logout(user.id);
+  logout(@CurrentUser() user: User, @Req() req: Request) {
+    const rawToken = req.headers.authorization?.replace(/^Bearer\s+/i, '');
+    return this.authService.logout(user.id, rawToken);
   }
 
   @Post('forgot-password')
@@ -114,6 +116,13 @@ export class AuthController {
     @CurrentUser() currentUser: User,
   ) {
     return this.authService.updateUserRole(id, dto, currentUser.id);
+  }
+
+  @Patch('users/:id/unlock')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  unlockUser(@Param('id') id: string) {
+    return this.authService.adminUnlockUser(id);
   }
 
   @Get('admin-check')
