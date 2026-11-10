@@ -40,6 +40,15 @@ export class AiIntegrationController {
     return this.aiService.getBiomassForecast(pondId, user);
   }
 
+  @Get('predicted-trends')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.FARMER)
+  getPredictedTrends(
+    @Param('pondId') pondId: string,
+    @CurrentUser() user: User,
+  ) {
+    return this.aiService.getPredictedTrends(pondId, user);
+  }
+
   @Get('recommendations/latest')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.FARMER)
   getLatest(@Param('pondId') pondId: string, @CurrentUser() user: User) {

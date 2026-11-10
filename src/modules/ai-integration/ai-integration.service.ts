@@ -17,6 +17,7 @@ import {
   AppetiteLevel,
   CropSeasonStatus,
   FeedingStatus,
+  SafetyDecision,
 } from '../../database/entities/enums';
 import { PondAccessService } from '../../common/guards/pond-access.service';
 import { User } from '../../database/entities/user.entity';
@@ -263,6 +264,40 @@ export class AiIntegrationService {
       order: { createdAt: 'DESC' },
       take: Math.min(100, Math.max(1, limit)),
     });
+  }
+
+  async getPredictedTrends(pondId: string, user: User) {
+    await this.ensurePondExists(pondId);
+    await this.pondAccessService.ensureCanAccess(user, pondId);
+
+    const evaluation = await this.safetyRuleEngineService.evaluateFeedingSafety(
+      pondId,
+      undefined,
+      10.0,
+    );
+
+    const isAdjusted = evaluation.contextSnapshot?.isAdaptiveAdjusted ?? false;
+    const isBlocked = evaluation.decision === SafetyDecision.BLOCKED;
+
+    return {
+      pondId,
+      currentDo: evaluation.telemetrySnapshot?.dissolvedOxygenMgL,
+      predictedDo1h: evaluation.contextSnapshot?.predictedDo1h,
+      predictedDo2h: evaluation.contextSnapshot?.predictedDo2h,
+      riskLevel: isBlocked ? 'CRITICAL' : isAdjusted ? 'WARNING' : 'NORMAL',
+      adaptiveAction: isBlocked
+        ? 'BLOCK_FEEDING'
+        : isAdjusted
+          ? 'REDUCE_FEED_40%'
+          : 'MAINTAIN_NORMAL_FEED',
+      decision: evaluation.decision,
+      reasons: evaluation.reasons,
+      recommendation: isBlocked
+        ? 'Chất lượng nước hiện tại vi phạm ngưỡng an toàn. Cần bật quạt nước khẩn cấp và hoãn cữ ăn.'
+        : isAdjusted
+          ? 'Dự báo sau cữ ăn DO tụt dưới 3.2 mg/L do vi khuẩn phân hủy thức ăn. Hệ thống tự động giảm 40% thức ăn và kích hoạt quạt nước sớm 15 phút.'
+          : 'Chỉ số môi trường và dự báo 2 giờ tới hoàn toàn an toàn, cho tôm ăn đúng định mức.',
+    };
   }
 
   async getBiomassForecast(pondId: string, user: User) {
