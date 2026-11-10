@@ -16,6 +16,9 @@ export default () => ({
   ai: {
     engineUrl: process.env.AI_ENGINE_URL,
   },
+  device: {
+    staleTimeoutMinutes: Number.parseInt(process.env.DEVICE_STALE_TIMEOUT_MINUTES ?? '15', 10),
+  },
   mail: {
     smtpHost: process.env.SMTP_HOST,
     smtpPort: Number.parseInt(process.env.SMTP_PORT ?? '587', 10),

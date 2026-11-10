@@ -26,6 +26,7 @@ export class TelemetryService {
       await this.pondAccessService.ensureCanAccess(user, pondId);
     }
 
+    const isBuffered = Boolean(dto.isBuffered);
     const reading = this.readingRepository.create({
       pondId,
       deviceId: dto.deviceId ?? null,
@@ -37,11 +38,23 @@ export class TelemetryService {
       turbidityNtu: dto.turbidityNtu ?? null,
       measuredAt: dto.measuredAt ? new Date(dto.measuredAt) : new Date(),
       rawData: dto.rawData ?? {},
+      isBuffered,
     });
 
     const saved = await this.readingRepository.save(reading);
 
-    // Kích hoạt kiểm tra ngưỡng nước và tự động sinh cảnh báo nếu vượt ngưỡng
+    // XỬ LÝ GÓI TIN ĐỆM GỬI BÙ (isBuffered = true):
+    // Vẫn lưu vào CSDL cho biểu đồ & chuỗi thời gian, nhưng BỎ QUA kiểm tra ngưỡng cảnh báo tức thời
+    // để tránh dữ liệu đo cũ gửi bù làm sai lệch quyết định cho ăn hoặc gây bão cảnh báo giả!
+    if (isBuffered) {
+      return {
+        ...saved,
+        violationsCount: 0,
+        violations: [],
+      };
+    }
+
+    // Kích hoạt kiểm tra ngưỡng nước và tự động sinh cảnh báo nếu vượt ngưỡng (chỉ áp dụng dữ liệu real-time)
     const violations = await this.telemetryThresholdService.checkThresholds(saved);
 
     return {

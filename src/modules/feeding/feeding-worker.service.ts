@@ -9,6 +9,7 @@ import { CropSeason } from '../../database/entities/crop-season.entity';
 import {
   AlertSeverity,
   CropSeasonStatus,
+  DeviceStatus,
   DeviceType,
   FeedingSource,
   FeedingStatus,
@@ -73,6 +74,48 @@ export class FeedingWorkerService {
     if (!feederDevice) {
       this.logger.warn(`[FeedingWorker] Ao ${pondId} chưa được gán máy cho ăn (Feeder). Hủy Job [${jobId}].`);
       return { success: false, status: 'SKIPPED', message: 'Chưa gán máy cho ăn vào ao' };
+    }
+
+    // 2.1 Kiểm tra trạng thái máy cho ăn (Health-check: nếu OFFLINE thì không bắn lệnh vào hư không)
+    if (feederDevice.status === DeviceStatus.OFFLINE) {
+      const offlineReason = `Máy cho ăn [${feederDevice.name}] đang OFFLINE (mất kết nối phần cứng). Cữ ăn tự động bị hủy để đảm bảo an toàn.`;
+
+      const blockedRecord = this.recordRepository.create({
+        pondId,
+        deviceId: feederDevice.id,
+        scheduleId,
+        startedAt: new Date(),
+        finishedAt: new Date(),
+        requestedAmountKg: jobData.feedAmountKg ? Number(jobData.feedAmountKg) : 0,
+        actualAmountKg: 0,
+        source: FeedingSource.SCHEDULE,
+        status: FeedingStatus.STOPPED,
+        safetyDecision: SafetyDecision.BLOCKED,
+        safetyReason: offlineReason,
+        stoppedReason: offlineReason,
+      });
+
+      const savedBlocked = await this.recordRepository.save(blockedRecord);
+
+      await this.alertsService.createAlert({
+        pondId,
+        deviceId: feederDevice.id,
+        type: 'FEEDER_OFFLINE_BLOCKED',
+        severity: AlertSeverity.CRITICAL,
+        message: `Cữ ăn [${scheduleName}] lúc ${scheduledTime} bị hủy: ${offlineReason}`,
+      });
+
+      this.eventsGateway.broadcastFeederStatus(pondId, {
+        recordId: savedBlocked.id,
+        scheduleId,
+        name: scheduleName,
+        status: FeedingStatus.STOPPED,
+        safetyDecision: SafetyDecision.BLOCKED,
+        reason: offlineReason,
+      });
+
+      this.logger.warn(`[FeedingWorker] ⚠️ Cữ ăn [${scheduleName}] BỊ HỦY vì máy cho ăn OFFLINE: ${offlineReason}`);
+      return { success: false, recordId: savedBlocked.id, status: 'BLOCKED', message: offlineReason };
     }
 
     // 3. Tính toán khối lượng thức ăn

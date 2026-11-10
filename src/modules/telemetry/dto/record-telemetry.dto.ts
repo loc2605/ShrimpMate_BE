@@ -1,4 +1,4 @@
-import { IsNumber, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsBoolean, IsNumber, IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class RecordTelemetryDto {
   @IsOptional()
@@ -35,4 +35,8 @@ export class RecordTelemetryDto {
 
   @IsOptional()
   rawData?: Record<string, unknown>;
+
+  @IsOptional()
+  @IsBoolean()
+  isBuffered?: boolean;
 }

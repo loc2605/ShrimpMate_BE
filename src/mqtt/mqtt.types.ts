@@ -9,6 +9,7 @@ export interface MqttTelemetryPayload {
   ammoniaMgL?: number;
   turbidityNtu?: number;
   rawData?: Record<string, unknown>;
+  isBuffered?: boolean;
 }
 
 export interface MqttFeederCommandPayload {

@@ -46,4 +46,7 @@ export class TelemetryReading {
 
   @Column({ type: 'jsonb', default: {} })
   rawData!: Record<string, unknown>;
+
+  @Column({ name: 'is_buffered', type: 'boolean', default: false })
+  isBuffered!: boolean;
 }

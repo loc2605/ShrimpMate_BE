@@ -174,6 +174,8 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
+    const isBuffered = Boolean(data.isBuffered);
+
     const recorded = await this.telemetryService.recordTelemetry(pondId, {
       deviceId: device?.id,
       ph: data.ph,
@@ -182,6 +184,7 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
       salinityPpt: data.salinityPpt,
       ammoniaMgL: data.ammoniaMgL,
       turbidityNtu: data.turbidityNtu,
+      isBuffered,
       measuredAt: data.measuredAt ?? new Date().toISOString(),
       rawData: data.rawData,
     });
@@ -196,6 +199,7 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
       salinityPpt: data.salinityPpt,
       ammoniaMgL: data.ammoniaMgL,
       turbidityNtu: data.turbidityNtu,
+      isBuffered,
       measuredAt: data.measuredAt ?? new Date().toISOString(),
       rawData: data.rawData,
     });
@@ -205,6 +209,7 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
       data.dissolvedOxygenMgL !== undefined ? `DO: ${data.dissolvedOxygenMgL} mg/L` : null,
       data.temperatureC !== undefined ? `Nhiệt độ: ${data.temperatureC}°C` : null,
       data.salinityPpt !== undefined ? `Độ mặn: ${data.salinityPpt} ppt` : null,
+      isBuffered ? `[Gói tin đệm / isBuffered]` : null,
     ]
       .filter(Boolean)
       .join(' | ');

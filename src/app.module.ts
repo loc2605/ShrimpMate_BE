@@ -50,6 +50,7 @@ import { FarmersModule } from './modules/farmers/farmers.module';
         REDIS_PORT: Joi.number().port().default(6379),
         MQTT_BROKER_URL: Joi.string().uri({ scheme: ['mqtt', 'mqtts'] }).default('mqtt://localhost:1883'),
         AI_ENGINE_URL: Joi.string().uri().optional(),
+        DEVICE_STALE_TIMEOUT_MINUTES: Joi.number().integer().min(1).default(15),
       }),
     }),
     DatabaseModule,
