@@ -122,6 +122,33 @@ export class NotificationsService {
   }
 
   /**
+   * Chuyển đổi mã loại sự cố sang tiếng Việt thân thiện, chuyên nghiệp
+   */
+  private formatAlertTypeName(type: string): string {
+    const alertTypeMap: Record<string, string> = {
+      CRITICAL_PH_OUT_OF_RANGE: 'Độ pH vượt ngưỡng nguy cấp',
+      WARNING_PH_ABNORMAL: 'Độ pH bất thường',
+      CRITICAL_DO_LOW: 'Oxy hòa tan (DO) tụt nguy cấp',
+      WARNING_DO_LOW: 'Oxy hòa tan (DO) ở mức thấp',
+      CRITICAL_TEMPERATURE: 'Nhiệt độ nước vượt ngưỡng nguy hiểm',
+      WARNING_TEMPERATURE: 'Nhiệt độ nước biến động bất thường',
+      CRITICAL_AMMONIA_HIGH: 'Nồng độ khí độc NH₃/TAN quá cao',
+      WARNING_AMMONIA_HIGH: 'Nồng độ khí độc NH₃/TAN tăng cao',
+      CRITICAL_SALINITY: 'Độ mặn vượt ngưỡng cho phép',
+      WARNING_SALINITY: 'Độ mặn biến động bất thường',
+      CRITICAL_TURBIDITY_HIGH: 'Độ đục của nước quá cao',
+      WARNING_TURBIDITY_HIGH: 'Độ đục của nước tăng cao',
+      AUTO_FEEDING_BLOCKED: 'Chặn lịch cho ăn tự động',
+      FEEDING_SAFETY_BLOCKED: 'Chặn lệnh cho ăn do vi phạm an toàn',
+      DEVICE_OFFLINE: 'Mất kết nối thiết bị phần cứng',
+      DEVICE_ERROR: 'Sự cố thiết bị phần cứng',
+      EMERGENCY_STOP: 'Kích hoạt dừng khẩn cấp',
+    };
+
+    return alertTypeMap[type] || type.replace(/_/g, ' ');
+  }
+
+  /**
    * Gửi Email cảnh báo sự cố khẩn cấp
    */
   private async sendEmergencyEmail(
@@ -133,11 +160,12 @@ export class NotificationsService {
   ) {
     const from = this.configService.get<string>('mail.smtpFrom', 'noreply@shrimpmate.local');
     const sender = from.includes('<') ? from : `"ShrimpMate Cảnh Báo" <${from}>`;
+    const alertTypeVi = this.formatAlertTypeName(alert.type);
 
     const htmlContent = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 2px solid #BA1A1A; border-radius: 12px; overflow: hidden;">
         <div style="background-color: #BA1A1A; color: white; padding: 16px; text-align: center;">
-          <h2 style="margin: 0; font-size: 20px;">🚨 CẢNH BÁO NGUY CẤP: CHỈ SỐ MÔI TRƯỜNG AO TÔM</h2>
+          <h2 style="margin: 0; font-size: 20px;">CẢNH BÁO NGUY CẤP: CHỈ SỐ MÔI TRƯỜNG AO TÔM</h2>
         </div>
         <div style="padding: 20px; background-color: #FFF8F5;">
           <p>Kính gửi: <strong>${recipientName}</strong>,</p>
@@ -153,7 +181,7 @@ export class NotificationsService {
             </tr>
             <tr style="background: #FFE8E5;">
               <td style="padding: 8px; border: 1px solid #FFCDD2; font-weight: bold;">Loại sự cố:</td>
-              <td style="padding: 8px; border: 1px solid #FFCDD2; color: #BA1A1A; font-weight: bold;">${alert.type}</td>
+              <td style="padding: 8px; border: 1px solid #FFCDD2; color: #BA1A1A; font-weight: bold;">${alertTypeVi}</td>
             </tr>
             <tr>
               <td style="padding: 8px; border: 1px solid #FFCDD2; font-weight: bold;">Nội dung cảnh báo:</td>
@@ -181,7 +209,7 @@ export class NotificationsService {
       await this.transporter.sendMail({
         from: sender,
         to: email,
-        subject: `🚨 [CẢNH BÁO NGUY CẤP] ${pondName} - ${alert.message}`,
+        subject: `[CẢNH BÁO NGUY CẤP] ${pondName} - ${alert.message}`,
         html: htmlContent,
       });
       this.logger.log(`Đã gửi email cảnh báo nguy cấp tới ${email} cho ao ${pondName}`);
@@ -206,7 +234,8 @@ export class NotificationsService {
     const smsType = this.configService.get<string>('esms.smsType', '2');
 
     // Cắt ngắn thông điệp SMS không dấu để đảm bảo tương thích nhà mạng
-    const shortMessage = `[ShrimpMate] CANH BAO NGUY CAP tai ${pondName}: ${alert.type}. Vui long kiem tra ao ngay!`;
+    const alertTypeVi = this.formatAlertTypeName(alert.type);
+    const shortMessage = `[ShrimpMate] CANH BAO NGUY CAP tai ${pondName}: ${alertTypeVi}. Vui long kiem tra ao ngay!`;
 
     this.logger.log(`[SMS CẢNH BÁO] Tới: ${normalizedPhone} (${recipientName}) | Nội dung: ${shortMessage}`);
 

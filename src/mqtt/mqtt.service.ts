@@ -195,7 +195,16 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
       rawData: data.rawData,
     });
 
-    this.logger.log(`[MQTT] Đã xử lý bản ghi telemetry từ thiết bị ${deviceUid ?? 'unknown'} cho ao ${pondId}`);
+    const metrics = [
+      data.ph !== undefined ? `pH: ${data.ph}` : null,
+      data.dissolvedOxygenMgL !== undefined ? `DO: ${data.dissolvedOxygenMgL} mg/L` : null,
+      data.temperatureC !== undefined ? `Nhiệt độ: ${data.temperatureC}°C` : null,
+      data.salinityPpt !== undefined ? `Độ mặn: ${data.salinityPpt} ppt` : null,
+    ]
+      .filter(Boolean)
+      .join(' | ');
+
+    this.logger.log(`[MQTT] [${deviceUid ?? 'DEV'}] -> ${metrics || 'Đã ghi nhận dữ liệu đo'}`);
   }
 
   private async processFeederStatusMessage(topic: string, data: MqttFeederStatusPayload) {
@@ -255,7 +264,6 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
         };
       }
       await this.deviceRepository.save(device);
-      this.logger.debug(`[MQTT] Heartbeat cập nhật cho thiết bị ${device.deviceUid}`);
 
       this.eventsGateway.broadcastDeviceStatus(device.id, {
         deviceUid: device.deviceUid,

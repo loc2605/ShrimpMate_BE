@@ -70,7 +70,6 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
     const payload = { pondId, ...telemetry, emittedAt: new Date().toISOString() };
     this.server.to(`pond_${pondId}`).emit('telemetry:update', payload);
     this.server.emit('telemetry:update', payload);
-    this.logger.debug(`[WS] Đã phát sự kiện telemetry:update cho ao ${pondId}`);
   }
 
   /**
