@@ -535,7 +535,7 @@ erDiagram
 ## 5. Các điểm lưu ý trong kiến trúc cơ sở dữ liệu
 
 1. **Khóa chính**: Tất cả bảng đều dùng UUID v4 làm khóa chính.
-2. **Quyền sở hữu trực tiếp**: Người nuôi sở hữu trang trại thông qua `farms.owner_id`. Toàn bộ ao nuôi, vụ nuôi, cữ ăn, thiết bị và cảnh báo đều liên kết phân cấp trực tiếp dưới quyền của người nuôi mà không cần bảng phân quyền trung gian `user_pond_assignments`.
+2. **Quyền sở hữu trực tiếp**: Người nuôi sở hữu trang trại thông qua `farms.owner_id`. Toàn bộ ao nuôi, vụ nuôi, cữ ăn, thiết bị và cảnh báo đều liên kết phân cấp trực tiếp dưới quyền của người quản lý trang trại hoặc người nuôi được phân công (`farmer_assignments`).
 3. **Danh mục thiết bị phần cứng**: Bảng `devices` hoạt động như kho thiết bị chuẩn của hệ thống do Admin quản trị. Khi thiết bị chưa được gán vào ao nuôi nào, `pond_id` mang giá trị `NULL`. Khi Farmer kích hoạt gán (`claim`), `pond_id` được cập nhật liên kết tới ao nuôi tương ứng.
 4. **Quy tắc đặt tên**:
    - Tên bảng và phần lớn các cột dùng chuẩn `snake_case`.
