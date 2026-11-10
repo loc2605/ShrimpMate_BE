@@ -1,11 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { MoreThan, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { TelemetryReading } from '../../database/entities/telemetry-reading.entity';
 import { Alert } from '../../database/entities/alert.entity';
 import { Device } from '../../database/entities/device.entity';
 import { AlertSeverity, AlertStatus, DeviceStatus } from '../../database/entities/enums';
 import { AlertsService } from '../alerts/alerts.service';
+import { AlertCooldownService } from '../alerts/alert-cooldown.service';
 import {
   ThresholdViolation,
   WATER_QUALITY_THRESHOLDS,
@@ -14,7 +15,6 @@ import {
 @Injectable()
 export class TelemetryThresholdService {
   private readonly logger = new Logger(TelemetryThresholdService.name);
-  private readonly DEBOUNCE_WINDOW_MS = 15 * 60 * 1000; // 15 phút chống spam cảnh báo
 
   constructor(
     @InjectRepository(Alert)
@@ -22,6 +22,7 @@ export class TelemetryThresholdService {
     @InjectRepository(Device)
     private readonly deviceRepository: Repository<Device>,
     private readonly alertsService: AlertsService,
+    private readonly alertCooldownService: AlertCooldownService,
   ) {}
 
   async checkThresholds(reading: TelemetryReading): Promise<ThresholdViolation[]> {
@@ -212,67 +213,48 @@ export class TelemetryThresholdService {
     return violations;
   }
 
-  private readonly debounceStateMap = new Map<
-    string,
-    { severity: AlertSeverity; lastValue: number; lastLogTime: number }
-  >();
-
   private async processViolationAlert(reading: TelemetryReading, violation: ThresholdViolation) {
-    const debounceSince = new Date(Date.now() - this.DEBOUNCE_WINDOW_MS);
+    const metricKey = violation.parameter || violation.alertType;
 
-    // Kiểm tra xem đã có alert cùng type đang OPEN trong 15 phút gần nhất chưa
-    const existingAlert = await this.alertRepository.findOne({
-      where: {
-        pondId: reading.pondId,
-        type: violation.alertType,
-        status: AlertStatus.OPEN,
-        triggeredAt: MoreThan(debounceSince),
-      },
-    });
+    // 1. Kiểm tra Cooldown chống bão cảnh báo (Redis Atomic SET NX - 15 phút = 900s)
+    const isFirstBreach = await this.alertCooldownService.acquireAlertLock(
+      reading.pondId,
+      metricKey,
+      900,
+    );
 
-    const cacheKey = `${reading.pondId}:${violation.alertType}`;
+    if (!isFirstBreach) {
+      // ĐANG TRONG THỜI GIAN COOLDOWN:
+      // Cập nhật giá trị đo mới nhất vào bản ghi Alert đang OPEN thay vì tạo bản tin mới gây spam
+      const existingAlert = await this.alertRepository.findOne({
+        where: {
+          pondId: reading.pondId,
+          type: violation.alertType,
+          status: AlertStatus.OPEN,
+        },
+        order: { triggeredAt: 'DESC' },
+      });
 
-    if (existingAlert) {
-      const prev = this.debounceStateMap.get(cacheKey);
-
-      // 1. Lần đầu tiên phát hiện trùng lặp trong chu kỳ debounce: log 1 lần duy nhất
-      if (!prev) {
-        this.debounceStateMap.set(cacheKey, {
-          severity: violation.severity,
-          lastValue: violation.currentValue,
-          lastLogTime: Date.now(),
-        });
+      if (existingAlert) {
+        existingAlert.message = violation.message;
+        existingAlert.metadata = {
+          ...existingAlert.metadata,
+          latestValue: violation.currentValue,
+          unit: violation.unit,
+          lastBreachAt: new Date().toISOString(),
+          readingId: reading.id,
+          repeatCount: Number(existingAlert.metadata?.repeatCount ?? 1) + 1,
+        };
+        await this.alertRepository.save(existingAlert);
         this.logger.debug(
-          `[Debounce] Bắt đầu kích hoạt debounce cho ao ${reading.pondId}, loại ${violation.alertType} (giá trị: ${violation.currentValue} ${violation.unit})`,
-        );
-        return;
-      }
-
-      // 2. Chỉ log tiếp theo nếu có sự thay đổi (mức độ severity thay đổi hoặc giá trị thay đổi đáng kể >= 5%)
-      const isSeverityChanged = prev.severity !== violation.severity;
-      const valDiff = Math.abs(violation.currentValue - prev.lastValue);
-      const isSignificantValueChange =
-        prev.lastValue !== 0 ? valDiff / Math.abs(prev.lastValue) >= 0.05 : valDiff >= 0.2;
-
-      if (isSeverityChanged || isSignificantValueChange) {
-        this.debounceStateMap.set(cacheKey, {
-          severity: violation.severity,
-          lastValue: violation.currentValue,
-          lastLogTime: Date.now(),
-        });
-        this.logger.debug(
-          `[Debounce] Ao ${reading.pondId} - ${violation.alertType}: giá trị có sự thay đổi (${prev.lastValue} -> ${violation.currentValue} ${violation.unit}), tiếp tục bỏ qua alert trùng lặp`,
+          `[AlertCooldown] Debounce ao ${reading.pondId} (${violation.alertType}): Đã cập nhật giá trị mới nhất (${violation.currentValue} ${violation.unit}), không tạo thêm thông báo mới.`,
         );
       }
-
-      // Nếu không có thay đổi -> Im lặng hoàn toàn, không spam terminal
       return;
     }
 
-    // Khi không bị debounce (tạo alert mới hoặc hết chu kỳ debounce)
-    this.debounceStateMap.delete(cacheKey);
-
-    await this.alertsService.createAlert({
+    // 2. NẾU LẦN ĐẦU VI PHẠM HOẶC ĐÃ HẾT COOLDOWN: Tạo alert mới kèm Khuyến nghị can thiệp AI
+    const saved = await this.alertsService.createAlert({
       pondId: reading.pondId,
       deviceId: reading.deviceId ?? undefined,
       type: violation.alertType,
@@ -287,7 +269,9 @@ export class TelemetryThresholdService {
       },
     });
 
-    this.logger.warn(`Đã tự động tạo cảnh báo: ${violation.message} (Ao: ${reading.pondId})`);
+    this.logger.warn(
+      `[AlertCreated] Đã tạo cảnh báo mới [${violation.alertType}] cho ao ${reading.pondId}: ${violation.message} (Gắn AI Rec: ${saved.aiRecommendationId ?? 'N/A'})`,
+    );
   }
 
   private async updateDeviceHeartbeat(deviceId: string) {

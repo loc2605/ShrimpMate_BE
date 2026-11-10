@@ -161,6 +161,10 @@ export class NotificationsService {
     const from = this.configService.get<string>('mail.smtpFrom', 'noreply@shrimpmate.local');
     const sender = from.includes('<') ? from : `"ShrimpMate Cảnh Báo" <${from}>`;
     const alertTypeVi = this.formatAlertTypeName(alert.type);
+    const actionRecommendation =
+      (alert.metadata?.actionRecommendation as string) ||
+      alert.aiRecommendation?.explanation ||
+      '';
 
     const htmlContent = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 2px solid #BA1A1A; border-radius: 12px; overflow: hidden;">
@@ -187,6 +191,14 @@ export class NotificationsService {
               <td style="padding: 8px; border: 1px solid #FFCDD2; font-weight: bold;">Nội dung cảnh báo:</td>
               <td style="padding: 8px; border: 1px solid #FFCDD2;">${alert.message}</td>
             </tr>
+            ${
+              actionRecommendation
+                ? `<tr style="background: #FEF3C7;">
+                    <td style="padding: 8px; border: 1px solid #FDE68A; font-weight: bold; color: #92400E;">Khuyến nghị can thiệp (AI SCADA):</td>
+                    <td style="padding: 8px; border: 1px solid #FDE68A; color: #92400E; font-weight: bold;">${actionRecommendation}</td>
+                  </tr>`
+                : ''
+            }
             <tr style="background: #FFE8E5;">
               <td style="padding: 8px; border: 1px solid #FFCDD2; font-weight: bold;">Thời điểm phát hiện:</td>
               <td style="padding: 8px; border: 1px solid #FFCDD2;">${new Date(alert.triggeredAt).toLocaleString('vi-VN')}</td>
@@ -235,7 +247,23 @@ export class NotificationsService {
 
     // Cắt ngắn thông điệp SMS không dấu để đảm bảo tương thích nhà mạng
     const alertTypeVi = this.formatAlertTypeName(alert.type);
-    const shortMessage = `[ShrimpMate] CANH BAO NGUY CAP tai ${pondName}: ${alertTypeVi}. Vui long kiem tra ao ngay!`;
+    const actionRecommendation =
+      (alert.metadata?.actionRecommendation as string) ||
+      alert.aiRecommendation?.explanation ||
+      '';
+
+    const stripAccents = (str: string) =>
+      str
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/đ/g, 'd')
+        .replace(/Đ/g, 'D');
+
+    const recText = actionRecommendation
+      ? ` KHUYEN NGHI: ${stripAccents(actionRecommendation)}`
+      : ' Vui long kiem tra ao ngay!';
+
+    const shortMessage = `[ShrimpMate] CANH BAO NGUY CAP tai ${pondName}: ${alertTypeVi}.${recText}`;
 
     this.logger.log(`[SMS CẢNH BÁO] Tới: ${normalizedPhone} (${recipientName}) | Nội dung: ${shortMessage}`);
 

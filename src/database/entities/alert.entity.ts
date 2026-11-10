@@ -1,6 +1,7 @@
 import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 import { Device } from './device.entity';
 import { Pond } from './pond.entity';
+import { AiRecommendation } from './ai-recommendation.entity';
 import { AlertSeverity, AlertStatus } from './enums';
 
 @Entity('alerts')
@@ -22,6 +23,13 @@ export class Alert {
 
   @Column({ name: 'device_id', type: 'uuid', nullable: true })
   deviceId!: string | null;
+
+  @ManyToOne(() => AiRecommendation, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'ai_recommendation_id' })
+  aiRecommendation!: AiRecommendation | null;
+
+  @Column({ name: 'ai_recommendation_id', type: 'uuid', nullable: true })
+  aiRecommendationId!: string | null;
 
   @Column({ length: 100 })
   type!: string;

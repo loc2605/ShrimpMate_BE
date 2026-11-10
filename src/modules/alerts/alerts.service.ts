@@ -1,23 +1,35 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { FindOptionsWhere, In, Repository } from 'typeorm';
 import { Alert } from '../../database/entities/alert.entity';
 import { Pond } from '../../database/entities/pond.entity';
-import { AlertSeverity, AlertStatus, UserRole } from '../../database/entities/enums';
+import { AiRecommendation } from '../../database/entities/ai-recommendation.entity';
+import {
+  AiRecommendationStatus,
+  AlertSeverity,
+  AlertStatus,
+  SafetyDecision,
+  UserRole,
+} from '../../database/entities/enums';
 import { PondAccessService } from '../../common/guards/pond-access.service';
 import { User } from '../../database/entities/user.entity';
 import { QueryAlertDto } from './dto/query-alert.dto';
-
+import { AlertCooldownService } from './alert-cooldown.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { EventsGateway } from '../events/events.gateway';
 
 @Injectable()
 export class AlertsService {
+  private readonly logger = new Logger(AlertsService.name);
+
   constructor(
     @InjectRepository(Alert)
     private readonly alertRepository: Repository<Alert>,
     @InjectRepository(Pond)
     private readonly pondRepository: Repository<Pond>,
+    @InjectRepository(AiRecommendation)
+    private readonly aiRecommendationRepository: Repository<AiRecommendation>,
+    private readonly alertCooldownService: AlertCooldownService,
     private readonly pondAccessService: PondAccessService,
     private readonly notificationsService: NotificationsService,
     private readonly eventsGateway: EventsGateway,
@@ -67,7 +79,7 @@ export class AlertsService {
       order: { triggeredAt: 'DESC' },
       take: limit,
       skip,
-      relations: { pond: true, device: true },
+      relations: { pond: true, device: true, aiRecommendation: true },
     });
 
     return {
@@ -115,7 +127,7 @@ export class AlertsService {
       order: { triggeredAt: 'DESC' },
       take: limit,
       skip,
-      relations: { pond: true, device: true },
+      relations: { pond: true, device: true, aiRecommendation: true },
     });
 
     return {
@@ -190,6 +202,48 @@ export class AlertsService {
   }) {
     await this.ensurePondExists(data.pondId);
 
+    // 1. Tự động sinh Khuyến nghị can thiệp thủy sản thông minh (Domain Recommendation)
+    const metricParam = data.metadata?.parameter as string | undefined;
+    const metricVal = data.metadata?.currentValue as number | undefined;
+    const recommendedAction = this.alertCooldownService.getAquacultureRecommendation(
+      data.type,
+      metricParam,
+      metricVal,
+    );
+
+    // 2. Tạo bản ghi AiRecommendation gắn với sự cố
+    let aiRecId: string | null = null;
+    try {
+      const aiRec = this.aiRecommendationRepository.create({
+        pondId: data.pondId,
+        modelName: 'shrimpmate-safety-expert',
+        modelVersion: '1.2.0',
+        explanation: recommendedAction,
+        safetyDecision:
+          data.severity === AlertSeverity.CRITICAL
+            ? SafetyDecision.BLOCKED
+            : SafetyDecision.ADJUSTED,
+        safetyReason: data.message,
+        status: AiRecommendationStatus.PENDING,
+        inputSnapshot: {
+          type: data.type,
+          severity: data.severity,
+          message: data.message,
+          ...data.metadata,
+        },
+      });
+      const savedAiRec = await this.aiRecommendationRepository.save(aiRec);
+      aiRecId = savedAiRec.id;
+    } catch (err: any) {
+      this.logger.warn(`Không thể tạo AiRecommendation cho alert: ${err.message}`);
+    }
+
+    const metadata = {
+      ...(data.metadata ?? {}),
+      actionRecommendation: recommendedAction,
+      aiRecommendationId: aiRecId,
+    };
+
     const alert = this.alertRepository.create({
       pondId: data.pondId,
       deviceId: data.deviceId ?? null,
@@ -197,29 +251,38 @@ export class AlertsService {
       severity: data.severity,
       status: AlertStatus.OPEN,
       message: data.message,
+      aiRecommendationId: aiRecId,
       triggeredAt: new Date(),
-      metadata: data.metadata ?? {},
+      metadata,
     });
 
     const savedAlert = await this.alertRepository.save(alert);
 
-    // 1. Phát sự kiện WebSocket tức thì tới màn hình SCADA
-    this.eventsGateway.broadcastAlert(savedAlert as any);
+    // 3. Nạp đầy đủ quan hệ để broadcast và gửi thông báo
+    const populatedAlert = await this.alertRepository.findOne({
+      where: { id: savedAlert.id },
+      relations: { pond: true, device: true, aiRecommendation: true },
+    });
 
-    // 2. Nếu mức độ CRITICAL, kích hoạt gửi Email & SMS khẩn cấp qua NotificationsService
-    if (savedAlert.severity === AlertSeverity.CRITICAL) {
-      this.notificationsService.notifyCriticalAlert(savedAlert).catch((err) => {
-        console.error('Lỗi khi gửi thông báo khẩn cấp cho alert:', err);
+    const targetAlert = populatedAlert || savedAlert;
+
+    // 4. Phát sự kiện WebSocket tức thì tới màn hình SCADA
+    this.eventsGateway.broadcastAlert(targetAlert as any);
+
+    // 5. Nếu mức độ CRITICAL, kích hoạt gửi Email & SMS khẩn cấp qua NotificationsService
+    if (targetAlert.severity === AlertSeverity.CRITICAL) {
+      this.notificationsService.notifyCriticalAlert(targetAlert).catch((err) => {
+        this.logger.error('Lỗi khi gửi thông báo khẩn cấp cho alert:', err);
       });
     }
 
-    return savedAlert;
+    return targetAlert;
   }
 
   async acknowledgeAlert(id: string, user: User) {
     const alert = await this.alertRepository.findOne({
       where: { id },
-      relations: { pond: true, device: true },
+      relations: { pond: true, device: true, aiRecommendation: true },
     });
     if (!alert) {
       throw new NotFoundException(`Không tìm thấy cảnh báo với id ${id}`);
@@ -237,7 +300,7 @@ export class AlertsService {
   async resolveAlert(id: string, user: User) {
     const alert = await this.alertRepository.findOne({
       where: { id },
-      relations: { pond: true, device: true },
+      relations: { pond: true, device: true, aiRecommendation: true },
     });
     if (!alert) {
       throw new NotFoundException(`Không tìm thấy cảnh báo với id ${id}`);
