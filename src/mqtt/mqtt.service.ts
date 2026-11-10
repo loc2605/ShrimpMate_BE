@@ -10,6 +10,7 @@ import { TelemetryService } from '../modules/telemetry/telemetry.service';
 import { EventsGateway } from '../modules/events/events.gateway';
 import {
   MQTT_TOPICS,
+  MqttFeederAckPayload,
   MqttFeederCommandPayload,
   MqttFeederStatusPayload,
   MqttHeartbeatPayload,
@@ -21,6 +22,7 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(MqttService.name);
   private client: mqtt.MqttClient | null = null;
   private isConnected = false;
+  private readonly feederAckWaiters = new Map<string, (ack: MqttFeederAckPayload) => void>();
 
   constructor(
     private readonly configService: ConfigService,
@@ -103,6 +105,7 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
       MQTT_TOPICS.TELEMETRY_WILDCARD,
       MQTT_TOPICS.POND_DEVICE_TELEMETRY_WILDCARD,
       MQTT_TOPICS.FEEDER_STATUS_WILDCARD,
+      MQTT_TOPICS.FEEDER_ACK_WILDCARD,
       MQTT_TOPICS.HEARTBEAT_WILDCARD,
     ];
 
@@ -124,6 +127,8 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
 
       if (topic.includes('/telemetry')) {
         await this.processTelemetryMessage(topic, data);
+      } else if (topic.includes('/feeder/ack')) {
+        await this.processFeederAckMessage(topic, data);
       } else if (topic.includes('/feeder/status')) {
         await this.processFeederStatusMessage(topic, data);
       } else if (topic.includes('/heartbeat')) {
@@ -207,8 +212,30 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
     this.logger.log(`[MQTT] [${deviceUid ?? 'DEV'}] -> ${metrics || 'Đã ghi nhận dữ liệu đo'}`);
   }
 
+  private async processFeederAckMessage(topic: string, data: MqttFeederAckPayload) {
+    this.logger.log(`[MQTT] Nhận phản hồi ACK từ ${topic}: recordId=${data.recordId}, status=${data.status}`);
+    if (data.recordId && this.feederAckWaiters.has(data.recordId)) {
+      const resolver = this.feederAckWaiters.get(data.recordId);
+      this.feederAckWaiters.delete(data.recordId);
+      resolver?.(data);
+    }
+  }
+
   private async processFeederStatusMessage(topic: string, data: MqttFeederStatusPayload) {
     this.logger.log(`[MQTT] Nhận phản hồi trạng thái feeder từ ${topic}: status=${data.status}`);
+
+    // Kích hoạt implicit ACK nếu máy ăn báo running mà chưa có bản tin ACK riêng
+    if (data.recordId && data.status === 'running' && this.feederAckWaiters.has(data.recordId)) {
+      const resolver = this.feederAckWaiters.get(data.recordId);
+      this.feederAckWaiters.delete(data.recordId);
+      resolver?.({
+        recordId: data.recordId,
+        deviceUid: data.deviceUid,
+        status: 'ACK',
+        message: 'Implicit ACK from status:running',
+        timestamp: data.timestamp || new Date().toISOString(),
+      });
+    }
 
     if (data.recordId) {
       const record = await this.feedingRecordRepository.findOne({ where: { id: data.recordId } });
@@ -298,6 +325,24 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
           });
           resolve(true);
         }
+      });
+    });
+  }
+
+  /**
+   * Chờ xác nhận ACK từ máy cho ăn với thời gian chờ (timeout)
+   */
+  async waitForFeederAck(recordId: string, timeoutMs = 20000): Promise<MqttFeederAckPayload | null> {
+    return new Promise<MqttFeederAckPayload | null>((resolve) => {
+      const timer = setTimeout(() => {
+        this.feederAckWaiters.delete(recordId);
+        this.logger.warn(`[MQTT] Quá thời gian ${timeoutMs}ms không nhận được phản hồi ACK cho cữ ăn ${recordId}`);
+        resolve(null);
+      }, timeoutMs);
+
+      this.feederAckWaiters.set(recordId, (ack) => {
+        clearTimeout(timer);
+        resolve(ack);
       });
     });
   }

@@ -29,6 +29,14 @@ export interface MqttFeederStatusPayload {
   timestamp: string;
 }
 
+export interface MqttFeederAckPayload {
+  recordId: string;
+  deviceUid: string;
+  status: 'ACK' | 'NACK';
+  message?: string;
+  timestamp: string;
+}
+
 export interface MqttHeartbeatPayload {
   deviceUid: string;
   status?: string;
@@ -42,10 +50,12 @@ export const MQTT_TOPICS = {
   TELEMETRY_WILDCARD: 'shrimpmate/telemetry/+',
   POND_DEVICE_TELEMETRY_WILDCARD: 'shrimpmate/ponds/+/devices/+/telemetry',
   FEEDER_STATUS_WILDCARD: 'shrimpmate/devices/+/feeder/status',
+  FEEDER_ACK_WILDCARD: 'shrimpmate/devices/+/feeder/ack',
   HEARTBEAT_WILDCARD: 'shrimpmate/devices/+/heartbeat',
 
   feederCommand: (deviceUid: string) => `shrimpmate/devices/${deviceUid}/feeder/command`,
   feederStatus: (deviceUid: string) => `shrimpmate/devices/${deviceUid}/feeder/status`,
+  feederAck: (deviceUid: string) => `shrimpmate/devices/${deviceUid}/feeder/ack`,
   heartbeat: (deviceUid: string) => `shrimpmate/devices/${deviceUid}/heartbeat`,
   telemetry: (deviceUid: string) => `shrimpmate/telemetry/${deviceUid}`,
 };

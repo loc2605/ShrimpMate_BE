@@ -13,6 +13,8 @@ import { AiIntegrationModule } from '../ai-integration/ai-integration.module';
 import { FeedingController } from './feeding.controller';
 import { FeedingService } from './feeding.service';
 import { FeedingSchedulerService } from './feeding-scheduler.service';
+import { FeedingQueueService } from './feeding-queue.service';
+import { FeedingWorkerService } from './feeding-worker.service';
 
 @Module({
   imports: [
@@ -24,7 +26,7 @@ import { FeedingSchedulerService } from './feeding-scheduler.service';
     AiIntegrationModule,
   ],
   controllers: [FeedingController],
-  providers: [FeedingService, FeedingSchedulerService],
-  exports: [FeedingService, FeedingSchedulerService],
+  providers: [FeedingService, FeedingSchedulerService, FeedingQueueService, FeedingWorkerService],
+  exports: [FeedingService, FeedingSchedulerService, FeedingQueueService, FeedingWorkerService],
 })
 export class FeedingModule {}
