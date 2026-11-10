@@ -32,4 +32,7 @@ export class RecordTelemetryDto {
   @IsOptional()
   @IsString()
   measuredAt?: string;
+
+  @IsOptional()
+  rawData?: Record<string, unknown>;
 }

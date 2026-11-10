@@ -121,8 +121,27 @@ export class AiIntegrationService {
     let prevFeedKg = lastRecord?.actualAmountKg ? Number(lastRecord.actualAmountKg) : 6.5;
     if (dto?.prevFeedAmountKg !== undefined) prevFeedKg = dto.prevFeedAmountKg;
 
-    const morningRainMm = dto?.morningRainMm ?? 0.0;
-    const waterChangeM3 = dto?.waterChangeM3 ?? 0.0;
+    // Lấy dữ liệu thời tiết thực tế từ telemetry (nếu có từ cảm biến/IoT)
+    let morningRainMm = 0.0;
+    if (dto?.morningRainMm !== undefined) {
+      morningRainMm = dto.morningRainMm;
+    } else if (recentReadings.length > 0 && recentReadings[0].rawData) {
+      const rawRain = recentReadings[0].rawData['rainMm'] ?? recentReadings[0].rawData['morningRainMm'];
+      if (rawRain !== undefined && !isNaN(Number(rawRain))) {
+        morningRainMm = Number(rawRain);
+      }
+    }
+
+    let waterChangeM3 = 0.0;
+    if (dto?.waterChangeM3 !== undefined) {
+      waterChangeM3 = dto.waterChangeM3;
+    } else if (recentReadings.length > 0 && recentReadings[0].rawData) {
+      const rawWater = recentReadings[0].rawData['waterChangeM3'];
+      if (rawWater !== undefined && !isNaN(Number(rawWater))) {
+        waterChangeM3 = Number(rawWater);
+      }
+    }
+
     const pondAreaM2 = Number(pond.areaM2) || 1000.0;
 
     // 5. Đóng gói vector đặc trưng môi trường & sinh học gửi sang AI Microservice (FastAPI)

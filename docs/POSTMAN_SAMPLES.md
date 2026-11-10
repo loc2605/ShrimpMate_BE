@@ -49,15 +49,15 @@ Moi lan ban bam Send o request Login, Postman se tu dong luu token vao bien `{{a
 
 ---
 
-## 2. Tai Khoan Mau Co San (Seed Accounts)
+## 2. Danh Sach Tai Khoan Test & Live Demo
 
-He thong da co san 3 tai khoan voi 3 phan quyen khac nhau:
+He thong ho tro cac tai khoan kiem thu tren cac ung dung dau cuoi:
 
-| Role | Email | So dien thoai | Mat khau | Ung dung su dung |
-| --- | --- | --- | --- | --- |
-| `admin` | `admin@shrimpmate.local` | `0901000001` | `Admin@123456` | Web Dashboard |
-| `manager` | `manager@shrimpmate.local` | `0901000002` | `Manager@123456` | Web App |
-| `farmer` | `farmer@shrimpmate.local` | `0901000003` | `Farmer@123456` | Mobile App |
+| Role | Email | So dien thoai | Mat khau | Ung dung su dung | Ghi chu Demo |
+| --- | --- | --- | --- | --- | --- |
+| `admin` | `admin@shrimpmate.local` | `0901000001` | `Admin@123456` | Web Dashboard | Quan tri he thong |
+| `manager` | `locphanhuu2605@gmail.com` | `0865152043` | *(Mat khau da tao)* | Web App | Chu Trang trai Song Xanh, nhan mail that |
+| `farmer` | `locphanhuu26052004@gmail.com` | `0865498043` | `Loc26052004` | Mobile App | Phu trach Ao 1 (`POND-01`), nhan canh bao that |
 
 ---
 

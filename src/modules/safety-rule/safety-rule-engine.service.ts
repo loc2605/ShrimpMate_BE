@@ -65,7 +65,17 @@ export class SafetyRuleEngineService {
     const deltaTan = contextOverrides?.deltaTan !== undefined
       ? contextOverrides.deltaTan
       : computedDeltaTan;
-    const morningRainMm = contextOverrides?.morningRainMm ?? 0.0;
+
+    let computedRain = 0.0;
+    if (latestReading?.rawData) {
+      const rawRain = latestReading.rawData['rainMm'] ?? latestReading.rawData['morningRainMm'];
+      if (rawRain !== undefined && !isNaN(Number(rawRain))) {
+        computedRain = Number(rawRain);
+      }
+    }
+    const morningRainMm = contextOverrides?.morningRainMm !== undefined
+      ? contextOverrides.morningRainMm
+      : computedRain;
 
     // 2. Lấy thông tin thiết bị (nếu có)
     let device: Device | null = null;

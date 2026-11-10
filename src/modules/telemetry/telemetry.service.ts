@@ -36,6 +36,7 @@ export class TelemetryService {
       ammoniaMgL: dto.ammoniaMgL ?? null,
       turbidityNtu: dto.turbidityNtu ?? null,
       measuredAt: dto.measuredAt ? new Date(dto.measuredAt) : new Date(),
+      rawData: dto.rawData ?? {},
     });
 
     const saved = await this.readingRepository.save(reading);

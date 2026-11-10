@@ -215,13 +215,16 @@ npm run build
 
 ---
 
-## 8. Default Pre-Seeded Accounts
+## 8. Default Pre-Seeded & Live Demo Accounts
 
-| Role | Client Application | Username / Identifier | Password | Access Scope |
+| Role | Client Application | Username / Identifier | Password | Access Scope & Demo Role |
 | --- | --- | --- | --- | --- |
-| `admin` | **Web Dashboard** | `admin@shrimpmate.local` / `0901000001` | `Admin@123456` | Full platform governance, catalog, safety rules, FCR reports |
-| `manager` | **Web App** | `manager@shrimpmate.local` / `0901000002` | `Manager@123456` | Farm & pond owner, farmer supervisor, schedules, AI configs, analytics |
-| `farmer` | **Mobile App** | `farmer@shrimpmate.local` / `0901000003` | `Farmer@123456` | Assigned pond operator, pond telemetry, quick feed, emergency stop, alerts |
+| `admin` | **Web Dashboard** | `admin@shrimpmate.local` / `0901000001` | `Admin@123456` | Platform governance, hardware catalog, safety rules, system-wide analytics |
+| `manager` | **Web App** | `locphanhuu2605@gmail.com` / `0865152043`<br>*(Seed fallback: `manager@shrimpmate.local` / `0901000002` - `Manager@123456`)* | *(Your registered password)* | Owner of **Trang trại Sóng Xanh**, farm supervisor, feeding schedules, AI configs, receives real alert emails |
+| `farmer` | **Mobile App** | `locphanhuu26052004@gmail.com` / `0865498043`<br>*(Seed fallback: `farmer@shrimpmate.local` / `0901000003` - `Farmer@123456`)* | `Loc26052004` | Operator assigned directly to **Ao 1 - Giai đoạn tăng trưởng (POND-01)**, telemetry, quick feed, emergency stop, receives real pond alert emails |
+
+> [!NOTE]
+> **Live IoT Simulation Target**: Ao 1 (`208cf3b7-a60f-4c83-83b0-54d06fee3d97`), Thiết bị Wokwi: `DEV-FEEDER-001`. Mọi cảnh báo bất thường (DO < 3.5 mg/L, pH < 7.0) sẽ tự động gửi email cảnh báo HTML thật tới các hòm thư trên.
 
 ---
 

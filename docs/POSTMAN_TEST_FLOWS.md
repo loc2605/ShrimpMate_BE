@@ -45,13 +45,17 @@ if (pm.response.code === 200) {
 
 ---
 
-## 2. Tài Khoản Seed Sẵn Có
+## 2. Tài Khoản Phục Vụ Kiểm Thử & Live Demo
 
-| Role | Ứng dụng | Identifier (Email/SĐT) | Mật khẩu |
-|---|---|---|---|
-| `admin` | **Web Dashboard** | `admin@shrimpmate.local` / `0901000001` | `Admin@123456` |
-| `manager` | **Web App** | `manager@shrimpmate.local` / `0901000002` | `Manager@123456` |
-| `farmer` | **Mobile App** | `farmer@shrimpmate.local` / `0901000003` | `Farmer@123456` |
+| Role | Ứng dụng | Identifier (Email/SĐT) | Mật khẩu | Phạm vi / Trạng thái |
+|---|---|---|---|---|
+| `admin` | **Web Dashboard** | `admin@shrimpmate.local` / `0901000001` | `Admin@123456` | Quản trị viên hệ thống |
+| `manager` | **Web App** | `locphanhuu2605@gmail.com` / `0865152043` | *(Mật khẩu đã tạo)* | Chủ sở hữu Trang trại Sóng Xanh, nhận email cảnh báo toàn trại |
+| `farmer` | **Mobile App** | `locphanhuu26052004@gmail.com` / `0865498043` | `Loc26052004` | Phụ trách trực tiếp Ao 1 (`POND-01`), nhận email cảnh báo khẩn cấp |
+
+> **Ghi chú mô phỏng IoT/Wokwi:**
+> - Ao nuôi demo: `208cf3b7-a60f-4c83-83b0-54d06fee3d97` (Ao 1 - Giai đoạn tăng trưởng)
+> - Thiết bị giả lập: `DEV-FEEDER-001`
 
 ---
 

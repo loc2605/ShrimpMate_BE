@@ -178,6 +178,7 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
       ammoniaMgL: data.ammoniaMgL,
       turbidityNtu: data.turbidityNtu,
       measuredAt: data.measuredAt ?? new Date().toISOString(),
+      rawData: data.rawData,
     });
 
     this.eventsGateway.broadcastTelemetry(pondId, {
@@ -191,6 +192,7 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
       ammoniaMgL: data.ammoniaMgL,
       turbidityNtu: data.turbidityNtu,
       measuredAt: data.measuredAt ?? new Date().toISOString(),
+      rawData: data.rawData,
     });
 
     this.logger.log(`[MQTT] Đã xử lý bản ghi telemetry từ thiết bị ${deviceUid ?? 'unknown'} cho ao ${pondId}`);

@@ -107,10 +107,16 @@ Tài liệu tra cứu nhanh (Quick Reference) toàn bộ các endpoint, phương
 
 ---
 
-## 3. Tài Khoản Test Mẫu Khởi Tạo Sẵn (Seeded Accounts)
+## 3. Danh Sách Tài Khoản Thử Nghiệm & Live Demo
 
-| Vai trò | Định danh (`identifier`) | Mật khẩu | Ứng dụng sử dụng | Phạm vi quyền hạn |
+| Vai trò | Định danh (`identifier`) | Mật khẩu | Ứng dụng | Phạm vi quyền hạn & Trạng thái Demo |
 | :--- | :--- | :--- | :--- | :--- |
 | **Quản trị viên** (`admin`) | `admin@shrimpmate.local`<br>`0901000001` | `Admin@123456` | **Admin Web Dashboard** | Quản lý toàn bộ Manager & Farmer, Catalog thiết bị, Safety Rules, Báo cáo toàn hệ thống |
-| **Quản lý** (`manager`) | `manager@shrimpmate.local`<br>`0901000002` | `Manager@123456` | **Manager Web App** | Sở hữu trang trại, tạo Farmer, phân công ao, lập lịch ăn, vụ nuôi, FCR, cấu hình AI |
-| **Người nuôi** (`farmer`) | `farmer@shrimpmate.local`<br>`0901000003` | `Farmer@123456` | **Farmer Mobile App** | Vận hành ngoài bờ ao, xem ao được phân công, đo tức thời, Cho ăn nhanh, Dừng khẩn cấp, nhận cảnh báo FCM |
+| **Quản lý** (`manager`) | `locphanhuu2605@gmail.com`<br>`0865152043` | *(Mật khẩu đã tạo)* | **Manager Web App** | Sở hữu **Trang trại Sóng Xanh**, tạo Farmer, phân công ao, lập lịch ăn, vụ nuôi, FCR, cấu hình AI, nhận thông báo sự cố qua Gmail thật |
+| **Người nuôi** (`farmer`) | `locphanhuu26052004@gmail.com`<br>`0865498043` | `Loc26052004` | **Farmer Mobile App** | Phụ trách trực tiếp **Ao 1 - Giai đoạn tăng trưởng (`POND-01`)**, xem đo đạc từ Wokwi ESP32, Cho ăn nhanh, Dừng khẩn cấp, nhận email cảnh báo khẩn cấp tức thời |
+
+> [!TIP]
+> **Thông tin Ao & Thiết bị Live Demo**:
+> - **Ao nuôi**: Ao 1 (`208cf3b7-a60f-4c83-83b0-54d06fee3d97`) - Vụ nuôi kích hoạt `Vụ tôm thẻ chân trắng 2026 - Đợt 1`.
+> - **Thiết bị phần cứng Wokwi**: `DEV-FEEDER-001` (Máy cho ăn kiêm cảm biến đo chất lượng nước).
+> - **Kênh cảnh báo thực tế**: Kết nối trực tiếp Gmail SMTP (`locphanhuu2605@gmail.com`) phát cảnh báo khi chỉ số pH hoặc DO vượt ngưỡng an toàn.
