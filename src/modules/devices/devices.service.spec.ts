@@ -77,6 +77,27 @@ describe('DevicesService', () => {
     ).rejects.toThrow(BadRequestException);
   });
 
+  it('should check pond access when creating a device with pondId', async () => {
+    deviceRepository.findOne.mockResolvedValue(null);
+    pondRepository.findOne.mockResolvedValue({ id: 'pond-1' });
+    deviceRepository.create.mockImplementation((dto: any) => dto);
+    deviceRepository.save.mockImplementation((dto: any) => Promise.resolve({ id: 'new-dev', ...dto }));
+
+    const mockUser = { id: 'mgr-1' } as any;
+    const result = await service.createDevice(
+      {
+        deviceUid: 'DEV-NEW-01',
+        name: 'Feeder New',
+        type: DeviceType.FEEDER,
+        pondId: 'pond-1',
+      },
+      mockUser,
+    );
+
+    expect(pondAccessService.ensureCanAccess).toHaveBeenCalledWith(mockUser, 'pond-1');
+    expect(result).toHaveProperty('pondId', 'pond-1');
+  });
+
   it('should throw NotFoundException when device does not exist', async () => {
     deviceRepository.findOne.mockResolvedValue(null);
 

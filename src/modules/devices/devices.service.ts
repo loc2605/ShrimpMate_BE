@@ -29,7 +29,7 @@ export class DevicesService {
     private readonly mqttService: MqttService,
   ) { }
 
-  async createDevice(createDeviceDto: CreateDeviceDto, _user?: User) {
+  async createDevice(createDeviceDto: CreateDeviceDto, user?: User) {
     const normalizedUid = createDeviceDto.deviceUid.trim();
     const existingDevice = await this.deviceRepository.findOne({
       where: { deviceUid: normalizedUid },
@@ -42,6 +42,9 @@ export class DevicesService {
     const pondId = createDeviceDto.pondId ?? null;
     if (pondId) {
       await this.ensurePondExists(pondId);
+      if (user) {
+        await this.pondAccessService.ensureCanAccess(user, pondId);
+      }
     }
 
     const device = this.deviceRepository.create({

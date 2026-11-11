@@ -31,7 +31,7 @@ export class DevicesController {
   }
 
   @Post()
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   create(@Body() createDeviceDto: CreateDeviceDto, @CurrentUser() user: User) {
     return this.devicesService.createDevice(createDeviceDto, user);
   }

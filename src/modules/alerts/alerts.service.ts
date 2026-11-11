@@ -42,7 +42,7 @@ export class AlertsService {
 
     const where: FindOptionsWhere<Alert> = {};
 
-    if (user.role === UserRole.FARMER) {
+    if (user.role !== UserRole.ADMIN) {
       const pondIds = await this.pondAccessService.findAssignedPondIds(user);
       if (!pondIds || pondIds.length === 0) {
         return { data: [], total: 0, page, limit, totalPages: 0 };
@@ -51,8 +51,8 @@ export class AlertsService {
     }
 
     if (queryDto?.pondId) {
-      // Nếu là farmer, kiểm tra quyền truy cập pondId được truyền vào
-      if (user.role === UserRole.FARMER) {
+      // Nếu không phải admin, kiểm tra quyền truy cập pondId được truyền vào
+      if (user.role !== UserRole.ADMIN) {
         await this.pondAccessService.ensureCanAccess(user, queryDto.pondId);
       }
       where.pondId = queryDto.pondId;
@@ -142,7 +142,7 @@ export class AlertsService {
   async getAlertsSummary(user: User, pondId?: string) {
     let allowedPondIds: string[] | null = null;
 
-    if (user.role === UserRole.FARMER) {
+    if (user.role !== UserRole.ADMIN) {
       allowedPondIds = await this.pondAccessService.findAssignedPondIds(user);
       if (!allowedPondIds || allowedPondIds.length === 0) {
         return {
@@ -158,7 +158,7 @@ export class AlertsService {
     }
 
     if (pondId) {
-      if (user.role === UserRole.FARMER) {
+      if (user.role !== UserRole.ADMIN) {
         await this.pondAccessService.ensureCanAccess(user, pondId);
       }
       allowedPondIds = [pondId];

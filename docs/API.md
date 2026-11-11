@@ -1715,7 +1715,7 @@ GET /ponds/:pondId/ai/recommendations?limit=10
 
 ## 13. Module Cảnh báo & Xử lý Sự cố (`/alerts`)
 
-Quyền: `admin`, `farmer` (Farmer chỉ thấy ao của mình, Admin thấy toàn hệ thống).
+Quyền: `admin`, `manager`, `farmer` (Manager thấy tất cả ao trong các trang trại của mình, Farmer chỉ thấy ao được phân công, Admin thấy toàn hệ thống).
 
 ### 13.1. Tổng kết số lượng cảnh báo (Summary Badge)
 
