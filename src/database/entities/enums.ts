@@ -25,7 +25,6 @@ export enum CropSeasonStatus {
 export enum DeviceType {
   FEEDER = 'feeder',
   SENSOR_NODE = 'sensor_node',
-  CAMERA = 'camera',
   EDGE_GATEWAY = 'edge_gateway',
 }
 

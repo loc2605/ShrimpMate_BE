@@ -57,7 +57,7 @@ export class AiIntegrationService {
 
   /**
    * Dự báo nhu cầu thức ăn thông minh sử dụng mô hình AI Machine Learning (XGBoost)
-   * Tự động tổng hợp 7 đặc trưng từ CSDL sinh học & cảm biến môi trường (không dùng camera/FIS)
+   * Tự động tổng hợp 7 đặc trưng từ CSDL sinh học & cảm biến môi trường
    */
   async predictFeedDemand(pondId: string, user: User, dto?: PredictFeedOverrideDto) {
     const pond = await this.ensurePondExists(pondId);

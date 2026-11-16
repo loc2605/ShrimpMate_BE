@@ -62,27 +62,24 @@ export async function seedFarmPondData(dataSource: DataSource) {
 
   const farms = await farmRepository.save([
     {
+      id: '788b3aaf-8235-45fb-8214-abe3aaed2bb5',
       name: 'Trang trại Sóng Xanh',
       address: 'Bạc Liêu, Việt Nam',
       status: FarmStatus.ACTIVE,
       ownerId: managerUser?.id ?? null,
     },
     {
-      name: 'Ao Nước Trong',
+      id: 'f2eb0d82-d932-4d07-a508-14f9653ba022',
+      name: 'Trang trại Cà Mau Eco-Shrimp',
       address: 'Cà Mau, Việt Nam',
       status: FarmStatus.ACTIVE,
       ownerId: managerUser?.id ?? null,
-    },
-    {
-      name: 'Vườn Tôm Minh Phú',
-      address: 'Sóc Trăng, Việt Nam',
-      status: FarmStatus.INACTIVE,
-      ownerId: null,
     },
   ]);
 
   const ponds = await pondRepository.save([
     {
+      id: '208cf3b7-a60f-4c83-83b0-54d06fee3d97',
       farmId: farms[0].id,
       code: 'POND-01',
       name: 'Ao 1 - Giai đoạn tăng trưởng',
@@ -90,6 +87,7 @@ export async function seedFarmPondData(dataSource: DataSource) {
       status: PondStatus.ACTIVE,
     },
     {
+      id: '9449a7a5-4c28-4b18-aabb-ff0171116a74',
       farmId: farms[0].id,
       code: 'POND-02',
       name: 'Ao 2 - Giai đoạn nuôi thương phẩm',
@@ -97,17 +95,19 @@ export async function seedFarmPondData(dataSource: DataSource) {
       status: PondStatus.ACTIVE,
     },
     {
+      id: '7466260a-ff2b-4e3c-870b-2b8f1a6a82bc',
       farmId: farms[1].id,
       code: 'POND-03',
-      name: 'Ao 3 - Bảo dưỡng',
-      areaM2: 1900,
-      status: PondStatus.MAINTENANCE,
+      name: 'Ao 3 - Ương giống công nghệ cao',
+      areaM2: 2000,
+      status: PondStatus.ACTIVE,
     },
     {
+      id: '624bbafc-1caa-4a5f-a345-26cc29ed8466',
       farmId: farms[1].id,
       code: 'POND-04',
-      name: 'Ao 4 - Nuôi thử nghiệm',
-      areaM2: 2400,
+      name: 'Ao 4 - Nuôi tuần hoàn RAS',
+      areaM2: 2500,
       status: PondStatus.ACTIVE,
     },
   ]);

@@ -15,9 +15,10 @@ export async function seedDeviceData(dataSource: DataSource) {
 
   const devices = await deviceRepository.save([
     {
+      id: '52c77a02-f1d4-4b0f-ac37-48f5473ac820',
       pondId: ponds[0]?.id ?? null,
       deviceUid: 'DEV-FEEDER-001',
-      name: 'Máy cho ăn Ao 1',
+      name: 'Máy cho ăn thông minh Ao 1',
       type: DeviceType.FEEDER,
       status: DeviceStatus.ONLINE,
       mode: DeviceMode.AUTOMATIC,
@@ -25,14 +26,15 @@ export async function seedDeviceData(dataSource: DataSource) {
       metadata: { zone: 'north', batteryLevel: 88 },
     },
     {
-      pondId: ponds[1]?.id ?? null,
+      id: '3811bc6e-0d53-4e8b-a581-32771f85a103',
+      pondId: ponds[0]?.id ?? null,
       deviceUid: 'DEV-SENSOR-001',
-      name: 'Sensor pH Ao 2',
+      name: 'Trạm cảm biến đa chỉ tiêu Ao 1',
       type: DeviceType.SENSOR_NODE,
       status: DeviceStatus.ONLINE,
-      mode: DeviceMode.MANUAL,
+      mode: DeviceMode.AUTOMATIC,
       firmwareVersion: '2.1.0',
-      metadata: { parameter: 'ph', batteryLevel: 71 },
+      metadata: { parameter: 'do_ph_tan', batteryLevel: 92 },
     },
     {
       pondId: null,
