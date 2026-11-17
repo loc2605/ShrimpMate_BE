@@ -6,7 +6,7 @@ import {
 	ServiceUnavailableException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Between, Repository } from 'typeorm';
 import { Device } from '../../database/entities/device.entity';
 import { CropSeason } from '../../database/entities/crop-season.entity';
 import { FeedingRecord } from '../../database/entities/feeding-record.entity';
@@ -70,6 +70,131 @@ export class FeedingService {
 		await this.findPond(pondId);
 		if (user) await this.pondAccessService.ensureCanAccess(user, pondId);
 		return this.scheduleRepository.find({ where: { pondId }, order: { timeOfDay: 'ASC' } });
+	}
+
+	/**
+	 * Lấy ngưỡng thức ăn giới hạn và gợi ý cữ ăn hợp lý cho ao nuôi
+	 * Giúp Frontend hiển thị trực quan khi tạo lịch hoặc giám sát cữ ăn
+	 */
+	async getFeedingRecommendation(pondId: string, user?: User) {
+		await this.findPond(pondId);
+		if (user) await this.pondAccessService.ensureCanAccess(user, pondId);
+
+		// 1. Kiểm tra vụ nuôi đang hoạt động
+		const activeSeason = await this.cropSeasonRepository.findOne({
+			where: { pondId, status: CropSeasonStatus.ACTIVE },
+		});
+
+		if (!activeSeason) {
+			return {
+				hasActiveSeason: false,
+				message: 'Ao chưa có vụ nuôi đang hoạt động (ACTIVE). Vui lòng tạo vụ nuôi trước khi lập lịch.',
+				pondId,
+				daysOfCulture: 0,
+				estimatedBiomassKg: 0,
+				feedLimits: {
+					dailyDemandKg: 0,
+					maxDailyLimitKg: 0,
+					minDailyLimitKg: 0,
+					totalFedTodayKg: 0,
+					remainingAllowanceTodayKg: 0,
+				},
+				scheduleRecommendation: {
+					existingScheduleCount: 0,
+					suggestedMealCount: 4,
+					suggestedAmountPerMealKg: 0,
+					minSafeMealKg: 0,
+					maxSafeMealKg: 0,
+					suggestedSpreadRate: 1.5,
+				},
+			};
+		}
+
+		// 2. Tính toán ngày tuổi (DOC), trọng lượng trung bình (ABW) và sinh khối (Biomass)
+		const diffDays = Math.max(
+			1,
+			Math.floor((Date.now() - new Date(activeSeason.stockingDate).getTime()) / (1000 * 60 * 60 * 24)),
+		);
+		const initialWeight = Number(activeSeason.initialAverageWeightG) || 0.8;
+		const currentWeightG = Number((initialWeight + diffDays * 0.28).toFixed(2));
+		const survivalRate = (Number(activeSeason.estimatedSurvivalRate) || 85) / 100;
+		const currentCount = Math.floor(activeSeason.initialCount * survivalRate);
+		const estimatedBiomassKg = Number(((currentCount * currentWeightG) / 1000).toFixed(2));
+
+		// 3. Tính nhu cầu ăn tiêu chuẩn trong 1 ngày theo đường cong sinh học (Feed Demand Curve)
+		const dailyDemandRatePercent = Number((6.5 / Math.pow(currentWeightG, 0.28)).toFixed(2));
+		const dailyDemandKg = Number(((estimatedBiomassKg * dailyDemandRatePercent) / 100).toFixed(2));
+		const maxDailyLimitKg = Number((dailyDemandKg * 1.2).toFixed(2)); // +20% trần an toàn
+		const minDailyLimitKg = Number((dailyDemandKg * 0.8).toFixed(2)); // -20% sàn dinh dưỡng
+
+		// 4. Tính tổng lượng thức ăn thực tế đã rải trong ngày hôm nay (00:00:00 -> 23:59:59)
+		const startOfDay = new Date();
+		startOfDay.setHours(0, 0, 0, 0);
+		const endOfDay = new Date();
+		endOfDay.setHours(23, 59, 59, 999);
+
+		const todayRecords = await this.recordRepository.find({
+			where: {
+				pondId,
+				startedAt: Between(startOfDay, endOfDay),
+			},
+		});
+
+		const totalFedTodayKg = Number(
+			todayRecords
+				.filter((r) => r.status === FeedingStatus.COMPLETED || r.status === FeedingStatus.RUNNING)
+				.reduce((sum, r) => sum + (Number(r.actualAmountKg) || 0), 0)
+				.toFixed(2),
+		);
+
+		const remainingAllowanceTodayKg = Math.max(0, Number((maxDailyLimitKg - totalFedTodayKg).toFixed(2)));
+
+		// 5. Đếm số cữ ăn đã cấu hình cho ao
+		const existingSchedules = await this.scheduleRepository.find({
+			where: { pondId, isEnabled: true },
+		});
+		const existingScheduleCount = existingSchedules.length;
+
+		// 6. Số cữ ăn khuyến nghị theo giai đoạn phát triển của tôm
+		let suggestedMealCount = 4;
+		if (diffDays <= 20) {
+			suggestedMealCount = 5; // Tôm nhỏ ăn nhiều cữ, ít lượng
+		} else if (diffDays <= 60) {
+			suggestedMealCount = 4;
+		} else {
+			suggestedMealCount = 4; // Tôm lớn duy trì 4 cữ chính
+		}
+
+		// Khẩu phần khuyến nghị cho 1 cữ ăn dựa trên số cữ đang áp dụng hoặc số cữ gợi ý
+		const divisor = existingScheduleCount > 0 ? existingScheduleCount : suggestedMealCount;
+		const suggestedAmountPerMealKg = Number((dailyDemandKg / divisor).toFixed(2));
+		const minSafeMealKg = Number((suggestedAmountPerMealKg * 0.75).toFixed(2)); // -25%
+		const maxSafeMealKg = Number((suggestedAmountPerMealKg * 1.25).toFixed(2)); // +25%
+
+		return {
+			hasActiveSeason: true,
+			pondId,
+			cropSeasonId: activeSeason.id,
+			daysOfCulture: diffDays,
+			estimatedAverageWeightG: currentWeightG,
+			estimatedBiomassKg,
+			feedLimits: {
+				dailyDemandRatePercent,
+				dailyDemandKg,
+				maxDailyLimitKg,
+				minDailyLimitKg,
+				totalFedTodayKg,
+				remainingAllowanceTodayKg,
+			},
+			scheduleRecommendation: {
+				existingScheduleCount,
+				suggestedMealCount,
+				suggestedAmountPerMealKg,
+				minSafeMealKg,
+				maxSafeMealKg,
+				suggestedSpreadRate: 1.5,
+			},
+		};
 	}
 
 	async updateSchedule(id: string, dto: UpdateFeedingScheduleDto, user?: User) {

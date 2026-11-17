@@ -22,6 +22,12 @@ export class FeedingController {
 		return this.feedingService.findSchedulesByPond(pondId, user);
 	}
 
+	@Get('ponds/:pondId/feeding-schedules/recommendation')
+	@Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.FARMER)
+	getFeedingRecommendation(@Param('pondId') pondId: string, @CurrentUser() user: User) {
+		return this.feedingService.getFeedingRecommendation(pondId, user);
+	}
+
 	@Post('ponds/:pondId/feeding-schedules')
 	@Roles(UserRole.MANAGER)
 	createSchedule(@Param('pondId') pondId: string, @Body() dto: CreateFeedingScheduleDto, @CurrentUser() user: User) {

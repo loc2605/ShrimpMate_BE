@@ -1393,7 +1393,54 @@ GET /ponds/:pondId/feeding-schedules
 
 ---
 
-### 9.2. Tạo lịch cho ăn tự động
+### 9.2. Lấy ngưỡng thức ăn giới hạn và gợi ý cữ ăn hợp lý (Khuyến nghị cho Frontend)
+
+```http
+GET /ponds/:pondId/feeding-schedules/recommendation
+```
+
+- **Quyền truy cập**: `admin`, `manager`, `farmer`
+- **Mục đích**: Cung cấp ngưỡng ăn an toàn trong ngày của ao và gợi ý khối lượng thức ăn chuẩn xác cho từng cữ ăn. Frontend sử dụng endpoint này để hiển thị thanh hạn mức dinh dưỡng và tự động gợi ý số kg khi người dùng mở form tạo lịch hoặc cho ăn nhanh.
+
+#### Phản hồi mẫu (`200 OK`):
+```json
+{
+  "hasActiveSeason": true,
+  "pondId": "208cf3b7-a60f-4c83-83b0-54d06fee3d97",
+  "cropSeasonId": "c0a80123-7b89-4def-9012-3456789abcde",
+  "daysOfCulture": 35,
+  "estimatedAverageWeightG": 10.6,
+  "estimatedBiomassKg": 901.0,
+  "feedLimits": {
+    "dailyDemandRatePercent": 3.42,
+    "dailyDemandKg": 30.81,
+    "maxDailyLimitKg": 36.97,
+    "minDailyLimitKg": 24.65,
+    "totalFedTodayKg": 15.0,
+    "remainingAllowanceTodayKg": 21.97
+  },
+  "scheduleRecommendation": {
+    "existingScheduleCount": 3,
+    "suggestedMealCount": 4,
+    "suggestedAmountPerMealKg": 7.7,
+    "minSafeMealKg": 5.78,
+    "maxSafeMealKg": 9.63,
+    "suggestedSpreadRate": 1.5
+  }
+}
+```
+
+- **Ý nghĩa các trường quan trọng**:
+  - `feedLimits.dailyDemandKg`: Nhu cầu ăn tiêu chuẩn của cả ao trong ngày.
+  - `feedLimits.maxDailyLimitKg`: Ngưỡng trần tối đa an toàn trong ngày (+20% của nhu cầu tiêu chuẩn).
+  - `feedLimits.totalFedTodayKg`: Tổng lượng thức ăn thực tế đã rải trong ngày hôm nay.
+  - `feedLimits.remainingAllowanceTodayKg`: Lượng thức ăn còn được phép cấp phát tiếp trong ngày hôm nay trước khi chạm trần an toàn.
+  - `scheduleRecommendation.suggestedAmountPerMealKg`: Số kg thức ăn khuyến nghị cho 1 cữ ăn.
+  - `scheduleRecommendation.minSafeMealKg` / `maxSafeMealKg`: Khoảng an toàn cho 1 cữ ăn (Frontend có thể dùng để cảnh báo nếu người dùng nhập số quá cao).
+
+---
+
+### 9.3. Tạo lịch cho ăn tự động
 
 ```http
 POST /ponds/:pondId/feeding-schedules
