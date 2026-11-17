@@ -24,6 +24,15 @@ import { User } from '../../database/entities/user.entity';
 import { SafetyRuleEngineService } from '../safety-rule/safety-rule-engine.service';
 import { PredictFeedOverrideDto } from './dto/predict-feed.dto';
 
+export interface FeatureContribution {
+  feature: string;
+  name: string;
+  value: number | string;
+  impact: 'INCREASE' | 'DECREASE' | 'NEUTRAL';
+  deltaKg: number;
+  description: string;
+}
+
 interface AiMicroserviceFeedResponse {
   predictedFeedAmountKg: number;
   biomassKg: number;
@@ -33,6 +42,7 @@ interface AiMicroserviceFeedResponse {
   confidence: number;
   featureImportance: Record<string, number>;
   explanation: string;
+  featureContributions?: FeatureContribution[];
 }
 
 @Injectable()
@@ -212,7 +222,10 @@ export class AiIntegrationService {
       appetiteLevel: AppetiteLevel.NORMAL,
       biomassKg: aiResponse.biomassKg,
       confidence: aiResponse.confidence,
-      inputSnapshot: featurePayload,
+      inputSnapshot: {
+        ...featurePayload,
+        featureContributions: aiResponse.featureContributions ?? [],
+      },
       explanation: aiResponse.explanation,
       safetyDecision: safetyResult.decision,
       safetyReason: safetyResult.reasons.length > 0 ? safetyResult.reasons.join('; ') : 'Môi trường an toàn',
@@ -232,6 +245,7 @@ export class AiIntegrationService {
       safetyReasons: safetyResult.reasons,
       featureBreakdown: featurePayload,
       featureImportance: aiResponse.featureImportance,
+      featureContributions: aiResponse.featureContributions ?? [],
       explanation: aiResponse.explanation,
       createdAt: saved.createdAt,
     };
@@ -370,26 +384,91 @@ export class AiIntegrationService {
     // Khẩu phần cho 1 cữ ăn (chia đều 4 cữ ăn/ngày)
     const mealFeedKg = (biomassKg * (dailyRatePercent / 100)) / 4;
 
-    // 2. Hệ số hiệu chỉnh môi trường Heuristic
+    // 2. Hệ số hiệu chỉnh môi trường Heuristic và đóng góp chi tiết (Explainable AI)
     let factor = 1.0;
     const constraints: string[] = [];
+    const featureContributions: FeatureContribution[] = [];
+
+    // Gốc sinh khối cơ sở
+    featureContributions.push({
+      feature: 'biomass',
+      name: 'Sinh khối đàn tôm',
+      value: `${biomassKg} kg`,
+      impact: 'INCREASE',
+      deltaKg: Number(mealFeedKg.toFixed(2)),
+      description: `Đàn tôm DOC ${doc} (khoảng ${shrimpCount.toLocaleString()} con, bình quân ${avgWeightG}g/con), khẩu phần cơ bản cữ ăn là ${mealFeedKg.toFixed(2)} kg.`,
+    });
 
     if (temperatureC < 26) {
+      const delta = Number((mealFeedKg * 0.2).toFixed(2));
       factor *= 0.8;
       constraints.push(`Nhiệt độ nước thấp (${temperatureC}°C), giảm 20%`);
+      featureContributions.push({
+        feature: 'temperature',
+        name: 'Nhiệt độ nước',
+        value: `${temperatureC}°C`,
+        impact: 'DECREASE',
+        deltaKg: -delta,
+        description: `Nhiệt độ nước thấp dưới 26°C làm tôm co cụm, giảm tốc độ chuyển hóa trao đổi chất. Giảm ~${delta} kg.`,
+      });
     } else if (temperatureC > 32) {
+      const delta = Number((mealFeedKg * 0.15).toFixed(2));
       factor *= 0.85;
       constraints.push(`Nhiệt độ nước cao (${temperatureC}°C), giảm 15%`);
+      featureContributions.push({
+        feature: 'temperature',
+        name: 'Nhiệt độ nước',
+        value: `${temperatureC}°C`,
+        impact: 'DECREASE',
+        deltaKg: -delta,
+        description: `Nhiệt độ nước vượt ngưỡng 32°C khiến tôm bị stress nhiệt. Giảm ~${delta} kg.`,
+      });
+    } else {
+      featureContributions.push({
+        feature: 'temperature',
+        name: 'Nhiệt độ nước',
+        value: `${temperatureC}°C`,
+        impact: 'NEUTRAL',
+        deltaKg: 0,
+        description: `Nhiệt độ nước ${temperatureC}°C nằm trong khoảng sinh trưởng tối ưu (26-32°C).`,
+      });
     }
 
     if (doMin < 4.5 && doMin >= 3.5) {
+      const delta = Number((mealFeedKg * 0.25).toFixed(2));
       factor *= 0.75;
       constraints.push(`Oxy cận ngưỡng an toàn (${doMin} mg/L), giảm 25%`);
+      featureContributions.push({
+        feature: 'dissolved_oxygen',
+        name: 'Oxy hòa tan (DO)',
+        value: `${doMin} mg/L`,
+        impact: 'DECREASE',
+        deltaKg: -delta,
+        description: `Oxy hòa tan cận ngưỡng nguy cấp (3.5 - 4.5 mg/L). Cắt giảm ~${delta} kg để phòng tránh ngạt khí sau khi ăn.`,
+      });
+    } else if (doMin >= 4.5) {
+      featureContributions.push({
+        feature: 'dissolved_oxygen',
+        name: 'Oxy hòa tan (DO)',
+        value: `${doMin} mg/L`,
+        impact: 'NEUTRAL',
+        deltaKg: 0,
+        description: `Nồng độ oxy ${doMin} mg/L dồi dào, đảm bảo nhu cầu hô hấp khi tôm bắt mồi.`,
+      });
     }
 
     if (morningRainMm > 10) {
+      const delta = Number((mealFeedKg * 0.3).toFixed(2));
       factor *= 0.7;
       constraints.push(`Trời mưa (${morningRainMm}mm), giảm 30%`);
+      featureContributions.push({
+        feature: 'rain',
+        name: 'Lượng mưa',
+        value: `${morningRainMm} mm`,
+        impact: 'DECREASE',
+        deltaKg: -delta,
+        description: `Trời mưa lớn làm phân tầng nước ngọt trên mặt ao và tôm bỏ ăn. Giảm ~${delta} kg.`,
+      });
     }
 
     const predictedFeedAmountKg = Number(Math.max(1.0, mealFeedKg * factor).toFixed(2));
@@ -407,7 +486,8 @@ export class AiIntegrationService {
         dissolved_oxygen: 0.2,
         rain: 0.15,
       },
-      explanation: `Mô hình thủy sản Heuristic dự phòng (AI Microservice timeout/offline): Dựa trên sinh khối ${biomassKg}kg (DOC ${doc}), tỷ lệ cơ bản ${dailyRatePercent}%. Hiệu chỉnh: ${constraints.length > 0 ? constraints.join(', ') : 'môi trường tối ưu'}. Khuyến nghị: ${predictedFeedAmountKg}kg.`,
+      explanation: `Dựa trên sinh khối ${biomassKg} kg (DOC ${doc}), khẩu phần cơ sở là ${mealFeedKg.toFixed(2)} kg. Điều chỉnh môi trường: ${constraints.length > 0 ? constraints.join('; ') : 'môi trường nước tối ưu'}. Khối lượng đề xuất: ${predictedFeedAmountKg} kg/cữ.`,
+      featureContributions,
     };
   }
 }

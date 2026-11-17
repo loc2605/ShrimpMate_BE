@@ -1670,10 +1670,10 @@ POST /ponds/:pondId/ai/predict-feed
 {
   "recommendationId": "uuid-rec",
   "pondId": "uuid-ao",
-  "predictedFeedAmountKg": 9.42,
-  "safeAllowedAmountKg": 9.42,
+  "predictedFeedAmountKg": 7.35,
+  "safeAllowedAmountKg": 7.35,
   "biomassKg": 1125.0,
-  "feedRatePercent": 0.84,
+  "feedRatePercent": 0.65,
   "safetyDecision": "allowed",
   "safetyReasons": [],
   "featureBreakdown": {
@@ -1681,13 +1681,45 @@ POST /ponds/:pondId/ai/predict-feed
     "avgWeightG": 12.5,
     "doMin": 5.2,
     "deltaTan": 0.05,
-    "morningRainMm": 0.0,
+    "morningRainMm": 12.0,
     "prevFeedAmountKg": 8.0,
     "waterChangeM3": 20.0,
     "pondAreaM2": 1000.0,
     "shrimpCount": 90000
   },
-  "explanation": "Tôm 45 ngày tuổi, trọng lượng mẫu bình quân 12.5 g/con (Tổng sinh khối ước tính 1125.0 kg). Lượng ăn cữ trước: 8.0 kg. Khuyến nghị AI cấp phát: 9.42 kg cho cữ ăn này.",
+  "featureImportance": {
+    "biomass": 0.45,
+    "temperature": 0.2,
+    "dissolved_oxygen": 0.2,
+    "rain": 0.15
+  },
+  "featureContributions": [
+    {
+      "feature": "biomass",
+      "name": "Sinh khối đàn tôm",
+      "value": "1125.0 kg",
+      "impact": "INCREASE",
+      "deltaKg": 9.0,
+      "description": "Đàn tôm DOC 45 (khoảng 90.000 con, bình quân 12.5g/con), khẩu phần cơ bản cữ ăn là 9.0 kg."
+    },
+    {
+      "feature": "rain",
+      "name": "Lượng mưa",
+      "value": "12 mm",
+      "impact": "DECREASE",
+      "deltaKg": -2.7,
+      "description": "Trời mưa lớn làm phân tầng nước ngọt trên mặt ao và tôm bỏ ăn. Giảm ~2.7 kg."
+    },
+    {
+      "feature": "dissolved_oxygen",
+      "name": "Oxy hòa tan (DO)",
+      "value": "5.2 mg/L",
+      "impact": "NEUTRAL",
+      "deltaKg": 0,
+      "description": "Nồng độ oxy 5.2 mg/L dồi dào, đảm bảo nhu cầu hô hấp khi tôm bắt mồi."
+    }
+  ],
+  "explanation": "Dựa trên sinh khối 1125.0 kg (DOC 45), khẩu phần cơ sở là 9.0 kg. Điều chỉnh môi trường: Trời mưa (12mm), giảm 30%. Khối lượng đề xuất: 7.35 kg/cữ.",
   "createdAt": "2026-10-10T08:45:00.000Z"
 }
 ```
