@@ -4,12 +4,22 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { UserRole } from '../../database/entities/enums';
 import { AdminService } from './admin.service';
+import { AiIntegrationService } from '../ai-integration/ai-integration.service';
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.ADMIN)
 export class AdminController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(
+    private readonly adminService: AdminService,
+    private readonly aiIntegrationService: AiIntegrationService,
+  ) {}
+
+  @Get('ai-service-status')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  getAiServiceStatus() {
+    return this.aiIntegrationService.checkAiServiceHealth();
+  }
 
   @Get('overview')
   getOverview() {

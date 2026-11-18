@@ -1,9 +1,10 @@
 import { ArrayNotEmpty, ArrayUnique, IsBoolean, IsInt, IsNumber, IsOptional, IsString, Length, Matches, Max, Min } from 'class-validator';
 
 export class CreateFeedingScheduleDto {
+  @IsOptional()
   @IsString()
-  @Length(2, 150)
-  name!: string;
+  @Length(0, 150)
+  name?: string;
 
   @IsString()
   @Matches(/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/)

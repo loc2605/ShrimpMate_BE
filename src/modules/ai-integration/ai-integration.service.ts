@@ -1,5 +1,4 @@
 import {
-  BadGatewayException,
   Injectable,
   Logger,
   NotFoundException,
@@ -14,7 +13,6 @@ import { TelemetryReading } from '../../database/entities/telemetry-reading.enti
 import { FeedingRecord } from '../../database/entities/feeding-record.entity';
 import {
   AiRecommendationStatus,
-  AppetiteLevel,
   CropSeasonStatus,
   FeedingStatus,
   SafetyDecision,
@@ -35,14 +33,38 @@ export interface FeatureContribution {
 
 interface AiMicroserviceFeedResponse {
   predictedFeedAmountKg: number;
-  biomassKg: number;
-  feedRatePercent: number;
+  baseValueKg?: number;
   modelName: string;
   modelVersion: string;
-  confidence: number;
   featureImportance: Record<string, number>;
   explanation: string;
   featureContributions?: FeatureContribution[];
+}
+
+interface AiMicroserviceHealthResponse {
+  status: string;
+  service?: string;
+  version?: string;
+  modelName?: string;
+  modelsLoaded?: {
+    xgboost?: boolean;
+  };
+}
+
+export interface AiServiceHealthStatus {
+  status: 'ONLINE' | 'DEGRADED' | 'OFFLINE';
+  mode: 'AI_XGBOOST' | 'HEURISTIC_FALLBACK';
+  engineUrl: string;
+  latencyMs: number;
+  serviceStatus: string;
+  modelName: string;
+  modelVersion: string;
+  modelsLoaded: {
+    xgboost: boolean;
+  };
+  message: string;
+  error?: string;
+  checkedAt: string;
 }
 
 @Injectable()
@@ -70,7 +92,7 @@ export class AiIntegrationService {
    * Tự động tổng hợp 7 đặc trưng từ CSDL sinh học & cảm biến môi trường
    */
   async predictFeedDemand(pondId: string, user: User, dto?: PredictFeedOverrideDto) {
-    const pond = await this.ensurePondExists(pondId);
+    await this.ensurePondExists(pondId);
     await this.pondAccessService.ensureCanAccess(user, pondId);
 
     // 1. Lấy vụ nuôi đang hoạt động (Active Crop Season)
@@ -78,10 +100,9 @@ export class AiIntegrationService {
       where: { pondId, status: CropSeasonStatus.ACTIVE },
     });
 
-    // 2. Tính toán ngày tuổi (DOC), trọng lượng mẫu (ABW) và số lượng tôm
+    // 2. Tính toán ngày tuổi (DOC) và trọng lượng bình quân mẫu (ABW)
     let doc = 35;
     let avgWeightG = 8.5;
-    let shrimpCount = 100000;
 
     if (activeSeason) {
       const stockingTime = new Date(activeSeason.stockingDate).getTime();
@@ -91,9 +112,6 @@ export class AiIntegrationService {
       const initialWeight = Number(activeSeason.initialAverageWeightG) || 0.8;
       // Tăng trưởng bình quân 0.28g/ngày theo mô hình thực nghiệm nuôi tôm
       avgWeightG = Number((initialWeight + doc * 0.28).toFixed(2));
-
-      const survivalRate = (Number(activeSeason.estimatedSurvivalRate) || 85) / 100;
-      shrimpCount = Math.floor(activeSeason.initialCount * survivalRate);
     }
 
     // Áp dụng giá trị ghi đè thủ công (nếu người dùng truyền vào trong DTO)
@@ -153,9 +171,7 @@ export class AiIntegrationService {
       }
     }
 
-    const pondAreaM2 = Number(pond.areaM2) || 1000.0;
-
-    // 5. Đóng gói vector đặc trưng môi trường & sinh học gửi sang AI Microservice (FastAPI)
+    // 5. Đóng gói đúng 7 đặc trưng chuẩn gửi sang AI Microservice (FastAPI XGBoost)
     const featurePayload = {
       doc,
       avgWeightG,
@@ -164,12 +180,12 @@ export class AiIntegrationService {
       morningRainMm,
       prevFeedAmountKg: prevFeedKg,
       waterChangeM3,
-      pondAreaM2,
-      shrimpCount,
     };
 
-    const aiEngineBaseUrl = this.configService.get<string>('ai.engineUrl', 'http://localhost:8000');
+    const aiEngineBaseUrl = this.configService.get<string>('ai.engineUrl') || 'http://localhost:8000';
+    const shortPondId = pondId.slice(0, 8);
     let aiResponse: AiMicroserviceFeedResponse;
+    const requestStartedAt = performance.now();
 
     try {
       // Thiết lập timeout 6 giây qua AbortController
@@ -179,7 +195,10 @@ export class AiIntegrationService {
       const response = await fetch(`${aiEngineBaseUrl}/ai/predict-feed-demand`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(featurePayload),
+        body: JSON.stringify({
+          pondId,
+          ...featurePayload,
+        }),
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
@@ -189,20 +208,16 @@ export class AiIntegrationService {
         throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
       aiResponse = (await response.json()) as AiMicroserviceFeedResponse;
+      const elapsedMs = (performance.now() - requestStartedAt).toFixed(1);
+      this.logger.log(
+        `[AI-ENGINE] [Pond: ${shortPondId}] -> DOC: ${doc} | ABW: ${avgWeightG.toFixed(2)}g | DO_min: ${doMin.toFixed(2)}mg/L | Predict: ${aiResponse.predictedFeedAmountKg.toFixed(2)}kg | Latency: ${elapsedMs}ms`,
+      );
     } catch (err: unknown) {
       const errorMsg = err instanceof Error ? err.message : String(err);
       this.logger.warn(
-        `[AiIntegration] Không thể kết nối AI Microservice (${aiEngineBaseUrl}): ${errorMsg}. Tự động kích hoạt cơ chế Chịu lỗi Dự phòng (Heuristic Aquaculture Fallback).`,
+        `[AI-ENGINE] [Pond: ${shortPondId}] Không thể kết nối AI Microservice (${aiEngineBaseUrl}): ${errorMsg}. Tự động kích hoạt chế độ Dự phòng (Heuristic Aquaculture Fallback).`,
       );
-      aiResponse = this.calculateHeuristicFeedDemand(
-        doc,
-        avgWeightG,
-        shrimpCount,
-        doMin,
-        recentReadings[0]?.temperatureC ?? 28.5,
-        morningRainMm,
-        pondAreaM2,
-      );
+      aiResponse = this.calculateHeuristicFeedDemand(featurePayload);
     }
 
     // 6. Kiểm duyệt bắt buộc qua Lớp Quy tắc An toàn (Safety Rule Engine)
@@ -213,17 +228,19 @@ export class AiIntegrationService {
     );
 
     // 7. Lưu lịch sử khuyến nghị AI vào bảng ai_recommendations
+    // Chỉ lưu các trường được mô hình AI thực sự tính toán (không gán cứng spreadRate/appetiteLevel/confidence/biomass giả lập)
     const recommendation = this.recommendationRepository.create({
       pondId,
       modelName: aiResponse.modelName,
       modelVersion: aiResponse.modelVersion,
       predictedFeedAmountKg: safetyResult.allowedAmountKg,
-      spreadRateKgPerMinute: 1.5,
-      appetiteLevel: AppetiteLevel.NORMAL,
-      biomassKg: aiResponse.biomassKg,
-      confidence: aiResponse.confidence,
+      spreadRateKgPerMinute: null,
+      appetiteLevel: null,
+      biomassKg: null,
+      confidence: null,
       inputSnapshot: {
         ...featurePayload,
+        baseValueKg: aiResponse.baseValueKg ?? null,
         featureContributions: aiResponse.featureContributions ?? [],
       },
       explanation: aiResponse.explanation,
@@ -237,10 +254,11 @@ export class AiIntegrationService {
     return {
       recommendationId: saved.id,
       pondId,
+      modelName: aiResponse.modelName,
+      modelVersion: aiResponse.modelVersion,
       predictedFeedAmountKg: aiResponse.predictedFeedAmountKg,
       safeAllowedAmountKg: safetyResult.allowedAmountKg,
-      biomassKg: aiResponse.biomassKg,
-      feedRatePercent: aiResponse.feedRatePercent,
+      baseValueKg: aiResponse.baseValueKg ?? null,
       safetyDecision: safetyResult.decision,
       safetyReasons: safetyResult.reasons,
       featureBreakdown: featurePayload,
@@ -249,6 +267,84 @@ export class AiIntegrationService {
       explanation: aiResponse.explanation,
       createdAt: saved.createdAt,
     };
+  }
+
+  /**
+   * Kiểm tra trạng thái kết nối tới AI Microservice (FastAPI GET /health)
+   * Dùng cho Dashboard Admin/Manager hiển thị trạng thái AI Engine (ONLINE / OFFLINE)
+   */
+  async checkAiServiceHealth(): Promise<AiServiceHealthStatus> {
+    const aiEngineBaseUrl = this.configService.get<string>('ai.engineUrl') || 'http://localhost:8000';
+    const startedAt = performance.now();
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+      const response = await fetch(`${aiEngineBaseUrl}/health`, {
+        method: 'GET',
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      const latencyMs = Number((performance.now() - startedAt).toFixed(1));
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+
+      const data = (await response.json()) as AiMicroserviceHealthResponse;
+      const isXgboostReady = Boolean(data.modelsLoaded?.xgboost);
+      const version = data.version ?? '2.0.0';
+      const versionLabel = version.startsWith('v') ? version : `v${version}`;
+      const modelName = data.modelName ?? 'XGBoost-Regressor';
+
+      if (isXgboostReady) {
+        return {
+          status: 'ONLINE',
+          mode: 'AI_XGBOOST',
+          engineUrl: aiEngineBaseUrl,
+          latencyMs,
+          serviceStatus: data.status ?? 'healthy',
+          modelName,
+          modelVersion: versionLabel,
+          modelsLoaded: { xgboost: true },
+          message: `AI Engine: Hoạt động (XGBoost ${versionLabel} Ready)`,
+          checkedAt: new Date().toISOString(),
+        };
+      }
+
+      return {
+        status: 'DEGRADED',
+        mode: 'HEURISTIC_FALLBACK',
+        engineUrl: aiEngineBaseUrl,
+        latencyMs,
+        serviceStatus: data.status ?? 'degraded',
+        modelName,
+        modelVersion: versionLabel,
+        modelsLoaded: { xgboost: false },
+        message: 'AI Engine: Kết nối được nhưng mô hình XGBoost chưa sẵn sàng (Đang dự phòng Heuristic)',
+        checkedAt: new Date().toISOString(),
+      };
+    } catch (err: unknown) {
+      const latencyMs = Number((performance.now() - startedAt).toFixed(1));
+      const errorMsg = err instanceof Error ? err.message : String(err);
+
+      return {
+        status: 'OFFLINE',
+        mode: 'HEURISTIC_FALLBACK',
+        engineUrl: aiEngineBaseUrl,
+        latencyMs,
+        serviceStatus: 'unreachable',
+        modelName: 'Heuristic-Aquaculture-Fallback',
+        modelVersion: 'v1.0.0-heuristic',
+        modelsLoaded: { xgboost: false },
+        error: errorMsg,
+        message: 'AI Engine: Ngoại tuyến (Đang chạy chế độ Dự phòng Heuristic)',
+        checkedAt: new Date().toISOString(),
+      };
+    }
   }
 
   async getLatestRecommendation(pondId: string, user: User) {
@@ -360,133 +456,163 @@ export class AiIntegrationService {
   }
 
   /**
-   * Bộ quy tắc dự phòng Heuristic dựa trên khoa học thủy sản (tiêu chuẩn nuôi tôm thẻ chân trắng)
+   * Bộ quy tắc dự phòng Heuristic bám đúng 7 đặc trưng tiêu chuẩn
    * Tự động kích hoạt khi AI Microservice ngoại vi gặp sự cố hoặc timeout quá 6 giây
    */
-  private calculateHeuristicFeedDemand(
-    doc: number,
-    avgWeightG: number,
-    shrimpCount: number,
-    doMin: number,
-    temperatureC: number,
-    morningRainMm: number,
-    _pondAreaM2: number,
-  ): AiMicroserviceFeedResponse {
-    const biomassKg = Number(((shrimpCount * avgWeightG) / 1000).toFixed(2));
+  private calculateHeuristicFeedDemand(features: {
+    doc: number;
+    avgWeightG: number;
+    doMin: number;
+    deltaTan: number;
+    morningRainMm: number;
+    prevFeedAmountKg: number;
+    waterChangeM3: number;
+  }): AiMicroserviceFeedResponse {
+    const {
+      doc,
+      avgWeightG,
+      doMin,
+      deltaTan,
+      morningRainMm,
+      prevFeedAmountKg,
+      waterChangeM3,
+    } = features;
 
-    // 1. Tỷ lệ ăn cơ bản theo trọng lượng mẫu (ABW)
-    let dailyRatePercent = 3.5;
-    if (avgWeightG < 3) dailyRatePercent = 5.5;
-    else if (avgWeightG < 8) dailyRatePercent = 4.2;
-    else if (avgWeightG < 15) dailyRatePercent = 3.2;
-    else dailyRatePercent = 2.5;
-
-    // Khẩu phần cho 1 cữ ăn (chia đều 4 cữ ăn/ngày)
-    const mealFeedKg = (biomassKg * (dailyRatePercent / 100)) / 4;
-
-    // 2. Hệ số hiệu chỉnh môi trường Heuristic và đóng góp chi tiết (Explainable AI)
-    let factor = 1.0;
+    const baseFeedKg = Math.max(0, prevFeedAmountKg);
+    let currentFeedKg = baseFeedKg;
     const constraints: string[] = [];
-    const featureContributions: FeatureContribution[] = [];
+    const featureContributions: FeatureContribution[] = [
+      {
+        feature: 'prev_feed_kg',
+        name: 'Lượng ăn cữ liền trước',
+        value: `${prevFeedAmountKg.toFixed(2)} kg`,
+        impact: baseFeedKg > 0 ? 'INCREASE' : 'NEUTRAL',
+        deltaKg: Number(baseFeedKg.toFixed(2)),
+        description: `Dùng lượng ăn cữ liền trước (${prevFeedAmountKg.toFixed(2)} kg) làm mốc cơ sở khi chạy chế độ dự phòng Heuristic (DOC ${doc}, ABW ${avgWeightG.toFixed(2)}g).`,
+      },
+    ];
 
-    // Gốc sinh khối cơ sở
-    featureContributions.push({
-      feature: 'biomass',
-      name: 'Sinh khối đàn tôm',
-      value: `${biomassKg} kg`,
-      impact: 'INCREASE',
-      deltaKg: Number(mealFeedKg.toFixed(2)),
-      description: `Đàn tôm DOC ${doc} (khoảng ${shrimpCount.toLocaleString()} con, bình quân ${avgWeightG}g/con), khẩu phần cơ bản cữ ăn là ${mealFeedKg.toFixed(2)} kg.`,
-    });
-
-    if (temperatureC < 26) {
-      const delta = Number((mealFeedKg * 0.2).toFixed(2));
-      factor *= 0.8;
-      constraints.push(`Nhiệt độ nước thấp (${temperatureC}°C), giảm 20%`);
+    // 1. Oxy hòa tan (DO min)
+    if (doMin < 3.5) {
+      const delta = -Number(currentFeedKg.toFixed(2));
+      currentFeedKg = 0;
+      constraints.push(`DO nguy cấp (${doMin.toFixed(2)} mg/L < 3.5), ngắt cữ ăn`);
       featureContributions.push({
-        feature: 'temperature',
-        name: 'Nhiệt độ nước',
-        value: `${temperatureC}°C`,
+        feature: 'do_min',
+        name: 'Oxy hòa tan tối thiểu (DO min)',
+        value: `${doMin.toFixed(2)} mg/L`,
         impact: 'DECREASE',
-        deltaKg: -delta,
-        description: `Nhiệt độ nước thấp dưới 26°C làm tôm co cụm, giảm tốc độ chuyển hóa trao đổi chất. Giảm ~${delta} kg.`,
+        deltaKg: delta,
+        description: `Oxy hòa tan dưới ngưỡng sinh tồn (<3.5 mg/L), ngắt toàn bộ cữ ăn (${delta} kg).`,
       });
-    } else if (temperatureC > 32) {
-      const delta = Number((mealFeedKg * 0.15).toFixed(2));
-      factor *= 0.85;
-      constraints.push(`Nhiệt độ nước cao (${temperatureC}°C), giảm 15%`);
+    } else if (doMin < 4.0) {
+      const nextFeed = currentFeedKg * 0.5;
+      const delta = Number((nextFeed - currentFeedKg).toFixed(2));
+      currentFeedKg = nextFeed;
+      constraints.push(`DO thấp (${doMin.toFixed(2)} mg/L), giảm 50%`);
       featureContributions.push({
-        feature: 'temperature',
-        name: 'Nhiệt độ nước',
-        value: `${temperatureC}°C`,
+        feature: 'do_min',
+        name: 'Oxy hòa tan tối thiểu (DO min)',
+        value: `${doMin.toFixed(2)} mg/L`,
         impact: 'DECREASE',
-        deltaKg: -delta,
-        description: `Nhiệt độ nước vượt ngưỡng 32°C khiến tôm bị stress nhiệt. Giảm ~${delta} kg.`,
+        deltaKg: delta,
+        description: `Oxy hòa tan thấp (3.5 - 4.0 mg/L), cắt giảm 50% (${delta} kg).`,
       });
     } else {
       featureContributions.push({
-        feature: 'temperature',
-        name: 'Nhiệt độ nước',
-        value: `${temperatureC}°C`,
+        feature: 'do_min',
+        name: 'Oxy hòa tan tối thiểu (DO min)',
+        value: `${doMin.toFixed(2)} mg/L`,
         impact: 'NEUTRAL',
         deltaKg: 0,
-        description: `Nhiệt độ nước ${temperatureC}°C nằm trong khoảng sinh trưởng tối ưu (26-32°C).`,
+        description: `Nồng độ oxy ${doMin.toFixed(2)} mg/L đạt mức an toàn.`,
       });
     }
 
-    if (doMin < 4.5 && doMin >= 3.5) {
-      const delta = Number((mealFeedKg * 0.25).toFixed(2));
-      factor *= 0.75;
-      constraints.push(`Oxy cận ngưỡng an toàn (${doMin} mg/L), giảm 25%`);
+    // 2. Mưa sáng sớm
+    if (morningRainMm >= 10 && currentFeedKg > 0) {
+      const nextFeed = currentFeedKg * 0.7;
+      const delta = Number((nextFeed - currentFeedKg).toFixed(2));
+      currentFeedKg = nextFeed;
+      constraints.push(`Mưa lớn (${morningRainMm.toFixed(1)} mm), giảm 30%`);
       featureContributions.push({
-        feature: 'dissolved_oxygen',
-        name: 'Oxy hòa tan (DO)',
-        value: `${doMin} mg/L`,
+        feature: 'morning_rain_mm',
+        name: 'Lượng mưa sáng sớm',
+        value: `${morningRainMm.toFixed(1)} mm`,
         impact: 'DECREASE',
-        deltaKg: -delta,
-        description: `Oxy hòa tan cận ngưỡng nguy cấp (3.5 - 4.5 mg/L). Cắt giảm ~${delta} kg để phòng tránh ngạt khí sau khi ăn.`,
+        deltaKg: delta,
+        description: `Mưa lớn (>= 10 mm) làm giảm sức ăn, cắt giảm 30% (${delta} kg).`,
       });
-    } else if (doMin >= 4.5) {
+    } else {
       featureContributions.push({
-        feature: 'dissolved_oxygen',
-        name: 'Oxy hòa tan (DO)',
-        value: `${doMin} mg/L`,
+        feature: 'morning_rain_mm',
+        name: 'Lượng mưa sáng sớm',
+        value: `${morningRainMm.toFixed(1)} mm`,
         impact: 'NEUTRAL',
         deltaKg: 0,
-        description: `Nồng độ oxy ${doMin} mg/L dồi dào, đảm bảo nhu cầu hô hấp khi tôm bắt mồi.`,
+        description: `Lượng mưa ${morningRainMm.toFixed(1)} mm không ảnh hưởng đáng kể đến cữ ăn.`,
       });
     }
 
-    if (morningRainMm > 10) {
-      const delta = Number((mealFeedKg * 0.3).toFixed(2));
-      factor *= 0.7;
-      constraints.push(`Trời mưa (${morningRainMm}mm), giảm 30%`);
+    // 3. Biến thiên đạm Amoniac (Delta TAN)
+    if (deltaTan > 0.5 && currentFeedKg > 0) {
+      const nextFeed = currentFeedKg * 0.75;
+      const delta = Number((nextFeed - currentFeedKg).toFixed(2));
+      currentFeedKg = nextFeed;
+      constraints.push(`ΔTAN cao (+${deltaTan.toFixed(2)} mg/L), giảm 25%`);
       featureContributions.push({
-        feature: 'rain',
-        name: 'Lượng mưa',
-        value: `${morningRainMm} mm`,
+        feature: 'delta_tan',
+        name: 'Biến thiên đạm Amoniac (ΔTAN)',
+        value: `${deltaTan >= 0 ? '+' : ''}${deltaTan.toFixed(3)} mg/L`,
         impact: 'DECREASE',
-        deltaKg: -delta,
-        description: `Trời mưa lớn làm phân tầng nước ngọt trên mặt ao và tôm bỏ ăn. Giảm ~${delta} kg.`,
+        deltaKg: delta,
+        description: `Biến thiên TAN vượt 0.5 mg/L, cắt giảm 25% (${delta} kg) để hạn chế tích tụ khí độc.`,
+      });
+    } else {
+      featureContributions.push({
+        feature: 'delta_tan',
+        name: 'Biến thiên đạm Amoniac (ΔTAN)',
+        value: `${deltaTan >= 0 ? '+' : ''}${deltaTan.toFixed(3)} mg/L`,
+        impact: 'NEUTRAL',
+        deltaKg: 0,
+        description: `Biến thiên TAN nằm trong ngưỡng ổn định.`,
       });
     }
 
-    const predictedFeedAmountKg = Number(Math.max(1.0, mealFeedKg * factor).toFixed(2));
+    // 4. Thay nước
+    if (waterChangeM3 > 0 && currentFeedKg > 0) {
+      const nextFeed = currentFeedKg * 1.05;
+      const delta = Number((nextFeed - currentFeedKg).toFixed(2));
+      currentFeedKg = nextFeed;
+      constraints.push(`Thay nước (${waterChangeM3.toFixed(0)} m³), tăng nhẹ 5%`);
+      featureContributions.push({
+        feature: 'water_change_m3',
+        name: 'Lượng nước thay trong ngày',
+        value: `${waterChangeM3.toFixed(0)} m³`,
+        impact: 'INCREASE',
+        deltaKg: delta,
+        description: `Thay ${waterChangeM3.toFixed(0)} m³ nước kích thích tôm ăn khỏe (+${delta} kg).`,
+      });
+    } else {
+      featureContributions.push({
+        feature: 'water_change_m3',
+        name: 'Lượng nước thay trong ngày',
+        value: `${waterChangeM3.toFixed(0)} m³`,
+        impact: 'NEUTRAL',
+        deltaKg: 0,
+        description: `Không có thay nước trong ngày.`,
+      });
+    }
+
+    const predictedFeedAmountKg = Number(Math.max(0, currentFeedKg).toFixed(2));
 
     return {
       predictedFeedAmountKg,
-      biomassKg,
-      feedRatePercent: Number((dailyRatePercent * factor).toFixed(2)),
+      baseValueKg: Number(baseFeedKg.toFixed(2)),
       modelName: 'Heuristic-Aquaculture-Fallback',
       modelVersion: 'v1.0.0-heuristic',
-      confidence: 0.78,
-      featureImportance: {
-        biomass: 0.45,
-        temperature: 0.2,
-        dissolved_oxygen: 0.2,
-        rain: 0.15,
-      },
-      explanation: `Dựa trên sinh khối ${biomassKg} kg (DOC ${doc}), khẩu phần cơ sở là ${mealFeedKg.toFixed(2)} kg. Điều chỉnh môi trường: ${constraints.length > 0 ? constraints.join('; ') : 'môi trường nước tối ưu'}. Khối lượng đề xuất: ${predictedFeedAmountKg} kg/cữ.`,
+      featureImportance: {},
+      explanation: `[Dự phòng Heuristic] Dựa trên lượng ăn cữ trước ${baseFeedKg.toFixed(2)} kg (DOC ${doc}, ABW ${avgWeightG.toFixed(2)} g/con). Điều chỉnh theo môi trường: ${constraints.length > 0 ? constraints.join('; ') : 'môi trường ổn định'}. Khối lượng đề xuất: ${predictedFeedAmountKg.toFixed(2)} kg/cữ.`,
       featureContributions,
     };
   }

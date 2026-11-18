@@ -7,12 +7,14 @@ import { Device } from '../../database/entities/device.entity';
 import { Alert } from '../../database/entities/alert.entity';
 import { CropSeason } from '../../database/entities/crop-season.entity';
 import { FeedingRecord } from '../../database/entities/feeding-record.entity';
+import { AiIntegrationModule } from '../ai-integration/ai-integration.module';
 import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([User, Farm, Pond, Device, Alert, CropSeason, FeedingRecord]),
+    AiIntegrationModule,
   ],
   controllers: [AdminController],
   providers: [AdminService],

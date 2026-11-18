@@ -97,6 +97,28 @@ export class SafetyRuleEngineService {
     const reasons: string[] = [];
     const appliedRules: string[] = [];
 
+    // 3.1. KIỂM TRA ĐỘ TƯƠI CỦA DỮ LIỆU CẢM BIẾN (Telemetry Freshness Check)
+    // Nếu ao không có dữ liệu đo đạc nào, hoặc dữ liệu đo mới nhất đã quá 30 phút -> Cảm biến bị mất tín hiệu/offline
+    const MAX_STALE_MINUTES = 30;
+    if (!latestReading) {
+      currentDecision = SafetyDecision.BLOCKED;
+      allowedAmount = 0;
+      appliedRules.push('NO_TELEMETRY_DATA');
+      reasons.push('Ao chưa có bất kỳ dữ liệu đo đạc cảm biến nào. Cữ ăn bị chặn để đảm bảo an toàn!');
+    } else {
+      const readingAgeMinutes = Math.floor(
+        (Date.now() - new Date(latestReading.measuredAt).getTime()) / (1000 * 60),
+      );
+      if (readingAgeMinutes > MAX_STALE_MINUTES) {
+        currentDecision = SafetyDecision.BLOCKED;
+        allowedAmount = 0;
+        appliedRules.push('STALE_SENSOR_DATA');
+        reasons.push(
+          `Dữ liệu cảm biến môi trường đã quá cũ (${readingAgeMinutes} phút trước > giới hạn an toàn ${MAX_STALE_MINUTES} phút). Trạm cảm biến có thể đang mất tín hiệu, cữ ăn tự động bị hủy để phòng ngừa rủi ro!`,
+        );
+      }
+    }
+
     // 4. Đánh giá qua bộ quy tắc an toàn động cấu hình trong CSDL (dựa trên cảm biến nước và thiết bị)
     for (const rule of rules) {
       const isTriggered = this.evaluateCondition(
