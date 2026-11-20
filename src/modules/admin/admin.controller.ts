@@ -1,8 +1,10 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { UserRole } from '../../database/entities/enums';
+import { User } from '../../database/entities/user.entity';
 import { AdminService } from './admin.service';
 import { AiIntegrationService } from '../ai-integration/ai-integration.service';
 
@@ -19,6 +21,12 @@ export class AdminController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   getAiServiceStatus() {
     return this.aiIntegrationService.checkAiServiceHealth();
+  }
+
+  @Post('ai-service/retrain')
+  @Roles(UserRole.ADMIN)
+  retrainAiModel(@CurrentUser() user: User) {
+    return this.aiIntegrationService.triggerModelRetrain(user);
   }
 
   @Get('overview')

@@ -12,6 +12,7 @@ export * from './telemetry-reading.entity';
 export * from './user.entity';
 export * from './farmer-assignment.entity';
 export * from './password-reset-otp.entity';
+export * from './feeding-feedback.entity';
 
 import { Alert } from './alert.entity';
 import { AiRecommendation } from './ai-recommendation.entity';
@@ -26,6 +27,7 @@ import { TelemetryReading } from './telemetry-reading.entity';
 import { User } from './user.entity';
 import { FarmerAssignment } from './farmer-assignment.entity';
 import { PasswordResetOtp } from './password-reset-otp.entity';
+import { FeedingFeedback } from './feeding-feedback.entity';
 
 export const entities = [
 	User,
@@ -37,6 +39,7 @@ export const entities = [
 	Device,
 	FeedingSchedule,
 	FeedingRecord,
+	FeedingFeedback,
 	TelemetryReading,
 	AiRecommendation,
 	SafetyRule,

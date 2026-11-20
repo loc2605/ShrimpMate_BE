@@ -15,6 +15,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { User } from '../../database/entities/user.entity';
 import { AiIntegrationService } from './ai-integration.service';
 import { PredictFeedOverrideDto } from './dto/predict-feed.dto';
+import { RecordFeedingFeedbackDto } from './dto/record-feedback.dto';
 
 @Controller('ponds/:pondId/ai')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -64,5 +65,44 @@ export class AiIntegrationController {
   ) {
     const parsedLimit = limit ? parseInt(limit, 10) : 10;
     return this.aiService.getRecommendations(pondId, user, parsedLimit);
+  }
+
+  @Post('feeding-feedbacks/:recordId')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.FARMER)
+  recordFeedback(
+    @Param('pondId') pondId: string,
+    @Param('recordId') recordId: string,
+    @Body() dto: RecordFeedingFeedbackDto,
+    @CurrentUser() user: User,
+  ) {
+    return this.aiService.recordFeedingFeedback(pondId, recordId, dto, user);
+  }
+
+  @Get('feedback-history')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.FARMER)
+  getFeedbackHistory(
+    @Param('pondId') pondId: string,
+    @Query('limit') limit: string,
+    @Query('page') page: string,
+    @CurrentUser() user: User,
+  ) {
+    const parsedLimit = limit ? parseInt(limit, 10) : 20;
+    const parsedPage = page ? parseInt(page, 10) : 1;
+    return this.aiService.getFeedbackHistory(pondId, user, parsedLimit, parsedPage);
+  }
+
+  @Get('model-performance')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.FARMER)
+  getModelPerformance(
+    @Param('pondId') pondId: string,
+    @CurrentUser() user: User,
+  ) {
+    return this.aiService.getModelPerformanceMetrics(pondId, user);
+  }
+
+  @Post('retrain')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  retrainModel(@CurrentUser() user: User) {
+    return this.aiService.triggerModelRetrain(user);
   }
 }

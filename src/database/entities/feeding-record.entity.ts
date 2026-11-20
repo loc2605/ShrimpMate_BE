@@ -34,6 +34,13 @@ export class FeedingRecord {
   @Column({ name: 'schedule_id', type: 'uuid', nullable: true })
   scheduleId!: string | null;
 
+  @ManyToOne('AiRecommendation', { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'ai_recommendation_id' })
+  aiRecommendation!: any;
+
+  @Column({ name: 'ai_recommendation_id', type: 'uuid', nullable: true })
+  aiRecommendationId!: string | null;
+
   @Column({ name: 'started_at', type: 'timestamptz' })
   startedAt!: Date;
 

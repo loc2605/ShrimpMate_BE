@@ -5,6 +5,7 @@ import { Pond } from '../../database/entities/pond.entity';
 import { CropSeason } from '../../database/entities/crop-season.entity';
 import { TelemetryReading } from '../../database/entities/telemetry-reading.entity';
 import { FeedingRecord } from '../../database/entities/feeding-record.entity';
+import { FeedingFeedback } from '../../database/entities/feeding-feedback.entity';
 import { PondAccessModule } from '../../common/guards/pond-access.module';
 import { SafetyRuleModule } from '../safety-rule/safety-rule.module';
 import { AiIntegrationController } from './ai-integration.controller';
@@ -18,6 +19,7 @@ import { AiIntegrationService } from './ai-integration.service';
       CropSeason,
       TelemetryReading,
       FeedingRecord,
+      FeedingFeedback,
     ]),
     PondAccessModule,
     SafetyRuleModule,

@@ -120,11 +120,13 @@ export class FeedingWorkerService {
 
     // 3. Tính toán khối lượng thức ăn
     let requestedAmount = jobData.feedAmountKg ? Number(jobData.feedAmountKg) : 0;
+    let aiRecommendationId: string | null = null;
     if (requestedAmount <= 0) {
       try {
         const systemUser = { role: UserRole.ADMIN } as User;
         const aiResult = await this.aiService.predictFeedDemand(pondId, systemUser);
         requestedAmount = aiResult.predictedFeedAmountKg;
+        aiRecommendationId = aiResult.recommendationId;
         this.logger.log(
           `[FeedingWorker] AI đã tự động dự báo lượng ăn cho cữ [${scheduleName}]: ${requestedAmount} kg`,
         );
@@ -152,6 +154,7 @@ export class FeedingWorkerService {
         finishedAt: new Date(),
         requestedAmountKg: requestedAmount,
         actualAmountKg: 0,
+        aiRecommendationId,
         source: FeedingSource.SCHEDULE,
         status: FeedingStatus.STOPPED,
         safetyDecision: SafetyDecision.BLOCKED,
@@ -199,6 +202,7 @@ export class FeedingWorkerService {
         startedAt: new Date(),
         requestedAmountKg: requestedAmount,
         actualAmountKg: allowedAmount,
+        aiRecommendationId,
         source: FeedingSource.SCHEDULE,
         status: FeedingStatus.RUNNING,
         safetyDecision: evaluation.decision,
