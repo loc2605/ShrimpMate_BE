@@ -161,7 +161,24 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
     if (!this.server) return;
     const payload = { pondId, ...statusData, emittedAt: new Date().toISOString() };
     this.server.to(`pond_${pondId}`).emit('feeder:status', payload);
-    this.logger.log(`[WS] Đã phát sự kiện feeder:status cho ao ${pondId}`);
+    this.logger.log(`[WS] Đã phát sự kiện feeder:status cho ao ${pondId}: ${statusData.status ?? ''}`);
+
+    // Nếu cữ ăn đã hoàn tất, tự động phát thêm sự kiện feeding:completed cho màn hình theo dõi
+    const statusStr = String(statusData.status ?? '').toLowerCase();
+    if (statusStr === 'completed') {
+      this.broadcastFeedingCompleted(pondId, statusData);
+    }
+  }
+
+  /**
+   * Phát sự kiện cữ ăn hoàn tất (Feeding Completed) tới đúng room ao nuôi và toàn bộ client
+   */
+  broadcastFeedingCompleted(pondId: string, recordData: Record<string, unknown>) {
+    if (!this.server) return;
+    const payload = { pondId, ...recordData, emittedAt: new Date().toISOString() };
+    this.server.to(`pond_${pondId}`).emit('feeding:completed', payload);
+    this.server.emit('feeding:completed', payload);
+    this.logger.log(`[WS] 🎉 Đã phát sự kiện feeding:completed cho ao ${pondId}: record ${recordData.recordId ?? ''}`);
   }
 
   /**

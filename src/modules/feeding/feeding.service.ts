@@ -30,6 +30,7 @@ import { MqttService } from '../../mqtt/mqtt.service';
 import { AlertsService } from '../alerts/alerts.service';
 import { AiIntegrationService } from '../ai-integration/ai-integration.service';
 import { DeviceType } from '../../database/entities/enums';
+import { EventsGateway } from '../events/events.gateway';
 
 @Injectable()
 export class FeedingService {
@@ -49,6 +50,7 @@ export class FeedingService {
 		private readonly mqttService: MqttService,
 		private readonly alertsService: AlertsService,
 		private readonly aiService: AiIntegrationService,
+		private readonly eventsGateway: EventsGateway,
 	) { }
 
 	async createSchedule(pondId: string, dto: CreateFeedingScheduleDto, user?: User) {
@@ -325,6 +327,15 @@ export class FeedingService {
 
 		const savedRecord = await this.recordRepository.save(record);
 
+		if (safetyResult.decision === SafetyDecision.BLOCKED) {
+			this.eventsGateway.broadcastFeederStatus(pondId, {
+				recordId: savedRecord.id,
+				status: FeedingStatus.STOPPED,
+				safetyDecision: SafetyDecision.BLOCKED,
+				reason: stoppedReason,
+			});
+		}
+
 		// Nếu an toàn và có thiết bị Feeder -> Gửi lệnh MQTT thực tế xuống thiết bị
 		if (safetyResult.decision !== SafetyDecision.BLOCKED && device?.deviceUid) {
 			if (device.status === DeviceStatus.OFFLINE) {
@@ -332,6 +343,11 @@ export class FeedingService {
 				savedRecord.finishedAt = new Date();
 				savedRecord.stoppedReason = `Thiết bị máy cho ăn (${device.name} - ${device.deviceUid}) đang ở trạng thái Ngoại tuyến (Offline). Không thể kích hoạt cữ ăn!`;
 				await this.recordRepository.save(savedRecord);
+				this.eventsGateway.broadcastFeederStatus(pondId, {
+					recordId: savedRecord.id,
+					status: FeedingStatus.FAILED,
+					stoppedReason: savedRecord.stoppedReason,
+				});
 				throw new BadRequestException(savedRecord.stoppedReason);
 			}
 
@@ -340,6 +356,11 @@ export class FeedingService {
 				savedRecord.finishedAt = new Date();
 				savedRecord.stoppedReason = 'Hệ thống chưa kết nối tới MQTT Broker. Không thể truyền lệnh điều khiển tới thiết bị phần cứng!';
 				await this.recordRepository.save(savedRecord);
+				this.eventsGateway.broadcastFeederStatus(pondId, {
+					recordId: savedRecord.id,
+					status: FeedingStatus.FAILED,
+					stoppedReason: savedRecord.stoppedReason,
+				});
 				throw new ServiceUnavailableException(savedRecord.stoppedReason);
 			}
 
@@ -354,11 +375,24 @@ export class FeedingService {
 			if (commandSent) {
 				savedRecord.status = FeedingStatus.RUNNING;
 				await this.recordRepository.save(savedRecord);
+				this.eventsGateway.broadcastFeederStatus(pondId, {
+					recordId: savedRecord.id,
+					status: FeedingStatus.RUNNING,
+					requestedAmountKg: savedRecord.requestedAmountKg,
+					actualAmountKg: savedRecord.actualAmountKg,
+					safetyDecision: safetyResult.decision,
+					deviceUid: device.deviceUid,
+				});
 			} else {
 				savedRecord.status = FeedingStatus.FAILED;
 				savedRecord.finishedAt = new Date();
 				savedRecord.stoppedReason = `Gửi lệnh điều khiển qua MQTT tới thiết bị (${device.deviceUid}) thất bại. Thiết bị không phản hồi!`;
 				await this.recordRepository.save(savedRecord);
+				this.eventsGateway.broadcastFeederStatus(pondId, {
+					recordId: savedRecord.id,
+					status: FeedingStatus.FAILED,
+					stoppedReason: savedRecord.stoppedReason,
+				});
 				throw new BadGatewayException(savedRecord.stoppedReason);
 			}
 		}
@@ -395,7 +429,18 @@ export class FeedingService {
 			leftoverPercent: dto.leftoverPercent !== undefined ? dto.leftoverPercent : record.leftoverPercent,
 			stoppedReason: dto.stoppedReason !== undefined ? dto.stoppedReason?.trim() ?? null : record.stoppedReason,
 		});
-		return this.recordRepository.save(record);
+		const saved = await this.recordRepository.save(record);
+
+		// Phát sự kiện WebSocket realtime khi cữ ăn được cập nhật trạng thái (đang ăn, hoàn tất, dừng)
+		this.eventsGateway.broadcastFeederStatus(record.pondId, {
+			recordId: saved.id,
+			status: saved.status,
+			actualAmountKg: saved.actualAmountKg,
+			stoppedReason: saved.stoppedReason,
+			finishedAt: saved.finishedAt,
+		});
+
+		return saved;
 	}
 
 	private async findPond(id: string) {
