@@ -8,18 +8,13 @@ import { CreateFeedingScheduleDto } from './dto/create-feeding-schedule.dto';
 import { UpdateFeedingScheduleDto } from './dto/update-feeding-schedule.dto';
 import { UpdateFeedingRecordDto } from './dto/update-feeding-record.dto';
 import { FeedingService } from './feeding.service';
-import { AiIntegrationService } from '../ai-integration/ai-integration.service';
-import { RecordFeedingFeedbackDto } from '../ai-integration/dto/record-feedback.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { User } from '../../database/entities/user.entity';
 
 @Controller()
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class FeedingController {
-	constructor(
-		private readonly feedingService: FeedingService,
-		private readonly aiIntegrationService: AiIntegrationService,
-	) {}
+	constructor(private readonly feedingService: FeedingService) {}
 
 	@Get('ponds/:pondId/feeding-schedules')
 	@Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.FARMER)
@@ -67,16 +62,5 @@ export class FeedingController {
 	@Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.FARMER)
 	updateRecord(@Param('id') id: string, @Body() dto: UpdateFeedingRecordDto, @CurrentUser() user: User) {
 		return this.feedingService.updateRecord(id, dto, user);
-	}
-
-	@Post('ponds/:pondId/feeding-records/:id/feedback')
-	@Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.FARMER)
-	submitTrayFeedback(
-		@Param('pondId') pondId: string,
-		@Param('id') recordId: string,
-		@Body() dto: RecordFeedingFeedbackDto,
-		@CurrentUser() user: User,
-	) {
-		return this.aiIntegrationService.recordFeedingFeedback(pondId, recordId, dto, user);
 	}
 }

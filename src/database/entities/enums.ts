@@ -55,12 +55,6 @@ export enum FeedingStatus {
   FAILED = 'failed',
 }
 
-export enum FeedbackEvaluation {
-  OPTIMAL = 'optimal',
-  OVER_FEEDING = 'over_feeding',
-  UNDER_FEEDING = 'under_feeding',
-}
-
 export enum AppetiteLevel {
   NONE = 0,
   WEAK = 1,

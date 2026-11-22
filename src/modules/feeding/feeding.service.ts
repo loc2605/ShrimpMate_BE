@@ -261,13 +261,11 @@ export class FeedingService {
 
 		// 1. Tự động tính toán lượng thức ăn bằng AI nếu có cờ useAiPrediction hoặc không chỉ định số kg
 		let requestedAmount = Number(dto.requestedAmountKg);
-		let aiRecommendationId: string | null = null;
 		if (dto.useAiPrediction || isNaN(requestedAmount) || requestedAmount <= 0) {
 			if (user) {
 				try {
 					const aiResult = await this.aiService.predictFeedDemand(pondId, user);
 					requestedAmount = aiResult.predictedFeedAmountKg;
-					aiRecommendationId = aiResult.recommendationId;
 				} catch {
 					requestedAmount = Number(dto.requestedAmountKg) || 10.0;
 				}
@@ -316,7 +314,6 @@ export class FeedingService {
 			startedAt: dto.startedAt ? new Date(dto.startedAt) : new Date(),
 			requestedAmountKg: requestedAmount,
 			actualAmountKg: actualAmount,
-			aiRecommendationId,
 			status: initialStatus,
 			safetyDecision: safetyResult.decision,
 			safetyReason: safetyResult.reasons.length > 0 ? safetyResult.reasons.join('; ') : 'Môi trường nước an toàn',
