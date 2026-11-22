@@ -40,7 +40,7 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
     private readonly pondAccessService: PondAccessService,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
-  ) {}
+  ) { }
 
   afterInit() {
     this.logger.log('WebSocket Gateway đã khởi tạo và sẵn sàng nhận kết nối an toàn!');
@@ -178,7 +178,7 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
     const payload = { pondId, ...recordData, emittedAt: new Date().toISOString() };
     this.server.to(`pond_${pondId}`).emit('feeding:completed', payload);
     this.server.emit('feeding:completed', payload);
-    this.logger.log(`[WS] 🎉 Đã phát sự kiện feeding:completed cho ao ${pondId}: record ${recordData.recordId ?? ''}`);
+    this.logger.log(`[WS] Đã phát sự kiện feeding:completed cho ao ${pondId}: record ${recordData.recordId ?? ''}`);
   }
 
   /**
