@@ -438,4 +438,326 @@ socket.on('alert:new', (alertData) => {
 | **Mobile** | Nút Dừng khẩn cấp gọi đúng `POST /devices/:feederDeviceId/emergency-stop` | `src/app/(tabs)/may-cho-an.tsx` | **Cao** |
 
 ---
-*Tài liệu này được biên soạn dựa trên đúng 100% mã nguồn Controller và DTO của `shrimpmate-backend`. Đội ngũ Frontend chỉ cần bám sát tài liệu này là có thể code giao diện cực kỳ nhanh chóng, chuẩn xác và không sợ bị lệch pha với Backend!*
+
+# PHẦN 6: BẢNG NGƯỠNG MÀU CHUẨN QCVN & HÀM TIỆN ÍCH HELPER (CODE SẴN CHO FE)
+
+Để FE không phải tự suy nghĩ logic đổi màu, hãy copy trực tiếp hàm sau vào file `src/utils/waterQualityHelpers.js` (hoặc `.ts`):
+
+```typescript
+export interface WaterMetricEvaluation {
+  status: 'safe' | 'warning' | 'critical' | 'empty';
+  label: string;
+  badgeBg: string;
+  textColor: string;
+  borderColor: string;
+}
+
+/**
+ * Đánh giá trạng thái ngưỡng của 6 chỉ số môi trường nước theo chuẩn QCVN 02-19:2014
+ */
+export function evaluateWaterMetric(metric: string, rawValue: number | string | null | undefined): WaterMetricEvaluation {
+  if (rawValue === null || rawValue === undefined || rawValue === '' || isNaN(Number(rawValue))) {
+    return {
+      status: 'empty',
+      label: 'Chưa có dữ liệu',
+      badgeBg: '#F1F5F9',
+      textColor: '#64748B',
+      borderColor: '#CBD5E1',
+    };
+  }
+
+  const val = Number(rawValue);
+
+  switch (metric) {
+    case 'dissolvedOxygenMgL':
+    case 'do':
+      // Oxy hòa tan (DO): Chuẩn an toàn >= 4.0; Cảnh báo [3.5, 4.0); Nguy hiểm < 3.5
+      if (val < 3.5) {
+        return { status: 'critical', label: 'NGUY HIỂM (Ngạt tôm)', badgeBg: '#FFDAD6', textColor: '#BA1A1A', borderColor: '#BA1A1A' };
+      }
+      if (val < 4.0) {
+        return { status: 'warning', label: 'CẦN CHÚ Ý (Ăn yếu)', badgeBg: '#FEF3C7', textColor: '#B45309', borderColor: '#F59E0B' };
+      }
+      return { status: 'safe', label: 'TỐI ƯU', badgeBg: '#E8F5E9', textColor: '#006E2D', borderColor: '#7CF994' };
+
+    case 'ph':
+      // Độ pH nước: Chuẩn an toàn 7.5 - 8.5; Cảnh báo 7.0 - 7.5 hoặc 8.5 - 9.0; Nguy hiểm < 7.0 hoặc > 9.0
+      if (val < 7.0 || val > 9.0) {
+        return { status: 'critical', label: 'NGUY HIỂM (Sốc pH)', badgeBg: '#FFDAD6', textColor: '#BA1A1A', borderColor: '#BA1A1A' };
+      }
+      if (val < 7.5 || val > 8.5) {
+        return { status: 'warning', label: 'CẦN CHÚ Ý', badgeBg: '#FEF3C7', textColor: '#B45309', borderColor: '#F59E0B' };
+      }
+      return { status: 'safe', label: 'TỐI ƯU', badgeBg: '#E8F5E9', textColor: '#006E2D', borderColor: '#7CF994' };
+
+    case 'temperatureC':
+    case 'temperature':
+      // Nhiệt độ nước: Chuẩn an toàn 26 - 32°C; Nguy hiểm < 22°C hoặc > 34°C
+      if (val < 22 || val > 34) {
+        return { status: 'critical', label: 'NGUY HIỂM (Sốc nhiệt)', badgeBg: '#FFDAD6', textColor: '#BA1A1A', borderColor: '#BA1A1A' };
+      }
+      if (val < 26 || val > 32) {
+        return { status: 'warning', label: 'CẦN CHÚ Ý', badgeBg: '#FEF3C7', textColor: '#B45309', borderColor: '#F59E0B' };
+      }
+      return { status: 'safe', label: 'TỐI ƯU', badgeBg: '#E8F5E9', textColor: '#006E2D', borderColor: '#7CF994' };
+
+    case 'ammoniaMgL':
+    case 'nh3':
+      // Khí độc Ammonia (NH3): An toàn < 0.1; Cảnh báo 0.1 - 0.3; Nguy hiểm > 0.3
+      if (val > 0.3) {
+        return { status: 'critical', label: 'NGUY HIỂM (Độc tố cao)', badgeBg: '#FFDAD6', textColor: '#BA1A1A', borderColor: '#BA1A1A' };
+      }
+      if (val > 0.1) {
+        return { status: 'warning', label: 'CẦN CHÚ Ý', badgeBg: '#FEF3C7', textColor: '#B45309', borderColor: '#F59E0B' };
+      }
+      return { status: 'safe', label: 'AN TOÀN', badgeBg: '#E8F5E9', textColor: '#006E2D', borderColor: '#7CF994' };
+
+    case 'salinityPpt':
+    case 'salinity':
+      // Độ mặn: Chuẩn 10 - 25 ppt
+      if (val < 5 || val > 30) {
+        return { status: 'warning', label: 'CẦN CHÚ Ý', badgeBg: '#FEF3C7', textColor: '#B45309', borderColor: '#F59E0B' };
+      }
+      return { status: 'safe', label: 'PHÙ HỢP', badgeBg: '#E8F5E9', textColor: '#006E2D', borderColor: '#7CF994' };
+
+    case 'turbidityNtu':
+    case 'turbidity':
+      // Độ đục: Chuẩn 20 - 40 NTU
+      if (val > 60) {
+        return { status: 'warning', label: 'NƯỚC ĐỤC CAO', badgeBg: '#FEF3C7', textColor: '#B45309', borderColor: '#F59E0B' };
+      }
+      return { status: 'safe', label: 'TRONG HỢP LÝ', badgeBg: '#E8F5E9', textColor: '#006E2D', borderColor: '#7CF994' };
+
+    default:
+      return { status: 'safe', label: 'BÌNH THƯỜNG', badgeBg: '#E8F5E9', textColor: '#006E2D', borderColor: '#7CF994' };
+  }
+}
+```
+
+---
+
+# PHẦN 7: BỘ TYPESCRIPT INTERFACES ĐẦY ĐỦ CHO FRONTEND
+
+Copy vào file `src/types/shrimpmate.ts`:
+
+```typescript
+// 1. Dữ liệu Quan trắc Môi trường Nước
+export interface TelemetryReading {
+  id: string;
+  pondId: string;
+  deviceId?: string | null;
+  ph?: number | null;
+  dissolvedOxygenMgL?: number | null;
+  temperatureC?: number | null;
+  salinityPpt?: number | null;
+  ammoniaMgL?: number | null;
+  turbidityNtu?: number | null;
+  measuredAt: string;
+  isBuffered: boolean;
+}
+
+// 2. Thành phần Giải thích Mô hình TreeSHAP (XAI)
+export interface FeatureContribution {
+  feature: string;
+  name: string;
+  value: string | number;
+  impact: 'INCREASE' | 'DECREASE' | 'NEUTRAL';
+  deltaKg: number;
+  description: string;
+}
+
+// 3. Khuyến nghị lượng thức ăn từ AI
+export interface AiFeedRecommendation {
+  id: string;
+  pondId: string;
+  modelName: string;
+  modelVersion: string;
+  predictedFeedAmountKg: number;
+  explanation: string;
+  safetyDecision: 'allowed' | 'adjusted' | 'blocked';
+  safetyReason: string;
+  status: 'pending' | 'approved' | 'rejected' | 'executed';
+  inputSnapshot: {
+    doc: number;
+    avgWeightG: number;
+    doMin: number;
+    deltaTan: number;
+    morningRainMm: number;
+    prevFeedAmountKg: number;
+    waterChangeM3: number;
+    baseValueKg: number;
+    featureContributions: FeatureContribution[];
+  };
+}
+
+// 4. Lịch cho ăn trong ngày
+export interface FeedingSchedule {
+  id: string;
+  pondId: string;
+  name: string;
+  timeOfDay: string; // "06:30"
+  feedAmountKg: number;
+  spreadRateKgPerMinute?: number | null;
+  daysOfWeek: number[]; // [0,1,2,3,4,5,6]
+  isEnabled: boolean;
+}
+
+// 5. Thiết bị IoT
+export interface DeviceItem {
+  id: string;
+  name: string;
+  deviceUid: string;
+  type: 'feeder' | 'sensor_node' | 'edge_gateway';
+  status: 'online' | 'offline' | 'error' | 'maintenance';
+  mode: 'automatic' | 'manual' | 'emergency_stop';
+  lastSeenAt?: string | null;
+  pondId?: string | null;
+}
+```
+
+---
+
+# PHẦN 8: CODE MẪU COMPONENT (COPY & PASTE SỬ DỤNG NGAY)
+
+### 8.1. Component React Thẻ Khuyến Nghị AI với TreeSHAP Tags (`AiRecommendationCard.jsx`):
+
+```jsx
+import React from 'react';
+import { Sparkles, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+
+export const AiRecommendationCard = ({ recommendation, onApply, isLoading }) => {
+  if (!recommendation) return null;
+
+  const { predictedFeedAmountKg, explanation, safetyDecision, safetyReason, inputSnapshot } = recommendation;
+  const contributions = inputSnapshot?.featureContributions || [];
+
+  return (
+    <div className="bg-gradient-to-br from-amber-50 to-orange-50 border border-orange-200 rounded-2xl p-5 shadow-sm">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <div className="p-2 bg-orange-500 text-white rounded-xl shadow-sm">
+            <Sparkles size={18} />
+          </div>
+          <div>
+            <h3 className="font-bold text-gray-900">Khuyến nghị Khẩu phần AI (XGBoost)</h3>
+            <p className="text-xs text-gray-500">Mô hình v2.0.0 • TreeSHAP XAI</p>
+          </div>
+        </div>
+
+        {/* Badge Trạng thái An toàn */}
+        <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+          safetyDecision === 'blocked' ? 'bg-red-100 text-red-700' :
+          safetyDecision === 'adjusted' ? 'bg-amber-100 text-amber-700' :
+          'bg-emerald-100 text-emerald-700'
+        }`}>
+          {safetyDecision === 'blocked' ? 'ĐÃ KHÓA AN TOÀN' :
+           safetyDecision === 'adjusted' ? 'ĐÃ ĐIỀU CHỈNH AN TOÀN' : 'TỐI ƯU'}
+        </span>
+      </div>
+
+      {/* Số lượng cám đề xuất */}
+      <div className="flex items-baseline gap-2 mb-3">
+        <span className="text-3xl font-extrabold text-orange-600">{predictedFeedAmountKg}</span>
+        <span className="text-sm font-semibold text-gray-600">kg / cữ</span>
+        {inputSnapshot?.baseValueKg && (
+          <span className="text-xs text-gray-400 ml-2">(Mốc cơ sở: {inputSnapshot.baseValueKg} kg)</span>
+        )}
+      </div>
+
+      {/* Giải thích nông học */}
+      <p className="text-sm text-gray-700 leading-relaxed mb-4 bg-white/70 p-3 rounded-xl border border-orange-100">
+        {explanation}
+      </p>
+
+      {/* Danh sách Tag TreeSHAP tác động */}
+      {contributions.length > 0 && (
+        <div className="mb-4">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Yếu tố chi phối khẩu phần:</p>
+          <div className="flex flex-wrap gap-2">
+            {contributions.map((item, idx) => (
+              <span
+                key={idx}
+                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold ${
+                  item.impact === 'INCREASE'
+                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                    : item.impact === 'DECREASE'
+                    ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                    : 'bg-gray-100 text-gray-700 border border-gray-200'
+                }`}
+                title={item.description}
+              >
+                {item.impact === 'INCREASE' && <TrendingUp size={12} />}
+                {item.impact === 'DECREASE' && <TrendingDown size={12} />}
+                {item.impact === 'NEUTRAL' && <Minus size={12} />}
+                {item.name}: {item.deltaKg > 0 ? `+${item.deltaKg}` : item.deltaKg} kg
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Nút Áp dụng */}
+      <button
+        onClick={() => onApply(predictedFeedAmountKg)}
+        disabled={safetyDecision === 'blocked' || isLoading}
+        className="w-full py-2.5 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-300 text-white font-bold rounded-xl shadow-sm transition-all text-sm"
+      >
+        {safetyDecision === 'blocked' ? 'Không thể áp dụng (Vi phạm an toàn nước)' : 'Áp dụng mức cám này cho cữ ăn'}
+      </button>
+    </div>
+  );
+};
+```
+
+### 8.2. Component Bắt Lỗi Khóa An Toàn 422 (`SafetyBlockedModal.jsx`):
+
+```jsx
+import React from 'react';
+import { AlertOctagon, X } from 'lucide-react';
+
+export const SafetyBlockedModal = ({ isOpen, onClose, reason, pondName }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border-2 border-red-500 animate-in fade-in zoom-in-95">
+        <div className="flex justify-between items-start mb-4">
+          <div className="p-3 bg-red-100 text-red-600 rounded-2xl">
+            <AlertOctagon size={28} />
+          </div>
+          <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600 rounded-lg">
+            <X size={20} />
+          </button>
+        </div>
+
+        <h3 className="text-xl font-black text-gray-900 mb-1">LỆNH CHO ĂN BỊ CHẶN!</h3>
+        <p className="text-xs font-semibold text-red-600 uppercase tracking-wider mb-3">
+          Lớp Quy tắc An toàn Sinh học (Safety Rule Engine)
+        </p>
+
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-4">
+          <p className="text-xs text-red-500 font-semibold mb-1">Nguyên nhân từ chối phát lệnh:</p>
+          <p className="text-sm font-bold text-red-900 leading-snug">
+            {reason || 'Chất lượng nước vi phạm ngưỡng an toàn QCVN (Oxy hòa tan DO quá thấp hoặc thiết bị báo lỗi).'}
+          </p>
+        </div>
+
+        <p className="text-xs text-gray-500 leading-relaxed mb-5">
+          Hệ thống tự động ngắt lệnh xả cám xuống phần cứng để bảo vệ đàn tôm khỏi nguy cơ ngạt thở và tránh tồn đọng thức ăn thối đáy ao. Vui lòng bật quạt nước và kiểm tra lại ao nuôi.
+        </p>
+
+        <button
+          onClick={onClose}
+          className="w-full py-3 bg-gray-900 hover:bg-gray-800 text-white font-bold rounded-xl text-sm"
+        >
+          Tôi đã hiểu và sẽ kiểm tra ao
+        </button>
+      </div>
+    </div>
+  );
+};
+```
+
+---
+*Tài liệu này đã đầy đủ trọn gói 100% từ Contract API, JSON Payload mẫu, Hàm tiện ích đổi màu chuẩn QCVN đến Component UI hoàn chỉnh. Lập trình viên Frontend chỉ cần bám sát từng phần là có thể ráp code hoàn tất trong thời gian nhanh nhất!*
+
