@@ -5,6 +5,7 @@ import { TelemetryReading } from '../../database/entities/telemetry-reading.enti
 import { Pond } from '../../database/entities/pond.entity';
 import { PondAccessService } from '../../common/guards/pond-access.service';
 import { User } from '../../database/entities/user.entity';
+import { EventsGateway } from '../events/events.gateway';
 import { RecordTelemetryDto } from './dto/record-telemetry.dto';
 import { QueryTelemetryDto } from './dto/query-telemetry.dto';
 import { TelemetryThresholdService } from './telemetry-threshold.service';
@@ -18,6 +19,7 @@ export class TelemetryService {
     private readonly pondRepository: Repository<Pond>,
     private readonly pondAccessService: PondAccessService,
     private readonly telemetryThresholdService: TelemetryThresholdService,
+    private readonly eventsGateway: EventsGateway,
   ) {}
 
   async recordTelemetry(pondId: string, dto: RecordTelemetryDto, user?: User) {
@@ -42,6 +44,9 @@ export class TelemetryService {
     });
 
     const saved = await this.readingRepository.save(reading);
+
+    // Phát sự kiện real-time qua WebSocket cho dashboard và mobile
+    this.eventsGateway.broadcastTelemetry(pondId, saved as unknown as Record<string, unknown>);
 
     // XỬ LÝ GÓI TIN ĐỆM GỬI BÙ (isBuffered = true):
     // Vẫn lưu vào CSDL cho biểu đồ & chuỗi thời gian, nhưng BỎ QUA kiểm tra ngưỡng cảnh báo tức thời

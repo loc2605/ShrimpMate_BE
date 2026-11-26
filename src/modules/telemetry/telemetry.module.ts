@@ -6,6 +6,7 @@ import { Alert } from '../../database/entities/alert.entity';
 import { Device } from '../../database/entities/device.entity';
 import { PondAccessModule } from '../../common/guards/pond-access.module';
 import { AlertsModule } from '../alerts/alerts.module';
+import { EventsModule } from '../events/events.module';
 import { TelemetryController } from './telemetry.controller';
 import { TelemetryService } from './telemetry.service';
 import { TelemetryThresholdService } from './telemetry-threshold.service';
@@ -15,6 +16,7 @@ import { TelemetryThresholdService } from './telemetry-threshold.service';
     TypeOrmModule.forFeature([TelemetryReading, Pond, Alert, Device]),
     PondAccessModule,
     AlertsModule,
+    EventsModule,
   ],
   controllers: [TelemetryController],
   providers: [TelemetryService, TelemetryThresholdService],
