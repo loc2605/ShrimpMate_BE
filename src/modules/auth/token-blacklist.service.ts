@@ -191,8 +191,8 @@ export class TokenBlacklistService implements OnModuleInit, OnModuleDestroy {
           };
         }
 
-        if (attempts >= 5) {
-          // Khóa tạm thời 15 phút (900s)
+        if (attempts === 5) {
+          // Khóa tạm thời 15 phút (900s) sau đúng 5 lần sai liên tiếp
           await this.redisClient.set(lockKey, 'TEMPORARY', 'EX', 900);
           return {
             isLocked: true,
@@ -228,7 +228,7 @@ export class TokenBlacklistService implements OnModuleInit, OnModuleDestroy {
       };
     }
 
-    if (attempts >= 5) {
+    if (attempts === 5) {
       this.inMemoryLockouts.set(identifier, { type: 'TEMPORARY', expiresAt: now + 900 * 1000 });
       return {
         isLocked: true,
