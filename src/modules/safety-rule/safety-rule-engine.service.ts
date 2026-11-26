@@ -195,7 +195,7 @@ export class SafetyRuleEngineService {
         const trendReason = `Dự báo xu hướng DO tụt xuống ${predictedDo2h} mg/L trong 2 giờ tới (nhu cầu oxy tăng sau khi ăn). Hệ thống tự động giảm 40% lượng thức ăn để chống ngạt tôm.`;
         reasons.push(trendReason);
         appliedRules.push('ADAPTIVE_FEEDING_PREDICTED_DO_DROP');
-        this.logger.warn(`[SafetyRuleEngine] ⚠️ ${trendReason} (Khẩu phần điều chỉnh: ${allowedAmount}kg)`);
+        this.logger.warn(`[SafetyRuleEngine] ${trendReason} (Khẩu phần điều chỉnh: ${allowedAmount}kg)`);
       }
     }
 

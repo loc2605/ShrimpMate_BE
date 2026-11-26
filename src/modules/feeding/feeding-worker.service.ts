@@ -114,7 +114,7 @@ export class FeedingWorkerService {
         reason: offlineReason,
       });
 
-      this.logger.warn(`[FeedingWorker] ⚠️ Cữ ăn [${scheduleName}] BỊ HỦY vì máy cho ăn OFFLINE: ${offlineReason}`);
+      this.logger.warn(`[FeedingWorker] Cữ ăn [${scheduleName}] BỊ HỦY vì máy cho ăn OFFLINE: ${offlineReason}`);
       return { success: false, recordId: savedBlocked.id, status: 'BLOCKED', message: offlineReason };
     }
 
@@ -178,7 +178,7 @@ export class FeedingWorkerService {
         reason: reasonText,
       });
 
-      this.logger.warn(`[FeedingWorker] 🛑 Cữ ăn [${scheduleName}] ĐÃ BỊ CHẶN AN TOÀN: ${reasonText}`);
+      this.logger.warn(`[FeedingWorker] Cữ ăn [${scheduleName}] ĐÃ BỊ CHẶN AN TOÀN: ${reasonText}`);
       return { success: true, recordId: savedBlocked.id, status: 'BLOCKED', message: reasonText };
     }
 
@@ -233,7 +233,7 @@ export class FeedingWorkerService {
     });
 
     this.logger.log(
-      `[FeedingWorker] 📡 Đã gửi lệnh FEED tới [${feederDevice.deviceUid}]. Đang chờ ACK xác nhận trong 20s...`,
+      `[FeedingWorker] Đã gửi lệnh FEED tới [${feederDevice.deviceUid}]. Đang chờ ACK xác nhận trong 20s...`,
     );
 
     // 6. CHỜ XÁC NHẬN ACK TỪ THIẾT BỊ (Timeout 20 giây)
@@ -241,12 +241,12 @@ export class FeedingWorkerService {
 
     if (!ack || ack.status === 'NACK') {
       const errMsg = `Thiết bị [${feederDevice.deviceUid}] không phản hồi ACK sau 20s cho cữ [${scheduleName}] (Lần ${retryAttempt}/3)`;
-      this.logger.warn(`[FeedingWorker] ⚠️ ${errMsg}`);
+      this.logger.warn(`[FeedingWorker] ${errMsg}`);
       throw new Error(errMsg);
     }
 
     this.logger.log(
-      `[FeedingWorker] ✅ Nhận ACK xác nhận thành công từ máy [${feederDevice.deviceUid}]! Máy bắt đầu quay (${allowedAmount}kg).`,
+      `[FeedingWorker] Nhận ACK xác nhận thành công từ máy [${feederDevice.deviceUid}]! Máy bắt đầu quay (${allowedAmount}kg).`,
     );
 
     return {
@@ -264,7 +264,7 @@ export class FeedingWorkerService {
   async handleJobFailure(jobData: FeedingJobData, error: Error): Promise<void> {
     const { scheduleId, pondId, scheduleName, scheduledTime } = jobData;
     this.logger.error(
-      `[FeedingWorker] ❌ CỮ ĂN [${scheduleName}] THẤT BẠI HOÀN TOÀN SAU 3 LẦN THỬ LẠI: ${error.message}`,
+      `[FeedingWorker] CỮ ĂN [${scheduleName}] THẤT BẠI HOÀN TOÀN SAU 3 LẦN THỬ LẠI: ${error.message}`,
     );
 
     // Cập nhật FeedingRecord sang trạng thái FAILED

@@ -100,7 +100,7 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
       await this.pondAccessService.ensureCanAccess(client.user, pondId);
     } catch (err: any) {
       this.logger.warn(
-        `[WS-Security] ⛔ Người dùng [${client.user.email}] (${client.user.role}) BỊ TỪ CHỐI truy cập room ao ${pondId}: ${err.message}`,
+        `[WS-Security] Người dùng [${client.user.email}] (${client.user.role}) BỊ TỪ CHỐI truy cập room ao ${pondId}: ${err.message}`,
       );
       client.emit('error', {
         message: `Bạn không có quyền theo dõi dữ liệu của ao nuôi ${pondId}`,
@@ -116,7 +116,7 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
     const room = `pond_${pondId}`;
     client.join(room);
     this.logger.log(
-      `[WS-Security] ✅ Cấp quyền thành công: [${client.user.fullName}] (${client.user.role}) đã vào room ${room}`,
+      `[WS-Security] Cấp quyền thành công: [${client.user.fullName}] (${client.user.role}) đã vào room ${room}`,
     );
 
     return {

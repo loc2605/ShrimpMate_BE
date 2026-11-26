@@ -79,7 +79,7 @@ export class DeviceHealthService {
         }
 
         this.logger.warn(
-          `[DeviceHealth] ⚠️ Thiết bị [${dev.name}] (${dev.deviceUid}) đã chuyển trạng thái thành OFFLINE (Lần cuối hoạt động: ${dev.lastSeenAt ? dev.lastSeenAt.toISOString() : 'Chưa có dữ liệu'}).`,
+          `[DeviceHealth] Thiết bị [${dev.name}] (${dev.deviceUid}) đã chuyển trạng thái thành OFFLINE (Lần cuối hoạt động: ${dev.lastSeenAt ? dev.lastSeenAt.toISOString() : 'Chưa có dữ liệu'}).`,
         );
       }
     } catch (err: any) {

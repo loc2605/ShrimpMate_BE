@@ -61,7 +61,7 @@ export class FeedingQueueService implements OnModuleInit, OnModuleDestroy {
 
       await this.redisClient.connect();
       this.isRedisAvailable = true;
-      this.logger.log(`[BullMQ] ✅ Kết nối Redis thành công tại ${host}:${port}. Đang khởi tạo hàng đợi '${FEEDING_QUEUE_NAME}'...`);
+      this.logger.log(`[BullMQ] Kết nối Redis thành công tại ${host}:${port}. Đang khởi tạo hàng đợi '${FEEDING_QUEUE_NAME}'...`);
 
       // 1. Tạo hàng đợi BullMQ
       this.feedingQueue = new Queue(FEEDING_QUEUE_NAME, {
@@ -107,11 +107,11 @@ export class FeedingQueueService implements OnModuleInit, OnModuleDestroy {
         }
       });
 
-      this.logger.log(`[BullMQ] ✅ Hàng đợi '${FEEDING_QUEUE_NAME}' và Worker đã sẵn sàng hoạt động!`);
+      this.logger.log(`[BullMQ] Hàng đợi '${FEEDING_QUEUE_NAME}' và Worker đã sẵn sàng hoạt động!`);
     } catch (err: any) {
       this.isRedisAvailable = false;
       this.logger.warn(
-        `[BullMQ] ⚠️ Không thể kết nối Redis (${host}:${port}): ${err.message}. Tự động kích hoạt cơ chế In-Memory Idempotent Job Dispatcher (chống crash).`,
+        `[BullMQ] Không thể kết nối Redis (${host}:${port}): ${err.message}. Tự động kích hoạt cơ chế In-Memory Idempotent Job Dispatcher (chống crash).`,
       );
       if (this.redisClient) {
         this.redisClient.disconnect();
@@ -160,7 +160,7 @@ export class FeedingQueueService implements OnModuleInit, OnModuleDestroy {
         });
 
         this.executedJobIds.add(jobId);
-        this.logger.log(`[BullMQ] 📥 Đã đẩy Job [${jobId}] vào hàng đợi feeding-queue thành công.`);
+        this.logger.log(`[BullMQ] Đã đẩy Job [${jobId}] vào hàng đợi feeding-queue thành công.`);
         return true;
       } catch (err: any) {
         this.logger.warn(`[BullMQ] Lỗi khi đẩy vào Redis: ${err.message}. Chuyển sang In-Memory Dispatcher.`);
