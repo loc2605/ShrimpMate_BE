@@ -1,6 +1,7 @@
 import {
   BadGatewayException,
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -116,11 +117,9 @@ export class DevicesService {
     }
 
     if (device.pondId && device.pondId !== dto.pondId) {
-      try {
-        await this.pondAccessService.ensureCanAccess(user, device.pondId);
-      } catch {
-        throw new BadRequestException('Thiết bị này hiện đang được gán vào ao nuôi của một người dùng khác');
-      }
+      throw new ConflictException(
+        `Thiết bị này hiện đang được gán cho ao nuôi khác. Vui lòng gỡ (unassign) thiết bị khỏi ao cũ trước khi gán sang ao mới.`,
+      );
     }
 
     device.pondId = dto.pondId;
