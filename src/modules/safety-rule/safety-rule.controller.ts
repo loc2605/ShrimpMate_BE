@@ -22,7 +22,7 @@ export class SafetyRuleController {
   ) {}
 
   @Get('safety-rules')
-  @Roles(UserRole.ADMIN, UserRole.FARMER)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.FARMER)
   findAllRules() {
     return this.safetyRuleService.findAll();
   }
@@ -34,7 +34,7 @@ export class SafetyRuleController {
   }
 
   @Get('safety-rules/:id')
-  @Roles(UserRole.ADMIN, UserRole.FARMER)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.FARMER)
   findOneRule(@Param('id') id: string) {
     return this.safetyRuleService.findOne(id);
   }
@@ -52,7 +52,7 @@ export class SafetyRuleController {
   }
 
   @Post('ponds/:pondId/safety-rules/evaluate')
-  @Roles(UserRole.ADMIN, UserRole.FARMER)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.FARMER)
   async evaluateFeedingSafety(
     @Param('pondId') pondId: string,
     @Body() dto: EvaluateSafetyDto,
