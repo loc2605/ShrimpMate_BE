@@ -165,6 +165,8 @@ export class SafetyRuleEngineService {
             (1000 * 3600),
         );
         doSlopePerHour = (currentDo - prevDo) / timeDiffHours;
+        // Giới hạn tốc độ biến thiên DO tối đa trong ngưỡng sinh học tự nhiên (±2.5 mg/L mỗi giờ)
+        doSlopePerHour = Math.max(-2.5, Math.min(2.5, doSlopePerHour));
       }
 
       // Chu kỳ ngày đêm (đêm/sáng sớm: tảo hô hấp làm DO tự nhiên giảm)
@@ -177,8 +179,12 @@ export class SafetyRuleEngineService {
       // Tác động oxy sinh học sau khi cho ăn (BOD demand do tôm tranh mồi và phân hủy cám)
       const feedOxygenDemand = 0.25 * Math.min(2.0, allowedAmount / 8.0);
 
-      predictedDo1h = Number((currentDo + doSlopePerHour - diurnalDrop - feedOxygenDemand).toFixed(2));
-      predictedDo2h = Number((currentDo + doSlopePerHour * 2 - diurnalDrop * 2 - feedOxygenDemand).toFixed(2));
+      const rawDo1h = currentDo + doSlopePerHour - diurnalDrop - feedOxygenDemand;
+      const rawDo2h = currentDo + doSlopePerHour * 2 - diurnalDrop * 2 - feedOxygenDemand;
+
+      // Giới hạn trong khoảng bão hòa sinh học và thực tế của nước (0.0 đến 15.0 mg/L)
+      predictedDo1h = Number(Math.max(0, Math.min(15, rawDo1h)).toFixed(2));
+      predictedDo2h = Number(Math.max(0, Math.min(15, rawDo2h)).toFixed(2));
 
       // LUẬT ĐIỀU CHỈNH THÍCH ỨNG (Adaptive Feeding):
       // Nếu hiện tại an toàn (DO >= 3.5 mg/L), nhưng dự báo sau 1-2h nữa DO tụt < 3.2 mg/L
