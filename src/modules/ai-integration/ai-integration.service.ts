@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Not, Repository } from 'typeorm';
 import { AiRecommendation } from '../../database/entities/ai-recommendation.entity';
 import { Pond } from '../../database/entities/pond.entity';
 import { CropSeason } from '../../database/entities/crop-season.entity';
@@ -118,11 +118,16 @@ export class AiIntegrationService {
     if (dto?.doc !== undefined) doc = dto.doc;
     if (dto?.avgWeightG !== undefined) avgWeightG = dto.avgWeightG;
 
-    // 3. Lấy dữ liệu quan trắc môi trường (DO_min và Delta_TAN)
+    // Delta_TAN được tính từ hai số đo TAN gần nhất, không dùng số đo NH3.
     const recentReadings = await this.readingRepository.find({
       where: { pondId },
       order: { measuredAt: 'DESC' },
       take: 10,
+    });
+    const recentTanReadings = await this.readingRepository.find({
+      where: { pondId, tanMgL: Not(IsNull()) },
+      order: { measuredAt: 'DESC' },
+      take: 2,
     });
 
     let doMin = 5.2;
@@ -135,10 +140,12 @@ export class AiIntegrationService {
     if (dto?.doMin !== undefined) doMin = dto.doMin;
 
     let deltaTan = 0.05;
-    if (recentReadings.length >= 2) {
-      const tanLatest = Number(recentReadings[0].ammoniaMgL) || 0;
-      const tanPrev = Number(recentReadings[1].ammoniaMgL) || 0;
-      deltaTan = Number((tanLatest - tanPrev).toFixed(3));
+    if (recentTanReadings.length >= 2) {
+      const tanLatest = Number(recentTanReadings[0].tanMgL);
+      const tanPrevious = Number(recentTanReadings[1].tanMgL);
+      if (Number.isFinite(tanLatest) && Number.isFinite(tanPrevious)) {
+        deltaTan = Number((tanLatest - tanPrevious).toFixed(3));
+      }
     }
     if (dto?.deltaTan !== undefined) deltaTan = dto.deltaTan;
 

@@ -118,13 +118,13 @@ describe('SafetyRuleEngineService', () => {
       expect(result.appliedRules).toContain('DO_CRITICAL_LOW');
     });
 
-    it('should ADJUST feeding when DO rule triggers ADJUSTED action (e.g. 50% reduction)', async () => {
+    it('should not stack the predictive DO reduction on a configured DO adjustment', async () => {
       const freshDate = new Date();
       readingRepository.find!.mockResolvedValue([
         {
           id: 'reading-1',
           pondId: mockPondId,
-          dissolvedOxygenMgL: 3.8,
+          dissolvedOxygenMgL: 3.5,
           measuredAt: freshDate,
         } as any,
       ]);
@@ -148,11 +148,40 @@ describe('SafetyRuleEngineService', () => {
 
       ruleRepository.find!.mockResolvedValue([mockAdjustRule as SafetyRule]);
 
-      const result = await service.evaluateFeedingSafety(mockPondId, undefined, 10.0);
+      const result = await service.evaluateFeedingSafety(mockPondId, undefined, 50.0);
 
       expect(result.decision).toBe(SafetyDecision.ADJUSTED);
-      expect(result.allowedAmountKg).toBe(5.0);
+      expect(result.allowedAmountKg).toBe(25.0);
       expect(result.appliedRules).toContain('DO_LOW_ADJUST');
+      expect(result.appliedRules).not.toContain('ADAPTIVE_FEEDING_PREDICTED_DO_DROP');
+      expect(result.contextSnapshot?.isAdaptiveAdjusted).toBe(false);
+    });
+
+    it('calculates deltaTan from TAN readings rather than ammonia readings', async () => {
+      const now = Date.now();
+      readingRepository.find!.mockResolvedValue([
+        {
+          id: 'reading-1',
+          pondId: mockPondId,
+          dissolvedOxygenMgL: 6.5,
+          ammoniaMgL: 0.1,
+          tanMgL: 0.4,
+          measuredAt: new Date(now),
+        },
+        {
+          id: 'reading-2',
+          pondId: mockPondId,
+          dissolvedOxygenMgL: 6.5,
+          ammoniaMgL: 0.8,
+          tanMgL: 0.2,
+          measuredAt: new Date(now - 5 * 60 * 1000),
+        },
+      ] as any);
+      ruleRepository.find!.mockResolvedValue([]);
+
+      const result = await service.evaluateFeedingSafety(mockPondId, undefined, 8.0);
+
+      expect(result.contextSnapshot?.deltaTan).toBe(0.2);
     });
 
     it('should clamp predicted DO values between 0.0 and 15.0 mg/L even with extreme slope', async () => {

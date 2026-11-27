@@ -502,7 +502,8 @@ export const socketService = new SocketService();
 | `ph` | `number` | Độ pH nước ao. Xanh khi $7.5 - 8.5$, Vàng khi $7.0 - 7.5$ hoặc $8.5 - 9.0$, Đỏ khi $< 7.0$ hoặc $> 9.0$. |
 | `temperatureC` | `number` | Nhiệt độ nước ao ($^\circ C$). Thích hợp nhất $28 - 32^\circ C$. |
 | `salinityPpt` | `number` | Độ mặn ($ppt$ hay phần nghìn). Thích hợp cho tôm thẻ $10 - 25 ppt$. |
-| `ammoniaMgL` | `number` | Khí độc $NH_3 / TAN$ ($mg/L$). Cực kỳ nguy hiểm nếu $> 0.3 mg/L$. |
+| `ammoniaMgL` | `number` | Nồng độ NH3 ($mg/L$), dùng để kiểm tra ngưỡng NH3. |
+| `tanMgL` | `number` | Tổng nitơ ammonia TAN ($mg/L$), dùng để tính biến thiên `deltaTan` giữa hai số đo gần nhất. |
 | `isBuffered` | `boolean` | `true` nếu là gói tin gửi bù từ bộ nhớ flash của ESP32 sau khi có mạng lại. Không bật chuông cảnh báo. |
 | `status` (Device) | `enum` | `'online'` (Đèn xanh), `'offline'` (Đèn xám/đỏ mất tín hiệu > 15 phút), `'error'` (Đèn vàng nhấp nháy). |
 | `safetyDecision` | `enum` | `'allowed'` (Cho ăn bình thường), `'adjusted'` (AI tự giảm 40% cám do DO tụt), `'blocked'` (Bị chặn an toàn). |

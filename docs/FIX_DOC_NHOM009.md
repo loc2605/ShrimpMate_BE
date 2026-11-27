@@ -19,9 +19,9 @@ Stemming from this practical reality, the project “ShrimpMate - Smart Shrimp F
 
 🟢 **NỘI DUNG MỚI THAY THẾ (COPY & DÁN ĐÈ VÀO):**
 ```text
-Stemming from this practical reality, the project “ShrimpMate - Smart Shrimp Feeding Management and Automated Alert System Using IoT and AI” was developed to automate feeding workflows and deliver real-time environmental monitoring. The platform enables farm managers and farmers to configure feeding schedules, remotely control feeder motors, and track water quality indicators via a multi-platform ecosystem: a Mobile App for farmers at pond-side, a Web App for farm managers, and a Web Dashboard for system administrators. 
+Stemming from this practical reality, the project “ShrimpMate - Smart Shrimp Feeding Management and Automated Alert System Using IoT and AI” was developed to automate feeding workflows and deliver real-time environmental monitoring. Farm managers can configure feeding schedules through the Web App, while farmers can monitor water quality and operate assigned feeders through the Mobile App. System administrators use the Web Dashboard.
 
-By integrating an edge-buffered ESP32 microcontroller with an independent AI Microservice powered by an optimized 7-feature XGBoost Regressor combined with TreeSHAP explainability (XAI), and enforcing a strict multi-tier Safety Rule Engine compliant with aquaculture standard QCVN 02-19:2014/BNNPTNT alongside pre-feeding DO drop prediction, ShrimpMate guarantees data-driven feeding recommendations and immediate automated emergency alerts via Firebase Cloud Messaging (FCM). The system significantly minimizes uneaten feed, prevents shrimp suffocation risks, reduces production costs, and maximizes farming productivity.
+The backend integrates with an independent AI Microservice that uses a seven-feature XGBoost Regressor and TreeSHAP-based explanations. Before feeding, the NestJS Safety Rule Engine checks configured environmental rules, sensor-data freshness, and predicted dissolved-oxygen trends. Critical alerts are broadcast through Socket.IO and can be sent to configured recipients by email or SMS. These functions are designed to support timely, safety-aware feeding decisions; their effects on feed waste and production costs require validation through field trials.
 ```
 
 ---
@@ -50,9 +50,9 @@ Tích hợp mô hình phát hiện bất thường dựa trên Isolation Forest 
 
 🟢 **NỘI DUNG MỚI THAY THẾ (COPY & DÁN ĐÈ VÀO):**
 ```text
-Xây dựng kiến trúc trí tuệ nhân tạo chuyên biệt dưới dạng AI Microservice độc lập (Python FastAPI), sử dụng mô hình học máy XGBoost Regressor huấn luyện trên vector 7 đặc trưng sinh học và môi trường nước cốt lõi (DOC, ABW, DO_min, Delta_TAN, Rain, PrevFeed, WaterChange). Tích hợp cơ chế giải thích mô hình TreeSHAP (Explainable AI - XAI) để phân rã mức độ đóng góp (delta kg) của từng tham số và cung cấp chuỗi giải thích nông học minh bạch; đồng thời xây dựng sẵn cấu trúc bảng dữ liệu phục vụ nghiên cứu mở rộng thị giác máy tính nhận diện hoạt động ăn tại sàng ăn.
-Xây dựng Lớp Quy tắc An toàn (Safety Rule Engine) tích hợp trực tiếp trong lõi Backend NestJS, đóng vai trò chốt chặn bắt buộc trước mọi lệnh điều khiển phần cứng. Bộ quy tắc đối chiếu dữ liệu cảm biến thời gian thực với Quy chuẩn kỹ thuật quốc gia QCVN 02-19:2014/BNNPTNT, kiểm tra độ tươi của dữ liệu đo (ngắt lệnh nếu cảm biến mất kết nối > 30 phút), và tự động dự báo xu hướng sụt giảm oxy hòa tan (DO) sau khi ăn để điều chỉnh hoặc chặn cữ ăn, ngăn ngừa triệt để nguy cơ ngạt tôm.
-Tích hợp dịch vụ phát hiện bất thường theo ngưỡng an toàn kết hợp cơ chế Alert Cooldown (Redis TTL 15 phút) nhằm triệt tiêu hiện tượng bão cảnh báo (Alert Fatigue), phân cấp 3 mức độ cảnh báo và gửi thông báo khẩn cấp tức thời tới điện thoại người nuôi qua Firebase Cloud Messaging (FCM).
+Xây dựng và tích hợp AI Microservice độc lập bằng Python FastAPI, sử dụng XGBoost Regressor với 7 đặc trưng: DOC, ABW, DO_min, Delta_TAN, lượng mưa sáng sớm, lượng thức ăn cữ trước và lượng nước thay trong ngày. Delta_TAN là tên đặc trưng của mô hình; Backend hiện tính giá trị này từ trường telemetry được firmware mô phỏng gắn nhãn NH3, nên chưa xác nhận đó là TAN thực tế. Dịch vụ AI trả về dự báo lượng thức ăn cùng các giá trị đóng góp TreeSHAP để giải thích kết quả; dữ liệu huấn luyện hiện có là bộ dữ liệu mô phỏng, không phải 4.000 mẫu đo thực địa.
+Xây dựng Safety Rule Engine trong Backend NestJS để kiểm tra khuyến nghị trước khi cho ăn. Engine chặn khi không có telemetry hoặc dữ liệu mới nhất quá 30 phút; dùng giới hạn QCVN 02-19:2014/BNNPTNT cho DO, pH, nhiệt độ, độ mặn và NH3 khi đúng đại lượng đo; các hành động giảm thức ăn, ngưỡng cảnh báo phụ, biến thiên ammonia, mưa và dự báo DO được ghi rõ là heuristic của đề tài. Việc dùng một số giới hạn QCVN không đồng nghĩa toàn hệ thống đã được chứng nhận tuân thủ.
+Áp dụng Alert Cooldown 15 phút cho cảnh báo telemetry bằng Redis SET NX EX; khi Redis không khả dụng, service có cơ chế dự phòng trong bộ nhớ. Cảnh báo được phát qua WebSocket và có thể gửi email/SMS theo cấu hình. Không ghi FCM nếu chưa xác nhận dịch vụ này được tích hợp trong phiên bản triển khai.
 ```
 
 ---
@@ -68,9 +68,9 @@ Về phạm vi mô hình AI, đề tài áp dụng kiến trúc AI đa mô hình
 
 🟢 **NỘI DUNG MỚI THAY THẾ (COPY & DÁN ĐÈ VÀO):**
 ```text
-Về phạm vi mô hình AI, trọng tâm thực thi cốt lõi của đề tài tập trung vào việc nghiên cứu, chuẩn hóa và triển khai hoàn chỉnh mô hình dự báo định mức thức ăn thông minh dựa trên thuật toán XGBoost Regressor tối ưu hóa trên dữ liệu dạng bảng. Mô hình tiếp nhận vector 7 đặc trưng thực tế thu thập từ ao nuôi gồm: ngày tuổi tôm (DOC), khối lượng tôm bình quân (ABW), nồng độ oxy hòa tan tối thiểu (DO_min), biến thiên đạm Amoniac giữa 2 cữ (Delta_TAN), lượng mưa sáng sớm, lượng thức ăn cữ trước và thể tích nước thay trong ngày. Đi kèm với mô hình là kỹ thuật giải thích nguyên nhân TreeSHAP giúp người nuôi hiểu rõ căn cứ khoa học của từng quyết định tăng/giảm thức ăn. 
+Về phạm vi mô hình AI, phần đã được triển khai tập trung vào dự báo lượng thức ăn bằng XGBoost Regressor trên dữ liệu dạng bảng. Mô hình nhận 7 đặc trưng: ngày tuổi tôm (DOC), khối lượng bình quân (ABW), DO tối thiểu (DO_min), biến thiên TAN, lượng mưa sáng sớm, lượng thức ăn cữ trước và lượng nước thay trong ngày. Dịch vụ trả về các đóng góp TreeSHAP của từng đặc trưng. Bộ CSV 4.000 dòng hiện có được tạo bằng mô phỏng dựa trên các quy tắc và nguồn tham khảo; không mô tả bộ này là dữ liệu đo thực địa nếu chưa có hồ sơ thu thập tương ứng.
 
-Mọi khuyến nghị từ AI đều phải đi qua Lớp quy tắc an toàn (Safety Rule Engine) tại Backend NestJS trước khi chuyển thành lệnh rải thức ăn xuống phần cứng ESP32. Nếu AI Microservice gặp sự cố hoặc phản hồi trễ quá 6 giây, hệ thống tự động chuyển sang chế độ dự phòng nông học Heuristic Aquaculture Fallback để duy trì vận hành ổn định. Các hướng tiếp cận như thị giác máy tính nhận diện sàng ăn (YOLO11n, MobileNetV3), dự báo chuỗi thời gian dài hạn (LSTM) và Học tăng cường (DRL PPO/SAC) được định vị rõ là phạm vi nghiên cứu mở rộng trong giai đoạn tiếp theo của hệ thống.
+Khuyến nghị được đánh giá qua Safety Rule Engine của Backend trước khi hệ thống cho phép gửi lệnh cho ăn. Khi lời gọi AI lỗi hoặc vượt timeout 6 giây, Backend chuyển sang heuristic fallback. Không diễn đạt đây là bảo đảm hệ thống luôn hoạt động liên tục. Các hướng thị giác máy tính, LSTM và học tăng cường chỉ nên nêu là hướng mở rộng nếu chưa có triển khai và kết quả kiểm thử tương ứng.
 ```
 
 ---
@@ -86,7 +86,7 @@ theo mô hình kiến trúc Monolith (nguyên khối). Hệ thống được t�
 
 🟢 **NỘI DUNG MỚI THAY THẾ (COPY & DÁN ĐÈ VÀO):**
 ```text
-theo mô hình kiến trúc lai hiện đại: Modular Monolith kết hợp AI Microservice. Tầng nghiệp vụ trung tâm (Core Backend) được xây dựng theo mô hình Modular Monolith bằng NestJS, gom toàn bộ logic quản lý trang trại, ao nuôi, lập lịch cữ ăn, lớp quy tắc an toàn và kết nối MQTT/WebSocket vào một khối module hóa mạch lạc, đảm bảo tính toàn vẹn giao dịch ACID và triệt tiêu độ trễ mạng nội bộ. Tầng trí tuệ nhân tạo được tách biệt thành một AI Microservice độc lập bằng Python FastAPI chuyên trách các phép tính ma trận và suy luận mô hình học máy XGBoost, giao tiếp với Core Backend qua giao thức HTTP REST nội bộ tốc độ cao.
+theo mô hình kiến trúc lai: Modular Monolith kết hợp AI Microservice. Core Backend được xây dựng bằng NestJS, tổ chức các chức năng quản lý, cho ăn, an toàn, MQTT và WebSocket thành các module chạy trong cùng ứng dụng. Dịch vụ AI độc lập bằng Python FastAPI thực hiện dự báo XGBoost và giao tiếp với Backend qua HTTP REST. Tách dịch vụ AI giúp phân định trách nhiệm giữa xử lý nghiệp vụ và suy luận mô hình; không khẳng định việc này triệt tiêu độ trễ mạng hoặc bảo đảm một đặc tính ACID nếu chưa có đo đạc và mô tả giao dịch cụ thể.
 ```
 
 ---
@@ -106,14 +106,15 @@ XGBoost (Extreme Gradient Boosting) là một cài đặt tối ưu hóa của t
 🟢 **NỘI DUNG MỚI THAY THẾ (COPY & DÁN ĐÈ VÀO):**
 ```text
 2.4.6 Mô hình hồi quy XGBoost trong dự báo nhu cầu thức ăn thông minh
-XGBoost (Extreme Gradient Boosting) là một thuật toán học máy nâng cao dựa trên nguyên lý Gradient Boosting Decision Tree (GBDT), được tối ưu hóa về tốc độ xử lý và kiểm soát quá khớp (overfitting) thông qua kỹ thuật chuẩn hóa chính quy (L1/L2 regularization) được tích hợp trực tiếp vào hàm mục tiêu:
+XGBoost (Extreme Gradient Boosting) là một thuật toán học máy dựa trên nguyên lý Gradient Boosting Decision Tree (GBDT), có các thành phần chính quy hóa trong hàm mục tiêu để kiểm soát độ phức tạp của mô hình:
 $$\mathcal{L}^{(t)} = \sum_{i=1}^{n} l\left(y_i, \hat{y}_i^{(t-1)} + f_t(x_i)\right) + \Omega(f_t)$$
 trong đó $\Omega(f_t) = \gamma T + \frac{1}{2}\lambda \sum_{j=1}^{T} w_j^2$ là hàm phạt độ phức tạp của cây quyết định thứ $t$ với số lượng lá $T$ và trọng số lá $w_j$.
 
 Nhờ khả năng mô hình hóa phi tuyến vượt trội trên dữ liệu dạng bảng có kích thước vừa và nhỏ, XGBoost Regressor được đề tài lựa chọn làm thuật toán cốt lõi để dự báo định mức thức ăn cho từng cữ ăn (kg/cữ). Vector đặc trưng đầu vào của mô hình gồm 7 biến số sinh học và môi trường nước cốt lõi:
 $$x = [\text{DOC}, \text{ABW}, \text{DO}_{\min}, \Delta\text{TAN}, \text{MorningRain}, \text{PrevFeed}, \text{WaterChange}]$$
-Mô hình được cấu hình với các siêu tham số thực nghiệm tối ưu: $n\_estimators = 600$, $learning\_rate = 0.05$, $max\_depth = 6$, $subsample = 0.8$, $colsample\_bytree = 0.8$. Kết quả suy luận từ XGBoost đạt độ chính xác cao và thời gian phản hồi cực nhanh (< 40 ms), đóng vai trò then chốt trong chu trình cho ăn tự động của ShrimpMate.
+Mô hình được cấu hình với các siêu tham số: $n\_estimators = 600$, $learning\_rate = 0.05$, $max\_depth = 6$, $subsample = 0.8$, $colsample\_bytree = 0.8$. Theo metadata của lần huấn luyện hiện có trên bộ dữ liệu mô phỏng 4.000 mẫu, mô hình đạt MAE = 0.28 kg/cữ, RMSE = 0.473 kg/cữ, MAPE = 3.06% và $R^2 = 0.992$. Script ghi nhận latency suy luận trung bình 0.45 ms cho một mẫu ở mức mô hình; đây không phải thời gian phản hồi end-to-end của API.
 ```
+**Lưu ý khi dùng nội dung:** Ghi rõ đây là kết quả trên dữ liệu mô phỏng; không gọi là dữ liệu thực địa.
 
 ---
 
@@ -132,7 +133,7 @@ trong đó:
 - $\phi_0$ là giá trị kỳ vọng cơ sở (TreeSHAP bias) tính trên toàn bộ tập dữ liệu huấn luyện.
 - $\phi_i(x)$ là giá trị đóng góp (tăng hoặc giảm tính bằng kg) của đặc trưng thứ $i$ trong số 7 đặc trưng đầu vào.
 
-Thông qua TreeSHAP, hệ thống ShrimpMate cung cấp cho người nuôi bảng phân tích chi tiết: đặc trưng nào làm tăng khẩu phần (ví dụ tôm tăng trọng tốt $\Delta\text{ABW} > 0$), đặc trưng nào làm giảm khẩu phần (ví dụ sáng sớm có mưa $\text{Rain} \ge 15\text{ mm}$ làm giảm $0.4\text{ kg}$, hoặc khí độc $\Delta\text{TAN}$ tăng đột biến). Điều này giúp gia tăng tối đa tính minh bạch, độ tin cậy và thuyết phục người nuôi tự tin chuyển đổi sang quy trình cho ăn tự động.
+Thông qua TreeSHAP, hệ thống trả về đóng góp của từng đặc trưng đối với dự báo cụ thể. Dấu và độ lớn của các giá trị đóng góp phụ thuộc vào đầu vào và mô hình; chỉ đưa ví dụ định lượng (chẳng hạn một đặc trưng làm thay đổi khẩu phần bao nhiêu kg) khi đã chạy mô hình với đầu vào được nêu rõ và lưu lại kết quả. Cơ chế này hỗ trợ giải thích dự báo, nhưng không tự nó chứng minh độ chính xác hoặc mức độ tin cậy nông học của mô hình.
 ```
 
 ---
@@ -161,27 +162,29 @@ Quy trình xác thực và phân quyền đa cấp (RBAC): Hệ thống triển 
 ### 📌 ĐIỂM SỬA 9: CẬP NHẬT VÀ BỔ SUNG BẢNG USE CASE (MỤC 3.3.2)
 * **Vị trí trong docx:** Chương 3, Mục 3.3.2 Bảng Use Case hệ thống.
 * **Các điểm cần sửa trong bảng:**
-  1. **Sửa dòng UC001:** Tác nhân chính xác là **Quản lý (Manager)** (Người nuôi Farmer do Quản lý tạo tài khoản, không tự đăng ký ngoài luồng).
-  2. **Bổ sung thêm 2 Use Case còn thiếu** vào cuối bảng:
+  1. **Sửa cả mô tả và tác nhân UC001:** Manager tự đăng ký; Farmer do Manager tạo tài khoản.
+  2. **Bổ sung UC020 và UC021** đúng chức năng như các endpoint trong backend. E-Stop đã thuộc UC012 trong bảng hiện tại, không tạo mã UC mới cho chức năng này.
 
 🟢 **DÒNG BỔ SUNG THÊM VÀO BẢNG USE CASE (MỤC 3.3.2):**
 | Mã UC | Tên Use Case | Mô tả tóm tắt nghiệp vụ | Tác nhân |
 | :--- | :--- | :--- | :--- |
-| **UC020** | **Phân công Người nuôi phụ trách ao** | Quản lý thực hiện gán hoặc thu hồi quyền phụ trách ao nuôi/trang trại cho tài khoản Người nuôi, giới hạn phạm vi truy cập trên Mobile App. | Quản lý |
-| **UC021** | **Dừng khẩn cấp một chạm (1-Tap E-Stop)** | Người nuôi hoặc Quản lý phát lệnh dừng cưỡng bức rơ-le máy cho ăn trong thời gian < 800 ms khi phát hiện nguy cơ ngoài ao. | Quản lý và Người nuôi |
+| **UC020** | **Quản lý tài khoản Người nuôi** | Quản lý tạo, cập nhật và thay đổi trạng thái tài khoản Farmer thuộc quyền quản lý. | Quản lý |
+| **UC021** | **Phân công Người nuôi phụ trách ao/trang trại** | Quản lý gán hoặc thu hồi quyền phụ trách ao nuôi/trang trại cho tài khoản Farmer. | Quản lý |
+
+**Dòng UC001 đề xuất:** `UC001 | Đăng ký tài khoản Quản lý | Quản lý tự đăng ký tài khoản bằng Email hoặc số điện thoại để sử dụng Web App. | Quản lý`. Giữ E-Stop trong UC012. Chỉ ghi thời gian ngắt relay `< 800 ms` nếu có phép đo kiểm thử phần cứng làm bằng chứng.
 
 ---
 
 ### 📌 ĐIỂM SỬA 10: BỔ SUNG CÁC THỰC THỂ CSDL CÒN THIẾU TẠI MỤC 3.3.4
 * **Vị trí trong docx:** Chương 3, Mục 3.3.4 Danh sách các thực thể chính trong hệ thống.
 * **Từ khóa tìm kiếm (Ctrl + F):** `Danh sách các thực thể chính trong hệ thống:`
-* **Nội dung bổ sung:** Bổ sung mô tả chi tiết của 2 thực thể cực kỳ quan trọng đã có trong source code:
+* **Lưu ý:** DOCX hiện đã liệt kê `farmer_assignments` và `ai_recommendations`; không thêm lại thành thực thể mới. Có thể cập nhật mô tả hiện có như sau:
 
-🟢 **ĐOẠN VĂN BỔ SUNG VÀO CUỐI MỤC 3.3.4 (COPY VÀ DÁN VÀO):**
+🟢 **NỘI DUNG ĐIỀU CHỈNH CHO CÁC DÒNG HIỆN CÓ:**
 ```text
-- farmer_assignments: Quản lý mối quan hệ phân công giữa Quản lý (manager_id) và Người nuôi (farmer_id) đối với từng ao nuôi cụ thể (pond_id) hoặc toàn bộ trang trại (farm_id). Thực thể này đóng vai trò quyết định trong việc thiết lập hàng rào bảo vệ dữ liệu trên Mobile App.
-- telemetry_readings (bổ sung cờ is_buffered): Mỗi bản ghi quan trắc môi trường lưu trữ thêm cờ boolean is_buffered. Cờ này nhận giá trị true đối với các gói tin được lưu tạm trong bộ nhớ Flash của ESP32 và gửi bù sau khi mạng phục hồi, giúp hệ thống lưu trữ trọn vẹn dữ liệu chuỗi thời gian mà không kích hoạt kiểm tra ngưỡng tức thời gây bão cảnh báo giả.
-- ai_recommendations (chi tiết snapshot): Lưu trữ kết quả dự báo của mô hình XGBoost kèm trường JSON input_snapshot (lưu 7 đặc trưng môi trường, baseValueKg và mảng featureContributions theo TreeSHAP), kết luận từ bộ luật an toàn (safety_decision mang giá trị ALLOWED, ADJUSTED hoặc BLOCKED), lý do kiểm duyệt an toàn và trạng thái áp dụng (PENDING, APPLIED, REJECTED).
+farmer_assignments: Lưu thông tin liên kết Farmer với farm hoặc pond được phân công (manager_id, farmer_id, farm_id, pond_id), làm căn cứ giới hạn phạm vi truy cập.
+telemetry_readings: Lưu số đo môi trường, thời điểm đo và cờ is_buffered. Backend lưu cả telemetry gửi bù nhưng bỏ qua bước kiểm tra ngưỡng cảnh báo tức thời cho bản ghi này.
+ai_recommendations: Lưu kết quả dự báo, input_snapshot dạng JSONB (7 đặc trưng, baseValueKg và featureContributions nếu dịch vụ AI trả về), safety_decision, safety_reason và status. Các trạng thái trong backend gồm PENDING, APPROVED, REJECTED, EXECUTED; safety_decision gồm ALLOWED, ADJUSTED, BLOCKED.
 ```
 
 ---
@@ -199,11 +202,12 @@ Nền tảng thực thi: Node.js v20+LTS, NestJS framework phiên bản 12, Type
 
 🟢 **NỘI DUNG MỚI THAY THẾ (COPY & DÁN ĐÈ VÀO):**
 ```text
-Nền tảng thực thi: Node.js v20+ LTS, NestJS framework v12 (@nestjs/core: ^12.3.2), TypeScript v6.0 / v5.x.
-Cơ sở dữ liệu & ORM: PostgreSQL 16 kết hợp TimescaleDB Hypertable (phân vùng chunk 7 ngày), quản lý thực thể qua TypeORM v1.1 (^1.1.1).
-Tầng đệm và hàng đợi phân tán: Redis 7 in-memory cache kết hợp hàng đợi BullMQ v6.7 (^6.7.3) xử lý các cữ ăn tự động tuần tự với Idempotent Job Key, quản lý khóa chống lặp cảnh báo (Alert Cooldown TTL 15 phút qua cơ chế SET NX EX 900).
-Giao tiếp thiết bị & Thời gian thực: Giao thức MQTT v3.1.1/v5.0 qua thư viện MQTT.js v5.16 (^5.16.0), WebSocket hai chiều Socket.IO v4.8 (^4.8.4) phân chia Room an toàn theo từng ao nuôi.
+Nền tảng thực thi: Node.js v20+ (theo yêu cầu dự án), NestJS 12 (@nestjs/core ^12.3.2), TypeScript ^6.0.2.
+Cơ sở dữ liệu & ORM: PostgreSQL qua TypeORM ^1.1.1. Migration tạo TimescaleDB hypertable khi extension đã được cài đặt; cấu hình hiện tại không chỉ định chu kỳ chunk 7 ngày.
+Hàng đợi và khóa: Redis kết hợp BullMQ ^6.7.3 cho hàng đợi cho ăn và các cơ chế Redis cho cooldown/lockout. Lịch cho ăn dùng khóa Idempotent Job ID; cooldown cảnh báo mặc định 900 giây với Redis SET NX EX. Một số service có fallback trong bộ nhớ khi Redis không khả dụng.
+Giao tiếp thiết bị & thời gian thực: MQTT.js ^5.16.0; Socket.IO ^4.8.4 dùng các room theo pondId và kiểm tra quyền truy cập ao trước khi tham gia room.
 ```
+**Lưu ý:** Chỉ ghi phiên bản PostgreSQL, Redis, broker và MQTT protocol đã xác nhận trên môi trường triển khai; các phiên bản này không được khóa đầy đủ trong mã nguồn backend.
 
 ---
 
@@ -218,73 +222,58 @@ SafetyRuleEngineService thực thi quy trình kiểm duyệt an toàn 3 tầng k
 Tầng 1 - Kiểm tra độ tươi của dữ liệu cảm biến (Telemetry Freshness Check):
 Hệ thống tính toán khoảng thời gian trôi qua kể từ thời điểm đo đạc mới nhất:
 Delta_t = (Thời gian hiện tại - Thời gian đo mới nhất) tính bằng phút.
-Nếu Delta_t > 30 phút hoặc ao nuôi chưa từng có dữ liệu cảm biến, trạm quan trắc được xác định là mất tín hiệu/offline. Hệ thống lập tức ban hành quyết định BLOCKED, hủy cữ ăn và ghi log cảnh báo: "Dữ liệu cảm biến môi trường đã quá cũ (> 30 phút). Cữ ăn tự động bị hủy để phòng ngừa rủi ro!".
+Nếu Delta_t > 30 phút hoặc ao nuôi chưa từng có dữ liệu cảm biến, engine trả về quyết định BLOCKED cùng lý do NO_TELEMETRY_DATA hoặc STALE_SENSOR_DATA. Luồng cho ăn xử lý quyết định này để không phát lệnh; một số luồng tạo cảnh báo tương ứng. Không trích dẫn chuỗi log nếu chưa xác nhận đúng nội dung log của phiên bản triển khai.
 
-Tầng 2 - Đánh giá 8 quy tắc an toàn động theo QCVN 02-19:2014/BNNPTNT:
+Tầng 2 - Đánh giá các quy tắc an toàn được bật và cấu hình trong cơ sở dữ liệu:
 - Quy tắc thiết bị: Nếu máy cho ăn ở trạng thái ERROR hoặc EMERGENCY_STOP -> Chặn hoàn toàn (BLOCKED).
-- Quy tắc Oxy hòa tan (DO): Nếu DO < 3.5 mg/L -> Chặn hoàn toàn (BLOCKED); Nếu 3.5 <= DO < 4.0 mg/L -> Cắt giảm 50% thức ăn (ADJUSTED).
-- Quy tắc Nhiệt độ: Nếu Nhiệt độ < 22°C hoặc > 34°C -> Cắt giảm 50% thức ăn (ADJUSTED).
-- Quy tắc pH: Nếu pH < 7.0 hoặc pH > 9.0 -> Chặn hoàn toàn (BLOCKED).
-- Quy tắc Khí độc Ammonia (NH3): Nếu NH3 > 0.3 mg/L -> Chặn hoàn toàn (BLOCKED).
-- Quy tắc Biến thiên Đạm Amoniac: Nếu Delta_TAN > 0.5 mg/L -> Cắt giảm 50% thức ăn (ADJUSTED).
-- Quy tắc Mưa lớn sáng sớm: Nếu Lượng mưa >= 15.0 mm -> Cắt giảm 30% thức ăn (ADJUSTED).
+- Theo QCVN 02-19:2014/BNNPTNT, giới hạn chất lượng nước ao được dùng trong code gồm DO >= 3.5 mg/L; pH 7-9 và dao động pH trong ngày không quá 0.5; nhiệt độ 18-33°C; độ mặn 5-35‰; NH3 < 0.3 mg/L.
+- Quy tắc DO: DO < 3.5 mg/L -> BLOCKED. Khoảng DO < 4.0 mg/L kích hoạt giảm 50% thức ăn; mức 4.0 và hành động giảm thức ăn là heuristic nội bộ, không phải yêu cầu hành động trong QCVN.
+- Quy tắc nhiệt độ: ngoài khoảng QCVN 18-33°C -> ADJUSTED, giảm 50% thức ăn theo chính sách heuristic của đề tài.
+- Quy tắc pH: ngoài khoảng QCVN 7-9 -> BLOCKED. Cảnh báo thêm nếu biên độ pH trong ngày > 0.5.
+- Quy tắc NH3: NH3 >= 0.3 mg/L -> BLOCKED để thực thi giới hạn NH3 < 0.3 mg/L.
+- Quy tắc độ mặn: ngoài khoảng QCVN 5-35‰ -> cảnh báo CRITICAL.
+- Các quy tắc biến thiên ammonia (> 0.5 mg/L) và mưa (>= 15 mm) tiếp tục là heuristic của đề tài, không phải ngưỡng QCVN. Firmware mô phỏng đang gửi trường ammonia dưới nhãn NH3; không gọi biến thiên này là Delta_TAN nếu chưa xác nhận phép đo là TAN.
+- QCVN quy định độ trong theo cm, còn telemetry hiện đo độ đục theo NTU; hai đại lượng không tương đương nên ngưỡng turbidity hiện tại vẫn là heuristic, chưa được đổi theo QCVN.
 
 Tầng 3 - Thuật toán Dự báo xu hướng DO sụt giảm trước cữ ăn (Adaptive Feeding):
-Dựa trên 2 lần đo gần nhất, hệ thống tính độ dốc biến thiên DO (Slope_DO), trừ đi mức sụt giảm hô hấp ban đêm của tảo (0.35 mg/L nếu từ 18:00 - 06:00), và trừ đi nhu cầu tiêu hao oxy sinh học (BOD) do tôm tranh mồi và cám phân hủy:
-DO_pred(2h) = DO_current + 2*Slope_DO - 2*Drop_diurnal - BOD_feed
-Nếu hiện tại DO an toàn (>= 3.5 mg/L) nhưng dự báo sau 1-2h nữa DO_pred < 3.2 mg/L, hệ thống tự động kích hoạt luật thích ứng: chuyển sang ADJUSTED và cắt giảm 40% lượng thức ăn, ngăn chặn triệt để nguy cơ tôm ngạt vào cuối cữ ăn.
+Dựa trên tối đa 2 lần đo gần nhất để tính độ dốc DO theo giờ (giới hạn trong khoảng -2.5 đến 2.5 mg/L/giờ). Trong khung giờ 18:00–06:00, mức giảm ban đêm được đặt là 0.35 mg/L cho mỗi giờ dự báo. Nhu cầu oxy do lượng thức ăn được tính theo công thức BOD_feed = 0.25 × min(2, lượng_ăn_được_phép / 8).
+DO_pred(1h) = DO_current + Slope_DO - Drop_diurnal - BOD_feed
+DO_pred(2h) = DO_current + 2 × Slope_DO - 2 × Drop_diurnal - BOD_feed
+Nếu DO hiện tại >= 3.5 mg/L nhưng dự báo 1h hoặc 2h < 3.2 mg/L, engine giảm 40% lượng ăn đang được phép, trừ khi một quy tắc DO đã kích hoạt và điều chỉnh khẩu phần; khi đó quy tắc DO được ưu tiên để tránh giảm hai lần cho cùng rủi ro. Các quy tắc điều chỉnh độc lập khác vẫn có thể được áp dụng tuần tự.
 ```
+**Lưu ý về diễn giải:** Các giới hạn chất lượng nước nêu trên được lấy từ QCVN 02-19:2014/BNNPTNT, Phụ lục I, Bảng 1; quy chuẩn được ban hành kèm Thông tư 22/2014/TT-BNNPTNT. Việc dùng đúng giới hạn trong code không đồng nghĩa toàn hệ thống đã được chứng nhận tuân thủ: thiết bị đo cần hiệu chuẩn, việc phân loại cảnh báo/chặn/giảm thức ăn là chính sách phần mềm, còn các ngưỡng DO 4.0, biến thiên ammonia, mưa và dự báo DO là heuristic. Dự án PlatformIO/Wokwi mô phỏng trường NH3 bằng potentiometer, chưa chứng minh cảm biến vật lý đã được hiệu chuẩn. Tham khảo: [Thông tư 22/2014/TT-BNNPTNT](https://thuvienphapluat.vn/van-ban/Tai-nguyen-Moi-truong/Thong-tu-22-2014-TT-BNNPTNT-Quy-chuan-ky-thuat-quoc-gia-dieu-kien-nuoi-thuy-san-242453.aspx) và [bản QCVN được lập chỉ mục trên cổng tiêu chuẩn của Bộ NN&PTNT](https://tieuchuan.mard.gov.vn/Documents/Uploads/QCVN%2002-19-2014-BNNPTNT.doc). Không viết “ngăn ngừa triệt để”. Test DO-adjust xác nhận quy tắc DO được áp dụng mà không chồng thêm heuristic dự báo DO.
 
 ---
 
 # PHẦN 6: CHƯƠNG 5 - KIỂM THỬ VÀ ĐÁNH GIÁ HỆ THỐNG
 
-### 📌 ĐIỂM SỬA 13: ĐIỀN ĐẦY ĐỦ NỘI DUNG VÀ BẢNG SỐ LIỆU CHO CÁC MỤC ĐANG TRỐNG
+### 📌 ĐIỂM SỬA 13: BỔ SUNG KẾT QUẢ KIỂM THỬ CÓ BẰNG CHỨNG
 * **Vị trí trong docx:** Chương 5, các tiêu đề mục đang để trống nội dung:
   - *"Kết quả kiểm thử chức năng & An toàn"*
   - *"Đánh giá chất lượng mô hình AI và Đối sánh Benchmark"*
   - *"Đánh giá hiệu quả của Lớp Quy tắc An toàn (Safety Rule Engine)"*
-* **Thao tác:** Bôi đen 3 tiêu đề này và **PASTE TOÀN BỘ NỘI DUNG THỰC NGHIỆM CHI TIẾT** dưới đây:
+* **Lưu ý:** Không sử dụng các con số benchmark MQTT/ESP32 hoặc số ca test 48/48, 16/16, 200 kịch bản ở bản nháp cũ nếu không có log và kết quả thực nghiệm tương ứng. Nội dung dưới đây chỉ ghi các kết quả có trong source/metadata và lần chạy test đã thực hiện; cần chạy lại sau khi sửa test lỗi.
 
-🟢 **NỘI DUNG HOÀN CHỈNH DÁN VÀO CHƯƠNG 5 (COPY VÀ DÁN VÀO):**
+🟢 **NỘI DUNG THAY THẾ (CẬP NHẬT KẾT QUẢ SAU KHI CHẠY LẠI TEST):**
 ```text
 5.2 Kết quả kiểm thử chức năng & An toàn
 
-Quá trình kiểm thử phần mềm được tiến hành tự động hóa thông qua các bộ công cụ kiểm thử tiêu chuẩn:
-- Kiểm thử đơn vị (Unit Testing) trên Backend: Sử dụng Jest Runner thực thi 48 ca kiểm thử đơn vị, kiểm tra toàn bộ logic tính toán FCR, logic phân quyền PondAccessService, cơ chế khóa phân tán Redis AlertCooldownService và hàm băm mật khẩu. Tỷ lệ vượt qua đạt 100% (48/48 passed).
-- Kiểm thử dịch vụ AI (FastAPI Testing): Sử dụng PyTest thực thi 16 ca kiểm thử kiểm tra tính hợp lệ của schema Pydantic, khả năng xử lý ngoại lệ khi thiếu đặc trưng đầu vào, và tốc độ suy luận mô hình XGBoost. Tỷ lệ vượt qua đạt 100% (16/16 passed).
-- Kiểm thử tích hợp luồng điều khiển phần cứng (Integration Testing): Giả lập 12 kịch bản phát lệnh cữ ăn qua Mosquitto MQTT Broker tới nút vi điều khiển ESP32. Kết quả ghi nhận: thời gian từ khi Backend phát lệnh FEED đến khi ESP32 kéo rơ-le đạt trung bình 240 ms; gói tin phản hồi xác nhận ACK gửi về máy chủ thành công trong vòng 1.2 giây; cơ chế Last Will and Testament (LWT) phát hiện thiết bị mất nguồn trong vòng 3.5 giây.
+Backend có các bộ kiểm thử Jest cho những service nghiệp vụ. Lần chạy trước khi sửa ngày 27/11/2026 có 1 test lỗi: rule DO giảm lượng ăn 50%, sau đó heuristic dự báo DO giảm tiếp 40% trên cùng rủi ro. Engine đã được cập nhật để ưu tiên rule DO và không chồng thêm heuristic đó. Lần chạy đầy đủ sau sửa: 6 test suites, 25 test cases; 25 passed, 0 failed. Đây là kết quả kiểm thử phần mềm, không thay thế kiểm thử thực địa hoặc phần cứng.
 
 5.3 Đánh giá chất lượng mô hình AI và Đối sánh Benchmark
 
-Mô hình dự báo lượng thức ăn XGBoost Regressor được huấn luyện và đánh giá trực tiếp trên bộ dữ liệu thực nghiệm gồm 4.000 bản ghi chu kỳ nuôi tôm thẻ chân trắng (Litopenaeus vannamei) thâm canh tại khu vực Đồng bằng sông Cửu Long (tập tin shrimp_feeding_dataset.csv, xây dựng dựa trên Bảng định mức kỹ thuật thức ăn C.P. Group Việt Nam kết hợp chuỗi thời gian quan trắc môi trường ao nuôi). Bộ dữ liệu được chia theo tỷ lệ 80% huấn luyện (Training Set: 3.200 mẫu) và 20% kiểm định (Test Set: 800 mẫu) nhằm triệt tiêu hoàn toàn hiện tượng rò rỉ dữ liệu.
+Mô hình XGBoost sử dụng bộ dữ liệu shrimp_feeding_dataset.csv gồm 4.000 dòng được tạo bằng mô phỏng theo các quy tắc sinh học và môi trường, không phải dữ liệu đo thực địa. Script huấn luyện chia dữ liệu ngẫu nhiên theo tỷ lệ 80/20 (3.200 mẫu train và 800 mẫu test); do đó không diễn giải việc chia tập này là kiểm định theo thời gian hoặc bằng chứng loại trừ hoàn toàn data leakage.
 
-Chất lượng dự báo của mô hình XGBoost được đối sánh trực tiếp với các giải pháp phổ biến hiện nay, bao gồm: Bảng mẫu kinh nghiệm nông học truyền thống, Hồi quy Tuyến tính (Linear Regression) và Rừng ngẫu nhiên (Random Forest Regressor).
+Metadata hiện có ghi nhận các chỉ số sau trên tập test mô phỏng: MAE = 0.28 kg/cữ, RMSE = 0.473 kg/cữ, MAPE = 3.06%, R² = 0.992. Latency 0.45 ms là trung bình đo suy luận một mẫu trong script huấn luyện, không phải latency end-to-end của API. Các chỉ số feature importance được lưu gồm ABW 31.28%, lượng ăn cữ trước 22.02%, DO tối thiểu 19.30% và mưa sáng sớm 19.28%.
 
-Bảng 5.1. Bảng đối sánh hiệu năng dự báo lượng thức ăn giữa các mô hình
-| Thuật toán / Giải pháp | MAE (kg/cữ) | RMSE (kg/cữ) | MAPE (%) | R² Score | Thời gian suy luận (Latency) |
-| :--- | :---: | :---: | :---: | :---: | :---: |
-| Bảng mẫu nông học truyền thống | 1.12 | 1.54 | 22.4% | 0.51 | < 5 ms |
-| Hồi quy Tuyến tính (Linear Regression) | 0.85 | 1.18 | 17.2% | 0.63 | < 10 ms |
-| Random Forest Regressor | 0.48 | 0.69 | 10.3% | 0.75 | 45 ms |
-| XGBoost Regressor (Đề tài lựa chọn) | 0.28 | 0.47 | 3.06% | 0.992 | 0.45 ms |
-
-Nhận xét kết quả:
-Mô hình XGBoost Regressor do nhóm phát triển đạt độ chính xác vượt trội trên toàn bộ các thước đo đánh giá:
-- Sai số tuyệt đối trung bình (MAE) đạt 0.28 kg/cữ (thấp hơn 75% so với phương pháp thủ công và giảm 41% so với Random Forest).
-- Sai số phần trăm tuyệt đối trung bình (MAPE) đạt 3.06% (nằm trong ngưỡng xuất sắc < 5% của các bài toán dự báo sinh học nông nghiệp).
-- Hệ số xác định R² đạt 0.992, chứng minh mô hình giải thích được hơn 99% sự biến thiên của nhu cầu tiêu thụ thức ăn thực tế của đàn tôm.
-- Thời gian suy luận trung bình chỉ 0.45 ms trên CPU thông thường, đáp ứng hoàn hảo tiêu chí phản hồi tức thời trong môi trường điều khiển IoT. Phân tích độ quan trọng đặc trưng ghi nhận trọng lượng tôm bình quân (31.28%), lượng ăn cữ trước (22.02%), oxy hòa tan tối thiểu (19.30%) và mưa sáng sớm (19.28%) là 4 yếu tố chi phối mạnh mẽ nhất đến khẩu phần ăn.
+Chưa có kết quả benchmark được lưu cho bảng mẫu nông học, Linear Regression hoặc Random Forest; chỉ thêm đối sánh nếu nhóm thực sự chạy các mô hình này trên cùng tập dữ liệu và ghi lại phương pháp, cấu hình cùng kết quả.
 
 5.4 Đánh giá hiệu quả của Lớp Quy tắc An toàn (Safety Rule Engine)
 
-Để đánh giá mức độ tin cậy của chốt chặn an toàn, nhóm thực hiện đã thiết lập kịch bản mô phỏng kiểm thử áp lực gồm 200 cữ ăn với các điều kiện môi trường bất thường:
-- Kịch bản 1 (Oxy hòa tan sụt giảm nguy hiểm DO < 3.5 mg/L): Mô phỏng 50 cữ ăn trong điều kiện ao bị mất điện quạt nước. Kết quả: 100% cữ ăn (50/50) bị chặn đứng (BLOCKED) thành công, không có bất kỳ lệnh xả thức ăn nào được gửi xuống phần cứng.
-- Kịch bản 2 (Cảm biến mất tín hiệu > 30 phút): Mô phỏng 30 cữ ăn khi ngắt kết nối trạm quan trắc. Kết quả: 100% cữ ăn (30/30) bị chặn an toàn với lý do STALE_SENSOR_DATA.
-- Kịch bản 3 (Mưa lớn sáng sớm Rain >= 15 mm): Mô phỏng 40 cữ ăn. Kết quả: 100% cữ ăn được tự động điều chỉnh cắt giảm 30% định mức (ADJUSTED) theo đúng quy tắc kỹ thuật.
-- Kịch bản 4 (Dự báo xu hướng DO tụt sau ăn DO_pred < 3.2 mg/L): Mô phỏng 40 cữ ăn vào ban đêm khi tảo hô hấp mạnh. Kết quả: Hệ thống tự động kích hoạt luật Adaptive Feeding, cắt giảm 40% lượng cám và phát cảnh báo sớm cho người nuôi.
-- Kịch bản 5 (Dừng khẩn cấp một chạm E-Stop): Thực hiện 40 lần bấm nút Dừng khẩn cấp trên Mobile App trong lúc máy đang rải thức ăn. Thời gian từ lúc bấm nút trên điện thoại đến khi rơ-le ngắt điện hoàn toàn ghi nhận trung bình là 720 ms (nhanh hơn yêu cầu kỹ thuật < 800 ms).
+Backend có các luật chặn/điều chỉnh theo dữ liệu cảm biến và dự báo xu hướng DO. Để đánh giá hiệu quả, cần chạy và lưu kết quả cho từng kịch bản, bao gồm DO thấp, telemetry cũ hoặc không có, mưa lớn, DO dự báo thấp, thiết bị lỗi và E-Stop. Hiện source không có báo cáo kết quả của 200 lượt mô phỏng hoặc phép đo thời gian phản hồi phần cứng; không ghi tỷ lệ thành công hay latency phần cứng khi chưa thực hiện kiểm thử và lưu log.
 ```
+
+**Trước khi đưa vào bản cuối:** Repo AI có `test_client.py` với hai kiểm tra tích hợp thủ công (health và dự báo), không phải bộ 16 ca PyTest. Chỉ bổ sung kết quả khi nhóm chạy script và lưu output. Tương tự, các con số MQTT/ESP32/E-Stop cần có log đo trên thiết bị hoặc môi trường mô phỏng được mô tả rõ.
 
 ---
 
@@ -303,9 +292,9 @@ Chuẩn hóa và huấn luyện thành công mô hình học máy XGBoost Regres
 🟢 **NỘI DUNG MỚI THAY THẾ (COPY & DÁN ĐÈ VÀO):**
 ```text
 Hiện thực hóa giải pháp AI dự báo lượng thức ăn thông minh kết hợp khả năng giải thích (XAI):
-Chuẩn hóa và huấn luyện thành công mô hình học máy XGBoost Regressor dựa trên vector 7 đặc trưng sinh học và môi trường nước cốt lõi, vận hành độc lập trên AI Microservice (FastAPI) nạp trực tiếp từ tập dữ liệu thực nghiệm 4.000 bản ghi chuẩn C.P. Group. Mô hình đạt độ chính xác ấn tượng trên tập kiểm thử thực nghiệm: MAE = 0.28 kg/cữ, MAPE = 3.06%, R² = 0.992 và thời gian suy luận cực nhanh < 1 ms. Tích hợp thuật toán giải thích TreeSHAP giúp minh bạch hóa mức độ đóng góp (delta kg) của từng biến số môi trường, kết hợp cơ chế dự phòng Heuristic Aquaculture Fallback đảm bảo hệ thống không bao giờ bị gián đoạn.
+Triển khai mô hình XGBoost Regressor trên AI Microservice (FastAPI) với 7 đặc trưng đầu vào và giải thích dự báo bằng TreeSHAP. Theo metadata của mô hình hiện có, trên bộ dữ liệu mô phỏng 4.000 dòng được chia ngẫu nhiên 80/20, các chỉ số là MAE = 0.28 kg/cữ, RMSE = 0.473 kg/cữ, MAPE = 3.06% và R² = 0.992. Latency 0.45 ms là phép đo suy luận mức mô hình trong script huấn luyện, không đại diện cho thời gian phản hồi toàn hệ thống. Backend có heuristic fallback khi lời gọi AI lỗi hoặc timeout; cơ chế này không đồng nghĩa hệ thống được bảo đảm không gián đoạn.
 ```
 
 ---
 
-*Toàn bộ 14 điểm sửa trên đã được đối chiếu chính xác 100% với mã nguồn hiện hành trong `shrimpmate-backend` và `shrimpmate-AI`. Bạn chỉ cần mở file Word `Nhom009_KLTN.docx` và thực hiện theo từng bước là bản báo cáo sẽ hoàn toàn đồng nhất và chuẩn chỉ!*
+*Các đề xuất trong tài liệu này đã được rà soát với source hiện có của `shrimpmate-backend` và `shrimpmate-AI`. Những kết quả thực nghiệm, triển khai phần cứng, dịch vụ bên ngoài và mức độ tuân thủ tiêu chuẩn vẫn cần được xác nhận bằng log, cấu hình môi trường và tài liệu tham chiếu trước khi đưa vào báo cáo cuối.*

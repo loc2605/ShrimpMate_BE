@@ -37,6 +37,7 @@ export class TelemetryService {
       temperatureC: dto.temperatureC ?? null,
       salinityPpt: dto.salinityPpt ?? null,
       ammoniaMgL: dto.ammoniaMgL ?? null,
+      tanMgL: dto.tanMgL ?? null,
       turbidityNtu: dto.turbidityNtu ?? null,
       measuredAt: dto.measuredAt ? new Date(dto.measuredAt) : new Date(),
       rawData: dto.rawData ?? {},

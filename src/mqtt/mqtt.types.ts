@@ -7,6 +7,7 @@ export interface MqttTelemetryPayload {
   temperatureC?: number;
   salinityPpt?: number;
   ammoniaMgL?: number;
+  tanMgL?: number;
   turbidityNtu?: number;
   rawData?: Record<string, unknown>;
   isBuffered?: boolean;

@@ -41,6 +41,9 @@ export class TelemetryReading {
   @Column({ name: 'ammonia_mg_l', type: 'double precision', nullable: true })
   ammoniaMgL!: number | null;
 
+  @Column({ name: 'tan_mg_l', type: 'double precision', nullable: true })
+  tanMgL!: number | null;
+
   @Column({ name: 'turbidity_ntu', type: 'double precision', nullable: true })
   turbidityNtu!: number | null;
 

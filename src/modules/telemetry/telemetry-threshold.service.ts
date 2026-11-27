@@ -7,6 +7,7 @@ import { Device } from '../../database/entities/device.entity';
 import { AlertSeverity, AlertStatus, DeviceStatus } from '../../database/entities/enums';
 import { AlertsService } from '../alerts/alerts.service';
 import { AlertCooldownService } from '../alerts/alert-cooldown.service';
+import { QCVN_02_19_REFERENCE, QCVN_02_19_WATER_LIMITS } from '../../common/constants/qcvn-02-19.constants';
 import {
   ThresholdViolation,
   WATER_QUALITY_THRESHOLDS,
@@ -19,6 +20,8 @@ export class TelemetryThresholdService {
   constructor(
     @InjectRepository(Alert)
     private readonly alertRepository: Repository<Alert>,
+    @InjectRepository(TelemetryReading)
+    private readonly readingRepository: Repository<TelemetryReading>,
     @InjectRepository(Device)
     private readonly deviceRepository: Repository<Device>,
     private readonly alertsService: AlertsService,
@@ -32,7 +35,11 @@ export class TelemetryThresholdService {
     }
 
     // 2. Thu thập danh sách vi phạm ngưỡng
-    const violations = this.detectViolations(reading);
+    const dailyPhRange =
+      reading.ph === null || reading.ph === undefined
+        ? undefined
+        : await this.getDailyPhRange(reading);
+    const violations = this.detectViolations(reading, dailyPhRange);
     if (violations.length === 0) {
       return [];
     }
@@ -45,7 +52,10 @@ export class TelemetryThresholdService {
     return violations;
   }
 
-  private detectViolations(reading: TelemetryReading): ThresholdViolation[] {
+  private detectViolations(
+    reading: TelemetryReading,
+    dailyPhRange?: { min: number; max: number },
+  ): ThresholdViolation[] {
     const violations: ThresholdViolation[] = [];
 
     // Kiểm tra Oxy hòa tan (DO)
@@ -100,6 +110,22 @@ export class TelemetryThresholdService {
           message: `Độ pH bất thường: ${val} (khoảng tối ưu ${th.optimalMin} - ${th.optimalMax}). Cần kiểm tra độ kiềm.`,
         });
       }
+
+      if (
+        dailyPhRange &&
+        dailyPhRange.max - dailyPhRange.min > QCVN_02_19_WATER_LIMITS.ph.maxDailyVariation
+      ) {
+        const variation = Number((dailyPhRange.max - dailyPhRange.min).toFixed(2));
+        violations.push({
+          parameter: 'phDailyVariation',
+          name: 'Độ dao động pH trong ngày',
+          unit: '',
+          currentValue: variation,
+          severity: AlertSeverity.WARNING,
+          alertType: 'WARNING_PH_DAILY_VARIATION',
+          message: `Độ dao động pH trong ngày là ${variation}, vượt giới hạn ${QCVN_02_19_WATER_LIMITS.ph.maxDailyVariation} theo ${QCVN_02_19_REFERENCE}.`,
+        });
+      }
     }
 
     // Kiểm tra Nhiệt độ
@@ -129,11 +155,11 @@ export class TelemetryThresholdService {
       }
     }
 
-    // Kiểm tra Ammonia (NH3/TAN)
+    // The firmware project reports this measurement as NH3; do not treat it as TAN.
     if (reading.ammoniaMgL !== null && reading.ammoniaMgL !== undefined) {
       const val = Number(reading.ammoniaMgL);
       const th = WATER_QUALITY_THRESHOLDS.ammoniaMgL;
-      if (th.criticalMax !== undefined && val > th.criticalMax) {
+      if (th.criticalMax !== undefined && val >= th.criticalMax) {
         violations.push({
           parameter: 'ammoniaMgL',
           name: th.name,
@@ -141,7 +167,7 @@ export class TelemetryThresholdService {
           currentValue: val,
           severity: AlertSeverity.CRITICAL,
           alertType: 'CRITICAL_AMMONIA_HIGH',
-          message: `Khí độc Ammonia (NH3) vượt ngưỡng độc tính nghiêm trọng: ${val} ${th.unit} (tối đa cho phép ${th.criticalMax} ${th.unit}).`,
+          message: `NH3 phải thấp hơn ${th.criticalMax} ${th.unit} theo QCVN; giá trị đo hiện tại là ${val} ${th.unit}.`,
         });
       } else if (th.warningMax !== undefined && val > th.warningMax) {
         violations.push({
@@ -211,6 +237,36 @@ export class TelemetryThresholdService {
     }
 
     return violations;
+  }
+
+  private async getDailyPhRange(reading: TelemetryReading): Promise<{ min: number; max: number } | undefined> {
+    const measurementTime = new Date(reading.measuredAt).getTime();
+    const vietnamOffsetMs = 7 * 60 * 60 * 1000;
+    const vietnamDate = new Date(measurementTime + vietnamOffsetMs);
+    const dayStartUtc = Date.UTC(
+      vietnamDate.getUTCFullYear(),
+      vietnamDate.getUTCMonth(),
+      vietnamDate.getUTCDate(),
+    ) - vietnamOffsetMs;
+    const dayStart = new Date(dayStartUtc);
+    const dayEnd = new Date(dayStartUtc + 24 * 60 * 60 * 1000);
+
+    const result = await this.readingRepository
+      .createQueryBuilder('reading')
+      .select('MIN(reading.ph)', 'minPh')
+      .addSelect('MAX(reading.ph)', 'maxPh')
+      .where('reading.pondId = :pondId', { pondId: reading.pondId })
+      .andWhere('reading.measuredAt >= :dayStart', { dayStart })
+      .andWhere('reading.measuredAt < :dayEnd', { dayEnd })
+      .andWhere('reading.measuredAt <= :measurementTime', { measurementTime: reading.measuredAt })
+      .andWhere('reading.ph IS NOT NULL')
+      .getRawOne<{ minPh: string | null; maxPh: string | null }>();
+
+    if (result?.minPh == null || result.maxPh == null) {
+      return undefined;
+    }
+
+    return { min: Number(result.minPh), max: Number(result.maxPh) };
   }
 
   private async processViolationAlert(reading: TelemetryReading, violation: ThresholdViolation) {

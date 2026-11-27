@@ -197,6 +197,17 @@ Trước khi test feeder thật, xác nhận `type: "feeder"`, `status: "online"
 
 ## 4. Gửi telemetry và kiểm tra safety
 
+### 4.0 Kiểm tra luồng telemetry từ simulator
+
+Trước khi gửi mẫu test thủ công, xác nhận `GET {{baseUrl}}/mqtt/status` trả về `"connected": true`. Đợi ít nhất 10 giây rồi gọi:
+
+- `GET {{baseUrl}}/ponds/{{pondId}}/telemetry/history?limit=50&page=1`
+- `GET {{baseUrl}}/ponds/{{pondId}}/telemetry/latest`
+
+Trong history, tìm mẫu có `deviceId` của sensor simulator và kiểm tra `measuredAt` tăng theo thời gian. Nếu simulator gửi cả hai trường, xác nhận `ammoniaMgL` (NH3 mô phỏng) và `tanMgL` (TAN mô phỏng) được lưu riêng; độ ẩm không khí nằm trong `rawData.humidityPercent`. `GET latest` sắp theo `measuredAt`, nên mẫu thủ công có timestamp mới hơn có thể đứng đầu dù simulator vẫn đang gửi dữ liệu. Không xóa telemetry cũ để kiểm tra luồng này.
+
+Với telemetry MQTT realtime, nếu `measuredAt` của thiết bị lệch hơn 2 phút so với giờ backend, backend dùng giờ nhận làm `measuredAt` và lưu timestamp gốc cùng độ lệch trong `rawData.timestampDiagnostics`. Gói `isBuffered: true` giữ nguyên timestamp thiết bị để bảo toàn thời gian đo lịch sử.
+
 ### 4.1 Gửi mẫu nước tốt
 
 **Request:** `POST {{baseUrl}}/ponds/{{pondId}}/telemetry`
@@ -208,6 +219,7 @@ Trước khi test feeder thật, xác nhận `type: "feeder"`, `status: "online"
   "temperatureC": 29.5,
   "salinityPpt": 15,
   "ammoniaMgL": 0.008,
+  "tanMgL": 0.20,
   "turbidityNtu": 25,
   "measuredAt": "{{$isoTimestamp}}",
   "isBuffered": false,
@@ -244,6 +256,7 @@ pm.test("Telemetry được ghi nhận", () => {
   "temperatureC": 29.5,
   "salinityPpt": 15,
   "ammoniaMgL": 0.025,
+  "tanMgL": 0.20,
   "turbidityNtu": 25,
   "measuredAt": "{{$isoTimestamp}}",
   "isBuffered": false
@@ -338,6 +351,7 @@ Kỳ vọng:
 - Nếu safety cho phép, feeder online và MQTT publish thành công: HTTP `201`; response là feeding record, thường ở trạng thái `running`.
 - Lưu `id` từ response vào `recordId`.
 - Quick-feed không chờ ACK trước khi trả HTTP response. Simulator cần nhận lệnh và publish trạng thái để backend cập nhật record.
+- Với simulator hiện tại, chờ trạng thái `completed` trên topic feeder status rồi kiểm tra lại record; nếu record còn `running` sau 15 giây, kiểm tra log/Serial của simulator và payload status có đúng `recordId` không.
 - Nếu safety chặn, API vẫn tạo record với `status: "stopped"`, `safetyDecision: "blocked"` và `actualAmountKg: 0`; đây không phải response HTTP `422`.
 - Nếu thiết bị offline, broker mất kết nối hoặc publish lỗi, record có thể được lưu ở trạng thái `failed` trước khi API trả lỗi.
 
@@ -388,6 +402,7 @@ Payload trạng thái cần có `recordId`, `deviceUid`, `status` (`running`, `c
 ```
 
 Kỳ vọng HTTP `201`, record `status: "stopped"`, `safetyDecision: "blocked"`, `actualAmountKg: 0`; không gửi lệnh FEED xuống MQTT. Có thể kiểm tra alert `FEEDING_SAFETY_BLOCKED` trong danh sách alert của ao.
+Để xác nhận không phát lệnh, lắng nghe `shrimpmate/devices/{{deviceUid}}/feeder/command` trước khi gọi API và bảo đảm không có payload `command: "FEED"` mang `recordId` của cữ bị chặn.
 
 Tests cho kết quả bị chặn:
 
@@ -502,3 +517,23 @@ Kiểm tra lại bằng `GET {{baseUrl}}/devices/{{deviceId}}`. Nếu không kh�
 - HTTP `201` của E-Stop chỉ xác nhận backend lưu mode và gửi lệnh khi broker sẵn sàng; không đo latency dừng và không xác nhận ACK phần cứng.
 - Response dự báo không tự chứng minh model XGBoost đang chạy. Xác nhận qua `/admin/ai-service-status`; số liệu R²/MAE/MAPE phải lấy từ kết quả đánh giá model riêng.
 - Các rule an toàn đang chạy là rule trong DB/backend hiện tại; không gọi chúng là bộ QCVN nếu chưa đối chiếu tài liệu tiêu chuẩn và cấu hình triển khai.
+
+## 12. Chạy script E2E an toàn
+
+`test/test_closed_loop_e2e.js` không kết nối trực tiếp PostgreSQL, không xóa telemetry và không hard-code pond/device ID hay thông tin đăng nhập. Script tìm feeder theo UID rồi xác minh ao, vụ nuôi và trạng thái thiết bị trước khi test.
+
+Trong PowerShell, cấu hình token lấy từ API login và UID đúng với simulator:
+
+```powershell
+$env:SHRIMPMATE_TEST_TOKEN = "<access-token>"
+$env:SHRIMPMATE_TEST_FEEDER_UID = "<deviceUid-trong-simulator>"
+$env:SHRIMPMATE_TEST_POND_ID = "<pondId>" # tùy chọn; phải khớp ao gán cho feeder
+node test/test_closed_loop_e2e.js
+```
+
+Mặc định script chỉ chạy kiểm tra telemetry, AI và case safety bị chặn; nó vẫn tạo telemetry test, feeding record bị chặn và alert trong DB. Chỉ khi đã xác nhận UID trỏ tới **simulator, không phải máy thật**, mới bật thêm happy path cho ăn 0,1 kg:
+
+```powershell
+$env:SHRIMPMATE_ALLOW_SIMULATED_FEED = "true"
+node test/test_closed_loop_e2e.js
+```

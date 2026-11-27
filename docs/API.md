@@ -1579,6 +1579,7 @@ GET /ponds/:pondId/telemetry/latest
   "temperatureC": 28.5,
   "salinityPpt": 15.2,
   "ammoniaMgL": 0.02,
+  "tanMgL": 0.12,
   "turbidityNtu": 12.0
 }
 ```
@@ -1626,12 +1627,18 @@ POST /ponds/:pondId/telemetry
 ```json
 {
   "deviceId": "uuid-cam-bien",
+  "measuredAt": "2026-11-27T08:00:00+07:00",
   "ph": 7.9,
   "dissolvedOxygenMgL": 3.2,
   "temperatureC": 28.7,
   "salinityPpt": 15.0,
   "ammoniaMgL": 0.03,
-  "turbidityNtu": 11.8
+  "tanMgL": 0.12,
+  "turbidityNtu": 11.8,
+  "rawData": {
+    "rainMm": 0,
+    "waterChangeM3": 0.5
+  }
 }
 ```
 

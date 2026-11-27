@@ -1,5 +1,6 @@
 import { DataSource } from 'typeorm';
 import { SafetyRule } from '../entities/safety-rule.entity';
+import { QCVN_02_19_WATER_LIMITS } from '../../common/constants/qcvn-02-19.constants';
 
 export const defaultSafetyRules = [
   {
@@ -15,10 +16,14 @@ export const defaultSafetyRules = [
   },
   {
     code: 'DO_BELOW_CRITICAL',
-    name: 'Chặn cho ăn khi oxy hòa tan (DO) < 3.5 mg/L',
+    name: 'Chặn cho ăn khi DO thấp hơn giới hạn QCVN (< 3.5 mg/L)',
     priority: 1,
     isEnabled: true,
-    condition: { field: 'dissolvedOxygenMgL', operator: '<', value: 3.5 },
+    condition: {
+      field: 'dissolvedOxygenMgL',
+      operator: '<',
+      value: QCVN_02_19_WATER_LIMITS.dissolvedOxygenMgL.min,
+    },
     action: {
       decision: 'blocked',
       reason: 'Nồng độ oxy hòa tan (DO) quá thấp (< 3.5 mg/L). Cấm cho ăn để tránh tôm bị ngạt và dư thừa thức ăn gây ô nhiễm đáy ao.',
@@ -26,42 +31,50 @@ export const defaultSafetyRules = [
   },
   {
     code: 'DO_LOW_ADJUST',
-    name: 'Giảm 50% thức ăn khi DO thấp (3.5 - 4.0 mg/L)',
+    name: 'Heuristic: giảm 50% thức ăn khi DO dưới 4.0 mg/L',
     priority: 2,
     isEnabled: true,
     condition: { field: 'dissolvedOxygenMgL', operator: '<', value: 4.0 },
     action: {
       decision: 'adjusted',
       factor: 0.5,
-      reason: 'Nồng độ oxy hòa tan (DO) thấp (3.5 - 4.0 mg/L). Giảm 50% lượng thức ăn và bật quạt nước.',
+      reason: 'DO dưới 4.0 mg/L; giảm 50% lượng thức ăn theo heuristic của đề tài. Mức 4.0 mg/L là ngưỡng cảnh báo nội bộ, không phải giới hạn QCVN.',
     },
   },
   {
     code: 'TEMP_EXTREME_ADJUST',
-    name: 'Giảm 50% thức ăn khi nhiệt độ nước quá lạnh (< 22°C) hoặc quá nóng (> 34°C)',
+    name: 'Heuristic: giảm 50% thức ăn khi nhiệt độ ngoài giới hạn QCVN (18 - 33°C)',
     priority: 3,
     isEnabled: true,
     condition: {
       or: [
-        { field: 'temperatureC', operator: '<', value: 22 },
-        { field: 'temperatureC', operator: '>', value: 34 },
+        {
+          field: 'temperatureC',
+          operator: '<',
+          value: QCVN_02_19_WATER_LIMITS.temperatureC.min,
+        },
+        {
+          field: 'temperatureC',
+          operator: '>',
+          value: QCVN_02_19_WATER_LIMITS.temperatureC.max,
+        },
       ],
     },
     action: {
       decision: 'adjusted',
       factor: 0.5,
-      reason: 'Nhiệt độ nước cực đoan (< 22°C hoặc > 34°C) làm tôm giảm bắt mồi và chuyển hóa chậm. Giảm 50% lượng thức ăn.',
+      reason: 'Nhiệt độ ngoài giới hạn QCVN 18 - 33°C; giảm 50% lượng thức ăn theo heuristic của đề tài.',
     },
   },
   {
     code: 'PH_CRITICAL_BLOCK',
-    name: 'Chặn cho ăn khi pH cực đoan (< 7.0 hoặc > 9.0)',
+    name: 'Chặn cho ăn khi pH ngoài giới hạn QCVN (7.0 - 9.0)',
     priority: 4,
     isEnabled: true,
     condition: {
       or: [
-        { field: 'ph', operator: '<', value: 7.0 },
-        { field: 'ph', operator: '>', value: 9.0 },
+        { field: 'ph', operator: '<', value: QCVN_02_19_WATER_LIMITS.ph.min },
+        { field: 'ph', operator: '>', value: QCVN_02_19_WATER_LIMITS.ph.max },
       ],
     },
     action: {
@@ -71,37 +84,41 @@ export const defaultSafetyRules = [
   },
   {
     code: 'AMMONIA_HIGH_BLOCK',
-    name: 'Chặn cho ăn khi khí độc Ammonia (NH3) > 0.3 mg/L',
+    name: 'Chặn cho ăn khi NH3 đạt hoặc vượt giới hạn QCVN (0.3 mg/L)',
     priority: 5,
     isEnabled: true,
-    condition: { field: 'ammoniaMgL', operator: '>', value: 0.3 },
+    condition: {
+      field: 'ammoniaMgL',
+      operator: '>=',
+      value: QCVN_02_19_WATER_LIMITS.ammoniaMgL.maxExclusive,
+    },
     action: {
       decision: 'blocked',
-      reason: 'Nồng độ khí độc Ammonia (NH3) ở mức nguy hiểm (> 0.3 mg/L). Cấm cho ăn để tránh gây độc cho đàn tôm.',
+      reason: 'NH3 phải thấp hơn 0.3 mg/L theo QCVN. Cấm cho ăn theo chính sách an toàn của đề tài.',
     },
   },
   {
     code: 'DELTA_TAN_SPIKE_ADJUST',
-    name: 'Giảm 50% thức ăn khi biến thiên Ammonia ΔTAN > 0.5 mg/L',
+    name: 'Heuristic: giảm 50% thức ăn khi biến thiên ammonia > 0.5 mg/L',
     priority: 6,
     isEnabled: true,
     condition: { field: 'deltaTan', operator: '>', value: 0.5 },
     action: {
       decision: 'adjusted',
       factor: 0.5,
-      reason: 'Biến thiên đạm Amoniac gia tăng đột biến (ΔTAN > 0.5 mg/L). Cảnh báo tồn đọng hữu cơ đáy ao, giảm 50% lượng thức ăn.',
+      reason: 'Biến thiên ammonia > 0.5 mg/L; giảm 50% lượng thức ăn theo heuristic của đề tài, không phải ngưỡng QCVN.',
     },
   },
   {
     code: 'HEAVY_RAIN_ADJUST',
-    name: 'Giảm 30% thức ăn khi có mưa lớn sáng sớm (≥ 15 mm)',
+    name: 'Heuristic: giảm 30% thức ăn khi mưa sáng sớm (≥ 15 mm)',
     priority: 7,
     isEnabled: true,
     condition: { field: 'morningRainMm', operator: '>=', value: 15.0 },
     action: {
       decision: 'adjusted',
       factor: 0.7,
-      reason: 'Ghi nhận mưa lớn sáng sớm (≥ 15 mm) gây nguy cơ phân tầng và sụt nhiệt độ nước. Giảm 30% lượng thức ăn để chống sốc môi trường.',
+      reason: 'Mưa sáng sớm ≥ 15 mm; giảm 30% lượng thức ăn theo heuristic của đề tài, không phải ngưỡng QCVN.',
     },
   },
 ];

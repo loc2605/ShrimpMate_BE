@@ -27,6 +27,10 @@ export class RecordTelemetryDto {
 
   @IsOptional()
   @IsNumber()
+  tanMgL?: number;
+
+  @IsOptional()
+  @IsNumber()
   turbidityNtu?: number;
 
   @IsOptional()

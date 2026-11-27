@@ -17,6 +17,52 @@ import {
   MqttTelemetryPayload,
 } from './mqtt.types';
 
+const REALTIME_TELEMETRY_MAX_CLOCK_SKEW_MS = 2 * 60 * 1000;
+
+interface NormalizedMqttTelemetryTimestamp {
+  measuredAt: string;
+  rawData: Record<string, unknown>;
+  adjusted: boolean;
+  clockSkewMs?: number | null;
+}
+
+export function normalizeMqttTelemetryTimestamp(
+  deviceMeasuredAt: string | undefined,
+  rawData: Record<string, unknown> | undefined,
+  receivedAt: Date,
+  isBuffered: boolean,
+): NormalizedMqttTelemetryTimestamp {
+  const receivedAtIso = receivedAt.toISOString();
+  const initialRawData = rawData ?? {};
+  if (!deviceMeasuredAt) {
+    return { measuredAt: receivedAtIso, rawData: initialRawData, adjusted: false };
+  }
+
+  const deviceTime = new Date(deviceMeasuredAt);
+  const clockSkewMs = receivedAt.getTime() - deviceTime.getTime();
+  const isValidDeviceTime = Number.isFinite(deviceTime.getTime());
+  const shouldUseReceiveTime = !isBuffered &&
+    (!isValidDeviceTime || Math.abs(clockSkewMs) > REALTIME_TELEMETRY_MAX_CLOCK_SKEW_MS);
+
+  if (!shouldUseReceiveTime) {
+    return { measuredAt: deviceMeasuredAt, rawData: initialRawData, adjusted: false };
+  }
+
+  const timestampDiagnostics = {
+    reportedMeasuredAt: deviceMeasuredAt,
+    receivedAt: receivedAtIso,
+    clockSkewMs: isValidDeviceTime ? clockSkewMs : null,
+    adjusted: true,
+  };
+
+  return {
+    measuredAt: receivedAtIso,
+    rawData: { ...initialRawData, timestampDiagnostics },
+    adjusted: true,
+    clockSkewMs: timestampDiagnostics.clockSkewMs,
+  };
+}
+
 @Injectable()
 export class MqttService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(MqttService.name);
@@ -175,6 +221,19 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
     }
 
     const isBuffered = Boolean(data.isBuffered);
+    const receivedAt = new Date();
+    const normalizedTimestamp = normalizeMqttTelemetryTimestamp(
+      data.measuredAt,
+      data.rawData,
+      receivedAt,
+      isBuffered,
+    );
+    if (normalizedTimestamp.adjusted) {
+      this.logger.warn(
+        `[MQTT] Timestamp telemetry lệch đồng hồ thiết bị; dùng thời gian nhận từ backend ` +
+          `(deviceUid=${deviceUid}, skewMs=${normalizedTimestamp.clockSkewMs ?? 'invalid'})`,
+      );
+    }
 
     const recorded = await this.telemetryService.recordTelemetry(pondId, {
       deviceId: device?.id,
@@ -183,10 +242,11 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
       temperatureC: data.temperatureC,
       salinityPpt: data.salinityPpt,
       ammoniaMgL: data.ammoniaMgL,
+      tanMgL: data.tanMgL,
       turbidityNtu: data.turbidityNtu,
       isBuffered,
-      measuredAt: data.measuredAt ?? new Date().toISOString(),
-      rawData: data.rawData,
+      measuredAt: normalizedTimestamp.measuredAt,
+      rawData: normalizedTimestamp.rawData,
     });
 
     this.eventsGateway.broadcastTelemetry(pondId, {
@@ -198,10 +258,11 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
       temperatureC: data.temperatureC,
       salinityPpt: data.salinityPpt,
       ammoniaMgL: data.ammoniaMgL,
+      tanMgL: data.tanMgL,
       turbidityNtu: data.turbidityNtu,
       isBuffered,
-      measuredAt: data.measuredAt ?? new Date().toISOString(),
-      rawData: data.rawData,
+      measuredAt: normalizedTimestamp.measuredAt,
+      rawData: normalizedTimestamp.rawData,
     });
 
     const metrics = [

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Not, Repository } from 'typeorm';
 import { SafetyRule } from '../../database/entities/safety-rule.entity';
 import { TelemetryReading } from '../../database/entities/telemetry-reading.entity';
 import { Device } from '../../database/entities/device.entity';
@@ -51,7 +51,7 @@ export class SafetyRuleEngineService {
       deltaTan?: number;
     },
   ): Promise<SafetyEvaluationResult> {
-    // 1. Lấy telemetry mới nhất và cữ trước để tính deltaTan
+    // 1. Lấy telemetry mới nhất và hai số đo TAN gần nhất.
     const recentReadings = await this.readingRepository.find({
       where: { pondId },
       order: { measuredAt: 'DESC' },
@@ -59,11 +59,18 @@ export class SafetyRuleEngineService {
     });
     const latestReading = recentReadings[0] ?? null;
 
+    const recentTanReadings = await this.readingRepository.find({
+      where: { pondId, tanMgL: Not(IsNull()) },
+      order: { measuredAt: 'DESC' },
+      take: 2,
+    });
     let computedDeltaTan = 0;
-    if (recentReadings.length >= 2) {
-      const tanLatest = Number(recentReadings[0].ammoniaMgL) || 0;
-      const tanPrev = Number(recentReadings[1].ammoniaMgL) || 0;
-      computedDeltaTan = Number((tanLatest - tanPrev).toFixed(3));
+    if (recentTanReadings.length >= 2) {
+      const tanLatest = Number(recentTanReadings[0].tanMgL);
+      const tanPrevious = Number(recentTanReadings[1].tanMgL);
+      if (Number.isFinite(tanLatest) && Number.isFinite(tanPrevious)) {
+        computedDeltaTan = Number((tanLatest - tanPrevious).toFixed(3));
+      }
     }
     const deltaTan = contextOverrides?.deltaTan !== undefined
       ? contextOverrides.deltaTan
@@ -94,6 +101,7 @@ export class SafetyRuleEngineService {
 
     let currentDecision: SafetyDecision = SafetyDecision.ALLOWED;
     let allowedAmount = requestedAmountKg;
+    let doRuleAdjusted = false;
     const reasons: string[] = [];
     const appliedRules: string[] = [];
 
@@ -143,6 +151,9 @@ export class SafetyRuleEngineService {
           currentDecision = SafetyDecision.ADJUSTED;
           const factor = Number(rule.action?.factor) || 0.5;
           allowedAmount = Number((allowedAmount * factor).toFixed(3));
+          if (this.conditionUsesField(rule.condition, 'dissolvedOxygenMgL')) {
+            doRuleAdjusted = true;
+          }
         }
       }
     }
@@ -186,9 +197,13 @@ export class SafetyRuleEngineService {
       predictedDo1h = Number(Math.max(0, Math.min(15, rawDo1h)).toFixed(2));
       predictedDo2h = Number(Math.max(0, Math.min(15, rawDo2h)).toFixed(2));
 
-      // LUẬT ĐIỀU CHỈNH THÍCH ỨNG (Adaptive Feeding):
-      // Nếu hiện tại an toàn (DO >= 3.5 mg/L), nhưng dự báo sau 1-2h nữa DO tụt < 3.2 mg/L
-      if (currentDo >= 3.5 && (predictedDo2h < 3.2 || predictedDo1h < 3.2)) {
+      // Heuristic của đề tài; ngưỡng dự báo 3.2 mg/L không phải giới hạn QCVN.
+      // A configured DO adjustment takes precedence to avoid reducing for the same risk twice.
+      if (
+        !doRuleAdjusted &&
+        currentDo >= 3.5 &&
+        (predictedDo2h < 3.2 || predictedDo1h < 3.2)
+      ) {
         currentDecision = SafetyDecision.ADJUSTED;
         allowedAmount = Number((allowedAmount * 0.6).toFixed(3)); // Giảm 40% lượng thức ăn
         isAdaptiveAdjusted = true;
@@ -218,6 +233,7 @@ export class SafetyRuleEngineService {
             temperatureC: latestReading.temperatureC,
             salinityPpt: latestReading.salinityPpt,
             ammoniaMgL: latestReading.ammoniaMgL,
+            tanMgL: latestReading.tanMgL,
             turbidityNtu: latestReading.turbidityNtu,
           }
         : null,
@@ -268,6 +284,26 @@ export class SafetyRuleEngineService {
     return this.evaluateSingleCondition(condition as ConditionItem, reading, device, deltaTan, morningRainMm);
   }
 
+  private conditionUsesField(condition: Record<string, unknown>, field: string): boolean {
+    if (condition.field === field) {
+      return true;
+    }
+
+    return ['and', 'or'].some((operator) => {
+      const nestedConditions = condition[operator];
+      return (
+        Array.isArray(nestedConditions) &&
+        nestedConditions.some(
+          (nestedCondition) =>
+            typeof nestedCondition === 'object' &&
+            nestedCondition !== null &&
+            !Array.isArray(nestedCondition) &&
+            this.conditionUsesField(nestedCondition as Record<string, unknown>, field),
+        )
+      );
+    });
+  }
+
   private evaluateSingleCondition(
     item: ConditionItem,
     reading: TelemetryReading | null,
@@ -286,7 +322,7 @@ export class SafetyRuleEngineService {
       return false;
     }
 
-    // Kiểm tra các trường tính toán từ môi trường & thời tiết (ΔTAN, Lượng mưa)
+    // Kiểm tra các trường heuristic tính toán từ ammonia và thời tiết.
     if (item.field === 'deltaTan') {
       return this.compareNumeric(deltaTan, Number(item.value), item.operator);
     }
