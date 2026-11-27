@@ -285,22 +285,20 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
           })`;
     const metrics = [
       `pH=${formatValue(data.ph, 2)}`,
-      `Oxy hòa tan (DO)=${formatValue(data.dissolvedOxygenMgL, 2)} mg/L`,
+      `Oxy hòa tan(DO)=${formatValue(data.dissolvedOxygenMgL, 2)} mg/L`,
       `Nhiệt độ nước=${formatValue(data.temperatureC, 1)}°C`,
       `Độ mặn=${formatValue(data.salinityPpt, 1)} ppt`,
-      `Amoniac (NH3)=${formatValue(data.ammoniaMgL, 2)} mg/L`,
-      `Tổng nitơ amoni (TAN)=${formatValue(data.tanMgL, 2)} mg/L`,
+      `Amoniac(NH3)=${formatValue(data.ammoniaMgL, 2)} mg/L`,
+      `Tổng nitơ amoni(TAN)=${formatValue(data.tanMgL, 2)} mg/L`,
       `Độ đục=${formatValue(data.turbidityNtu, 0)} NTU`,
       `Nhiệt độ không khí=${formatValue(rawData['airTemperatureC'], 1)}°C`,
       `Độ ẩm không khí=${formatValue(rawData['humidityPercent'], 1)}%`,
       `Lượng mưa=${formatValue(rawData['rainMm'], 1)} mm`,
       `Lượng nước thay=${formatValue(rawData['waterChangeM3'], 2)} m³`,
-      `Mức pin=${formatValue(rawData['batteryLevel'], 0)}%`,
       `Ao=${pondId}`,
-      `Thời gian thiết bị=${data.measuredAt ?? 'không có'}`,
-      `Thời gian backend lưu=${normalizedTimestamp.measuredAt}`,
+      `Giờ thiết bị=${data.measuredAt ?? 'không có'}`,
+      `Giờ backend lưu=${normalizedTimestamp.measuredAt}`,
       `Độ lệch đồng hồ=${clockSkewSeconds}`,
-      `Dữ liệu đệm=${isBuffered}`,
     ];
 
     this.logger.log(
