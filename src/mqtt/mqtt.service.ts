@@ -265,17 +265,47 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
       rawData: normalizedTimestamp.rawData,
     });
 
+    const rawData = data.rawData ?? {};
+    const formatValue = (value: unknown, fractionDigits: number): string =>
+      typeof value === 'number'
+        ? value.toFixed(fractionDigits)
+        : value === undefined || value === null
+          ? 'không có'
+          : String(value);
+    const clockSkewSeconds =
+      normalizedTimestamp.clockSkewMs === undefined ||
+      normalizedTimestamp.clockSkewMs === null
+        ? 'không xác định'
+        : `${Math.abs(normalizedTimestamp.clockSkewMs / 1000).toFixed(2)} giây (${
+            normalizedTimestamp.clockSkewMs > 0
+              ? 'thiết bị chậm'
+              : normalizedTimestamp.clockSkewMs < 0
+                ? 'thiết bị nhanh'
+                : 'đồng bộ'
+          })`;
     const metrics = [
-      data.ph !== undefined ? `pH: ${data.ph}` : null,
-      data.dissolvedOxygenMgL !== undefined ? `DO: ${data.dissolvedOxygenMgL} mg/L` : null,
-      data.temperatureC !== undefined ? `Nhiệt độ: ${data.temperatureC}°C` : null,
-      data.salinityPpt !== undefined ? `Độ mặn: ${data.salinityPpt} ppt` : null,
-      isBuffered ? `[Gói tin đệm / isBuffered]` : null,
-    ]
-      .filter(Boolean)
-      .join(' | ');
+      `pH=${formatValue(data.ph, 2)}`,
+      `Oxy hòa tan (DO)=${formatValue(data.dissolvedOxygenMgL, 2)} mg/L`,
+      `Nhiệt độ nước=${formatValue(data.temperatureC, 1)}°C`,
+      `Độ mặn=${formatValue(data.salinityPpt, 1)} ppt`,
+      `Amoniac (NH3)=${formatValue(data.ammoniaMgL, 2)} mg/L`,
+      `Tổng nitơ amoni (TAN)=${formatValue(data.tanMgL, 2)} mg/L`,
+      `Độ đục=${formatValue(data.turbidityNtu, 0)} NTU`,
+      `Nhiệt độ không khí=${formatValue(rawData['airTemperatureC'], 1)}°C`,
+      `Độ ẩm không khí=${formatValue(rawData['humidityPercent'], 1)}%`,
+      `Lượng mưa=${formatValue(rawData['rainMm'], 1)} mm`,
+      `Lượng nước thay=${formatValue(rawData['waterChangeM3'], 2)} m³`,
+      `Mức pin=${formatValue(rawData['batteryLevel'], 0)}%`,
+      `Ao=${pondId}`,
+      `Thời gian thiết bị=${data.measuredAt ?? 'không có'}`,
+      `Thời gian backend lưu=${normalizedTimestamp.measuredAt}`,
+      `Độ lệch đồng hồ=${clockSkewSeconds}`,
+      `Dữ liệu đệm=${isBuffered}`,
+    ];
 
-    this.logger.log(`[MQTT] [${deviceUid ?? 'DEV'}] -> ${metrics || 'Đã ghi nhận dữ liệu đo'}`);
+    this.logger.log(
+      `[MQTT] [${deviceUid ?? 'DEV'}] -> [Telemetry] ${metrics.join(' | ')}`,
+    );
   }
 
   private async processFeederAckMessage(topic: string, data: MqttFeederAckPayload) {
